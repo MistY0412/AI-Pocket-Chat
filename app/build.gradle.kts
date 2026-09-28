@@ -23,7 +23,22 @@ val keystoreProperties = Properties().apply {
 
 // 端侧 ONNX Runtime 坐标——单点声明，给 implementation 依赖与 16 KB 对齐守卫（verify16kbNativeAlignment）共用，
 // 版本一处改、守卫自动跟随检查那一份的 .so（见文件末尾的守卫与 §helpers）。
-val onnxRuntimeCoordinate = "com.microsoft.onnxruntime:onnxruntime-android:1.24.3"
+// 版本号（2026-09-28 用户拍板·版本管理）：基础版本号人工定（里程碑时才改）；正式包再自动接上「提交总数」作编号，
+// 每个装到手机上的包都分得清、闪退对照表按编号存档。打包流程 = tools/release/build_release.sh。
+val appVersionBase = "0.1.0"
+
+// 提交总数：main 上只增不减 → 天然递增的 versionCode。读不到 git（下载 zip、无 git 环境）时退回 1，照常可编译。
+// 懒求值：只有正式包任务真正需要时才跑 git，日常调试编译不碰。
+val gitCommitCount: Provider<Int> = providers.provider {
+    runCatching {
+        providers.exec {
+            commandLine("git", "rev-list", "--count", "HEAD")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.get().trim().toInt()
+    }.getOrDefault(1)
+}
+
+val onnxRuntimeCoordinate ="com.microsoft.onnxruntime:onnxruntime-android:1.24.3"
 
 // 16 KB 守卫专用的「只解析、不传递」配置：单独把 ONNX Runtime 的 AAR 拉到 Gradle 缓存里，让守卫能在不经 AGP
 // 原生库变换（会改变文件落点、难稳定定位）的前提下，直接读 AAR 内 jni/<abi>/*.so 的 ELF 头核对对齐。
@@ -61,8 +76,9 @@ android {
         applicationId = "com.situ.aichat"
         minSdk = 29
         targetSdk = 36
+        // 调试包固定 1 / 基础版本号；正式包的自动编号见文件末尾 androidComponents 块。
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = appVersionBase
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -177,6 +193,17 @@ kotlin {
         // 全部编译单元一视同仁，取代「--rerun 后人工 grep -c '^w:'」的手数门禁（PITFALLS §1e/§1g 记有两次假绿）。
         // 应急临时关掉（不改文件）：命令行加 -PkotlinWarningsAsErrors=false。
         allWarningsAsErrors = providers.gradleProperty("kotlinWarningsAsErrors").orNull != "false"
+    }
+}
+
+// 正式包自动编号：versionCode = 提交总数，versionName =「基础版本号 (提交总数)」，如「0.1.0 (3414)」。
+// 只作用于 release 变体——调试包若每个提交都变编号，会让各会话的日常增量编译平白重跑。
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.outputs.forEach { output ->
+            output.versionCode.set(gitCommitCount)
+            output.versionName.set(gitCommitCount.map { "$appVersionBase ($it)" })
+        }
     }
 }
 

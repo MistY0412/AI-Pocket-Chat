@@ -14,8 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
@@ -25,11 +24,11 @@ import androidx.navigation.NamedNavArgument
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
-import com.situ.aichat.ui.designsystem.AppTheme
 
 /*
  * 预测返回「原生卡片」的导航接线（图纸 docs/handoff/2026-09-24-预测性返回原生卡片.md §4.6）：
- * 导航库只拿零视觉的定时占位转场保两页存活，画面由每页的卡片包装按 [PredictiveBackMotion] 自画。
+ * 导航库只拿零视觉的定时占位转场保两页存活，画面由每页的卡片包装按 [PredictiveBackMotion] 自画；
+ * 卡片后面的舞台与当前页柔影 / 白边见 BackCardStage.kt（微图纸 2026-09-28-预测返回舞台底）。
  */
 
 /** 入场占位：零视觉、实测零时长（初值 = 终值）；入场页本就是新的栈顶页、始终在场，不需要它留人——只为与出场成对。 */
@@ -67,22 +66,33 @@ private fun PredictiveBackCard(entryId: String, content: @Composable () -> Unit)
         return
     }
     DisposableEffect(motion, entryId) { onDispose { motion.forget(entryId) } }
-    val isDark = AppTheme.colors.isDark
-    val cardBase = AppTheme.colors.surface.base
+    val stage = rememberBackCardStageStyle()
+    val cardBase = stage.base
     val density = LocalDensity.current
     val marginPx = with(density) { BackCardSpec.MARGIN_DP.dp.toPx() }
     val enteringOffsetPx = with(density) { BackCardSpec.ENTERING_START_OFFSET_DP.dp.toPx() }
-    // 外层：满版、不缩——遮罩画在上一页之上、当前页之下（当前页 zIndex 更高），盖住卡片与空隙（原生口径）。
+    // 外层：满版、不缩（微图纸 2026-09-28-预测返回舞台底）。上一页 = 舞台（卡片之下）+ 遮罩（盖住卡片与空隙·原生口径·
+    // 当前页 zIndex 更高所以在它之下）；当前页 = 柔影（卡片之下）。没有会话时一律不画。
     Box(
         Modifier
             .fillMaxSize()
-            .drawWithContent {
-                drawContent()
-                val a = motion.scrimAlphaFor(entryId, isDark)
-                if (a > 0f) drawRect(Color.Black, alpha = a)
+            .drawWithCache {
+                val shadowPaints by lazy { BackCardShadowPaints(this) }
+                onDrawWithContent {
+                    when (motion.roleFor(entryId)) {
+                        BackCardRole.Entering -> drawBackCardStage(stage, motion.scrimFractionFor(entryId))
+                        BackCardRole.Closing ->
+                            motion.transformFor(entryId, size.width, size.height, marginPx, enteringOffsetPx)
+                                ?.let { drawBackCardShadow(stage, it, motion.shadowCornerPx(), shadowPaints) }
+                        null -> Unit
+                    }
+                    drawContent()
+                    val a = stage.tone.scrim * motion.scrimFractionFor(entryId)
+                    if (a > 0f) drawRect(stage.tint, alpha = a)
+                }
             },
     ) {
-        // 内层 = 卡片：先决定放不放（已弹出页不放置）→ 变换 + 圆角裁切 → 卡片底色（只在有角色时）→ 页面内容。
+        // 内层 = 卡片：先决定放不放（已弹出页不放置）→ 变换 + 圆角裁切 → 卡片底色（只在有角色时）→ 页面内容 → 琉璃白边（只当前页）。
         Box(
             Modifier
                 .fillMaxSize()
@@ -105,7 +115,19 @@ private fun PredictiveBackCard(entryId: String, content: @Composable () -> Unit)
                         this.shape = shape; clip = true
                     }
                 }
-                .drawBehind { if (motion.shapeFor(entryId) != null) drawRect(cardBase) },
+                .drawBehind { if (motion.shapeFor(entryId) != null) drawRect(cardBase) }
+                .drawWithCache {
+                    // 读会话 = 换会话时重建外形；逐帧只读浮现度。
+                    val shape = motion.shapeFor(entryId)
+                    val rimOutline = if (stage.rim != null && shape != null) shape.createOutline(size, layoutDirection, this) else null
+                    onDrawWithContent {
+                        drawContent()
+                        if (rimOutline != null && motion.roleFor(entryId) == BackCardRole.Closing) {
+                            motion.transformFor(entryId, size.width, size.height, marginPx, enteringOffsetPx)
+                                ?.let { drawBackCardRim(stage, rimOutline, cardEdgeEmergence(it.scale)) }
+                        }
+                    }
+                },
         ) { content() }
     }
 }

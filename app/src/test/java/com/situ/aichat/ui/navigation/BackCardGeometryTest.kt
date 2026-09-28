@@ -7,7 +7,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * 预测返回原生卡片的几何与曲线 T1（图纸 docs/handoff/2026-09-24-预测性返回原生卡片.md §7 T1-1…T1-12）。
+ * 预测返回原生卡片的几何与曲线 T1（图纸 docs/handoff/2026-09-24-预测性返回原生卡片.md §7 T1-1…T1-12；t1_10 / 10b / 10c
+ * 随微图纸 2026-09-28-预测返回舞台底 §5 改写：遮罩拆成时间系数 + 按脸浓度表，另加卡边浮现度）。
  *
  * 期望值一律由本测试**自己**按 AOSP 口径另算，绝不调被测函数求期望：
  * - 曲线：自带三次贝塞尔二分求解器（按 x 反求参数 t 再取 y）；EMPHASIZED 用**原始坐标**两段路径，不用实现里的归一控制点。
@@ -191,14 +192,43 @@ class BackCardGeometryTest {
     // ---------- T1-10 / T1-11 / T1-12 ----------
 
     @Test
-    fun t1_10_遮罩() {
-        assertEquals(0.2f, scrimAlpha(BackCardPhase.Gesture, 0f, isDark = false), 1e-6f)
-        assertEquals(0.5f, scrimAlpha(BackCardPhase.Gesture, 0f, isDark = true), 1e-6f) // 用户 09-25 拍板 0.5
-        assertEquals(0.2f, scrimAlpha(BackCardPhase.Cancelled, 0.5f, isDark = false), 1e-6f)
-        assertEquals(0.1f, scrimAlpha(BackCardPhase.Committed, 0.5f, isDark = false), 1e-6f)
-        assertEquals(0.25f, scrimAlpha(BackCardPhase.Committed, 0.5f, isDark = true), 1e-6f)
-        assertEquals(0f, scrimAlpha(BackCardPhase.Committed, 1f, isDark = false), 1e-6f)
-        assertEquals(0f, scrimAlpha(BackCardPhase.Committed, 1f, isDark = true), 1e-6f)
+    fun t1_10_遮罩时间系数() {
+        // AOSP：手势期 / 取消期恒满值；确认后按线性收尾时间退到 0。
+        assertEquals(1f, scrimFraction(BackCardPhase.Gesture, 0f), 1e-6f)
+        assertEquals(1f, scrimFraction(BackCardPhase.Gesture, 0.9f), 1e-6f)
+        assertEquals(1f, scrimFraction(BackCardPhase.Cancelled, 0.5f), 1e-6f)
+        assertEquals(0.5f, scrimFraction(BackCardPhase.Committed, 0.5f), 1e-6f)
+        assertEquals(0f, scrimFraction(BackCardPhase.Committed, 1f), 1e-6f)
+        assertEquals(0f, scrimFraction(BackCardPhase.Committed, 1.3f), 1e-6f)
+    }
+
+    @Test
+    fun t1_10b_浓度表逐值对齐对比稿() {
+        // 微图纸 2026-09-28-预测返回舞台底 §4（对比稿 predictive_back_stage_mockup.html 用户 09-28 过审）：遮罩 / 舞台加深 / 柔影。
+        fun check(t: BackCardTone, scrim: Float, deepen: Float, shadow: Float) {
+            assertEquals("$t scrim", scrim, t.scrim, 1e-6f)
+            assertEquals("$t deepen", deepen, t.stageDeepen, 1e-6f)
+            assertEquals("$t shadow", shadow, t.shadow, 1e-6f)
+        }
+        check(BackCardTone.LiuliLight, 0.16f, 0.06f, 0.38f)
+        check(BackCardTone.LiuliDark, 0.5f, 0.10f, 0.55f) // 深色遮罩 0.5 = 用户 09-25 拍板值，不变
+        check(BackCardTone.ClayLight, 0.15f, 0.05f, 0.24f)
+        check(BackCardTone.ClayDark, 0.5f, 0.10f, 0.60f)
+        assertEquals(BackCardTone.LiuliLight, BackCardTone.of(liuli = true, dark = false))
+        assertEquals(BackCardTone.LiuliDark, BackCardTone.of(liuli = true, dark = true))
+        assertEquals(BackCardTone.ClayLight, BackCardTone.of(liuli = false, dark = false))
+        assertEquals(BackCardTone.ClayDark, BackCardTone.of(liuli = false, dark = true))
+    }
+
+    @Test
+    fun t1_10c_卡边浮现度() {
+        // 浮现度 = 缩小进度（0 = 全屏、1 = 缩到 0.9）× 1.6，封顶 1；静止必须为 0（静止像素零变化的前提）。
+        assertEquals(0f, cardEdgeEmergence(1f), 1e-6f)
+        assertEquals(0.48f, cardEdgeEmergence(0.97f), 1e-4f)
+        assertEquals(0.8f, cardEdgeEmergence(0.95f), 1e-4f)
+        assertEquals(1f, cardEdgeEmergence(0.9f), 1e-6f)
+        assertEquals(1f, cardEdgeEmergence(0.8f), 1e-6f)
+        assertEquals(0f, cardEdgeEmergence(1.02f), 1e-6f)
     }
 
     @Test

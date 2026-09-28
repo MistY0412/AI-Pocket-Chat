@@ -234,11 +234,11 @@ private fun attentionText(verdict: AttentionVerdict): String? = when (verdict) {
 /**
  * 三入口共用的内心行（卷三 §4.2）：场（**读值**·修缮卷 §3.5 [fieldForRead]）+ 双压 + 算子 → [InnerStateRenderer]；`zone` 与
  * [loadScheduleData] 同源（有日程用日程时区、否则系统时区），读值 / 时（hour）/ 台词变体（内心行换气）都按它算。
- * 成长系统关 ⇒ 恒空（场系统随成长系统开关）。
+ * 成长系统关 ⇒ 恒空（场系统随成长系统开关）。有心事句时下一行附心事护栏（微图纸 2026-09-29·仍在私 note 之前）。
  */
 private fun innerLine(ctx: PromptBuilder.BuildContext, zone: ZoneId): String {
     if (!ctx.appSettings.growthSystemEnabled) return ""
-    return InnerStateRenderer.render(
+    return InnerStateRenderer.renderForPrompt(
         field = fieldForRead(ctx.character.affectField, ctx.now.toEpochMilli(), zone),
         pressure = ctx.character.relationshipPressure,
         operators = ctx.character.personaOperators,

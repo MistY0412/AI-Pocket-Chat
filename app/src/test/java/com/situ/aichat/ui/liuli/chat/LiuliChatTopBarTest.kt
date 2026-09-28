@@ -2,6 +2,7 @@ package com.situ.aichat.ui.liuli.chat
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -11,6 +12,7 @@ import com.situ.aichat.ui.components.AppHaptics
 import com.situ.aichat.ui.components.LocalAppHaptics
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -126,12 +128,12 @@ class LiuliChatTopBarTest {
         assertEquals(null, opened)
     }
 
-    // ── 卷二B T2-10：副标链首位接上「此刻」 ────────────────────────────────────
+    // ── 副标链：日程 → 「此刻」→ 心情（卷二B 接上「此刻」·2026-09-29 用户拍板改日程优先） ──────────
 
-    @Test fun innerStateLine_winsOverSchedule() {
+    @Test fun schedule_winsOverInnerStateLine() {
         topBar(innerStateLine = "有点想你。", scheduleStatus = "在写稿", moodText = "还行")
-        compose.onNodeWithText("有点想你。").assertIsDisplayed()
-        compose.onNodeWithText("在写稿").assertDoesNotExist()
+        compose.onNodeWithText("在写稿").assertIsDisplayed()
+        compose.onNodeWithText("有点想你。").assertDoesNotExist()
         compose.onNodeWithText("还行").assertDoesNotExist()
     }
 
@@ -139,5 +141,50 @@ class LiuliChatTopBarTest {
         topBar(innerStateLine = null, scheduleStatus = "在写稿", moodText = "还行")
         compose.onNodeWithText("在写稿").assertIsDisplayed()
         compose.onNodeWithText("还行").assertDoesNotExist()
+    }
+
+    @Test fun noSchedule_showsInnerStateLine_overMood() {
+        topBar(innerStateLine = "有点想你。", scheduleStatus = null, moodEmoji = "😊", moodText = "还行")
+        compose.onNodeWithText("有点想你。").assertIsDisplayed()
+        compose.onNodeWithText("😊 还行").assertDoesNotExist()
+    }
+
+    /** 日程那档截 8 字素簇加「…」；「此刻」那句原样（截断只属于日程串）。 */
+    @Test fun longSchedule_truncated_innerLineShownWhole() {
+        topBar(innerStateLine = "今天心情很好，说话都带笑。", scheduleStatus = "在咖啡店窗边看一本旧书 📖")
+        compose.onNodeWithText("在咖啡店窗边看一…").assertIsDisplayed()
+        compose.onNodeWithText("今天心情很好，说话都带笑。").assertDoesNotExist()
+    }
+
+    /** 日程结束（→ null）时交叉淡化到「此刻」那句且原样不截；日程再出现时切回日程（走 Crossfade 真路径）。 */
+    @Test fun scheduleEnds_crossfadesToInnerLine_andBack() {
+        val schedule = mutableStateOf<String?>("在写稿")
+        val inner = "今天心情很好，说话都带笑。"
+        setContent {
+            LiuliChatTopBar(
+                characterName = "云野", loading = false, avatarPath = null,
+                innerStateLine = inner, scheduleStatus = schedule.value,
+                moodEmoji = "", moodText = "", isInOfflineMode = false, characterUuid = "uuid-1",
+                onBack = {}, onOpenProfile = {}, onEndMeeting = {}, canStartCall = true, onStartCall = {},
+            )
+        }
+        compose.onNodeWithText("在写稿").assertIsDisplayed()
+        schedule.value = null
+        compose.waitForIdle()
+        compose.onNodeWithText(inner).assertIsDisplayed()
+        compose.onNodeWithText("在写稿").assertDoesNotExist()
+        schedule.value = "在散步"
+        compose.waitForIdle()
+        compose.onNodeWithText("在散步").assertIsDisplayed()
+        compose.onNodeWithText(inner).assertDoesNotExist()
+    }
+
+    // ── T1：合流纯函数 ──────────────────────────────────────────────────────
+
+    @Test fun subtitleTop_order_and_truncation() {
+        assertEquals("在写稿", liuliSubtitleTop("在写稿", "有点想你。"))
+        assertEquals("在咖啡店窗边看一…", liuliSubtitleTop("在咖啡店窗边看一本旧书 📖", "有点想你。"))
+        assertEquals("今天心情很好，说话都带笑。", liuliSubtitleTop(null, "今天心情很好，说话都带笑。"))
+        assertNull(liuliSubtitleTop(null, null))
     }
 }

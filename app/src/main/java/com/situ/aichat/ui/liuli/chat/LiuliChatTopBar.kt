@@ -51,8 +51,8 @@ import com.situ.aichat.ui.theme.LocalIsDarkTheme
  * 返回圆钮 40 / 名片胶囊 44（呼吸环 + 头像 + 名 + 副标）/ 通话圆钮 40（见面态换「结束见面」玻璃胶囊），
  * 片间 10dp、状态栏底 + 6dp 起、左右 12dp。三片各是**独立玻璃片**（导航层才上玻璃·契约 §1）。
  *
- * 副标回退链（卷二B 起完整）= **「此刻」内心一句**（[rememberLiuliInnerStateLine]）→ `scheduleStatus`
- * （截 8 字素簇·复用暖陶 [truncateScheduleSubtitle]）→ 心情行。「此刻」两个字**不显示**——对版稿里那是标注。
+ * 副标回退链（2026-09-29 用户拍板改日程优先·与暖陶同序）= `scheduleStatus`（截 8 字素簇·复用暖陶
+ * [truncateScheduleSubtitle]）→ **「此刻」内心一句**（[rememberLiuliInnerStateLine]）→ 心情行。「此刻」两个字**不显示**——对版稿里那是标注。
  * 玻璃上字色恒 `onGlass.*`，情绪色只上呼吸环。
  */
 @Composable
@@ -60,7 +60,7 @@ internal fun LiuliChatTopBar(
     characterName: String,
     loading: Boolean,
     avatarPath: String?,
-    /** 副标链首位：活人感内核【此刻】那一段的第一句（无内容 / 成长系统关 ⇒ null·A-6）。 */
+    /** 副标链第二位（日程之后·2026-09-29）：活人感内核【此刻】那一段的第一句（无内容 / 成长系统关 ⇒ null·A-6）。 */
     innerStateLine: String?,
     scheduleStatus: String?,
     moodEmoji: String,
@@ -152,8 +152,15 @@ internal fun LiuliChatTopBar(
 }
 
 /**
- * 副标唯一活槽（图纸 §4.9）：「此刻」→ 日程 → 心情行；切换 Crossfade（reduceMotion 直切）。
- * Crossfade 的 target 取「此刻 ?: 日程」——两者都空时才落到心情行，心情变化不该单独触发一次交叉淡化。
+ * 副标链前两档合流成「要显的那句」（纯函数·T1）：日程（截 8 字素簇）优先 → 「此刻」原样（内心行本就短）；
+ * 都空 ⇒ null ⇒ 由调用方落到心情行。截断在合流时做完，Crossfade 拿到的就是成品文字，不必再回头猜它是哪一档。
+ */
+internal fun liuliSubtitleTop(scheduleStatus: String?, innerStateLine: String?): String? =
+    scheduleStatus?.let(::truncateScheduleSubtitle) ?: innerStateLine
+
+/**
+ * 副标唯一活槽（图纸 §4.9·2026-09-29 改日程优先）：日程 → 「此刻」→ 心情行；切换 Crossfade（reduceMotion 直切）。
+ * Crossfade 的 target 取 [liuliSubtitleTop]——两档都空时才落到心情行，心情变化不该单独触发一次交叉淡化。
  */
 @Composable
 private fun LiuliTopBarSubtitle(
@@ -163,38 +170,29 @@ private fun LiuliTopBarSubtitle(
     moodText: String,
     color: Color,
 ) {
+    val top = liuliSubtitleTop(scheduleStatus, innerStateLine)
     if (rememberReduceMotion()) {
-        LiuliTopBarSubtitleContent(innerStateLine, scheduleStatus, moodEmoji, moodText, color)
+        LiuliTopBarSubtitleContent(top, moodEmoji, moodText, color)
     } else {
         Crossfade(
-            targetState = innerStateLine ?: scheduleStatus,
+            targetState = top,
             animationSpec = tween(AppMotion.SMOOTH_MS),
             label = "liuliTopBarSubtitle",
-        ) { top ->
-            // top = 链前两档合流的结果：等于「此刻」那句就原样显（内心行本就短），否则它是日程串、按 8 字素簇截。
-            val fromInner = top != null && top == innerStateLine
-            LiuliTopBarSubtitleContent(
-                innerStateLine = if (fromInner) top else null,
-                scheduleStatus = if (fromInner) null else top,
-                moodEmoji = moodEmoji,
-                moodText = moodText,
-                color = color,
-            )
+        ) { shown ->
+            LiuliTopBarSubtitleContent(shown, moodEmoji, moodText, color)
         }
     }
 }
 
 @Composable
 private fun LiuliTopBarSubtitleContent(
-    innerStateLine: String?,
-    scheduleStatus: String?,
+    top: String?,
     moodEmoji: String,
     moodText: String,
     color: Color,
 ) {
     val text = when {
-        innerStateLine != null -> innerStateLine
-        scheduleStatus != null -> truncateScheduleSubtitle(scheduleStatus)
+        top != null -> top
         moodEmoji.isEmpty() && moodText.isEmpty() -> return
         else -> listOf(moodEmoji, moodText).filter { it.isNotEmpty() }.joinToString(" ")
     }

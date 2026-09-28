@@ -145,9 +145,19 @@ internal class PredictiveBackMotion(
 
     fun shapeFor(entryId: String): Shape? = session?.takeIf { it.roleOf(entryId) != null }?.shape
 
-    fun scrimAlphaFor(entryId: String, isDark: Boolean): Float {
+    /** 本页在当前会话里的角色；没有会话或与本页无关 = null（舞台 / 柔影 / 白边一律挂在它上面，静止零绘制）。 */
+    fun roleFor(entryId: String): BackCardRole? = session?.roleOf(entryId)
+
+    /** 遮罩与舞台加深的时间系数：只有上一页（Entering）有，其余 0。 */
+    fun scrimFractionFor(entryId: String): Float {
         val s = session ?: return 0f
-        return if (s.roleOf(entryId) == BackCardRole.Entering) scrimAlpha(s.phase, s.clock.value, isDark) else 0f
+        return if (s.roleOf(entryId) == BackCardRole.Entering) scrimFraction(s.phase, s.clock.value) else 0f
+    }
+
+    /** 柔影圆角：四角平均 × 最小缩放，整场会话取常数（Skia 圆角矩形模糊按圆角 + 模糊缓存，逐帧变圆角会反复重算）。 */
+    fun shadowCornerPx(): Float {
+        val c = session?.corners ?: return 0f
+        return (c.topLeft + c.topRight + c.bottomRight + c.bottomLeft) / 4f * BackCardSpec.MAX_SCALE
     }
 
     /** 已弹出的页：除「本会话正在淡出的那张」外一律不放置（不可见也不可点·图纸 §0.2-4/5）。 */

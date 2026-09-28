@@ -256,4 +256,52 @@ class PromptBuilderInnerStateTest {
             assertFalse("$label 不该出现前缀", text.contains("此刻你心里："))
         }
     }
+
+    // MARK: - 心事护栏（微图纸 2026-09-29-内心行心事护栏 §5 · 真 buildMessages · 护栏字面在此重新打字 = 用户拍板原话）
+
+    private val guard = "（这是你心底的事，不是这会儿要聊的话题：对方在聊别的，就先好好接对方的话，等话头自然碰到了再流露一点，" +
+        "别硬把话题往这上面拐，也别连着几轮都绕回去；它具体指什么，以聊天记录和记忆里有的为准，别凭空编。）"
+    private val apologyInner = "此刻你心里：你想跟小明道个歉，话到嘴边又咽了回去。"
+
+    /** 在线主路【此刻】块尾部 = 实验台 RULE 形状（RESULTS-2026-09-29-innerline）：最后一条日程行 → 内心行 → 护栏 → 空行 → 使用规矩。 */
+    @Test
+    fun worryIntent_online_guardFollowsInnerLine_exactlyTheTestedShape() {
+        val text = systemText(offline = false, withSchedule = true, affectJson = "", intentJson = apologyQueue, profile = xiaoming)
+        val lastSchedule = text.indexOf("接下来 14:00 要拉花赶单")
+        assertTrue("前提：在线主路有「接下来」行", lastSchedule >= 0)
+        val afterIt = text.substring(text.indexOf('\n', lastSchedule) + 1)
+        assertTrue(
+            "内心行 + 护栏 + 空行 + 使用规矩逐字相连",
+            afterIt.startsWith("$apologyInner\n$guard\n\n你的回复可以自然反映【此刻】的真实状态"),
+        )
+    }
+
+    @Test
+    fun worryIntent_offlineAndFallback_guardBetweenInnerLineAndPrivateNote() {
+        for ((label, text) in listOf(
+            "线下" to systemText(offline = true, withSchedule = true, affectJson = "", intentJson = apologyQueue, profile = xiaoming),
+            "兜底" to systemText(offline = false, withSchedule = false, affectJson = "", intentJson = apologyQueue, profile = xiaoming),
+        )) {
+            assertTrue("$label 内心行 → 护栏 → 私 note 逐行相连", text.contains("$apologyInner\n$guard\n（这段是给你看的，不要在回复里输出。）"))
+            assertEquals("$label 护栏只出现一次", 1, text.split(guard).size - 1)
+        }
+    }
+
+    @Test
+    fun noWorry_orGrowthOff_noGuardOnAnyPath() {
+        for ((label, text) in listOf(
+            "在线·只有心情" to systemText(offline = false, withSchedule = true, affectJson = gloomy),
+            "线下·只有心情" to systemText(offline = true, withSchedule = true, affectJson = gloomy),
+            "兜底·只有心情" to systemText(offline = false, withSchedule = false, affectJson = gloomy),
+            "在线·默认列" to systemText(offline = false, withSchedule = true, affectJson = "", profile = xiaoming),
+            "在线·成长关" to systemText(
+                offline = false, withSchedule = true, affectJson = "", intentJson = apologyQueue, profile = xiaoming,
+                settings = AppSettings(growthSystemEnabled = false),
+            ),
+        )) {
+            assertFalse("$label 不该有护栏", text.contains("心底的事"))
+        }
+        // 只有心情时内心行后面直接是原来的东西（在线 = 空行 + 使用规矩）
+        assertTrue(systemText(offline = false, withSchedule = true, affectJson = gloomy).contains("$inner\n\n你的回复可以自然反映【此刻】"))
+    }
 }

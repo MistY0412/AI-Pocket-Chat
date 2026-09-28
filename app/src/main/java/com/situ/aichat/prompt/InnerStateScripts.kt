@@ -14,6 +14,14 @@ internal object InnerStateScripts {
     /** 内心行前缀（总图纸 §4.2 锁定；有意**不**登记 DirtyMessageDetector matcher·N3）。 */
     const val PREFIX = "此刻你心里："
 
+    /**
+     * 心事护栏（微图纸 2026-09-29-内心行心事护栏 §4 · **逐字锁定** = 用户拍板原话 = 实验台 RULE 原文）：内心行里有意图句 / 残留句时
+     * 紧跟下一行（`InnerStateRenderer.renderForPrompt`）。实证：对方连聊 4 轮别的，往心事上绕 1.6 轮 → 0.5 轮（RESULTS-2026-09-29-innerline）。
+     * 同 [PREFIX] 口径不登记 DirtyMessageDetector matcher。
+     */
+    const val INTENT_GUARD = "（这是你心底的事，不是这会儿要聊的话题：对方在聊别的，就先好好接对方的话，等话头自然碰到了再流露一点，" +
+        "别硬把话题往这上面拐，也别连着几轮都绕回去；它具体指什么，以聊天记录和记忆里有的为准，别凭空编。）"
+
     // MARK: - 矛盾短句 8（≤22 字·与卷二 8 条同 key 语义对齐）
 
     private val CONTRADICTION_SHORT: Map<String, String> = mapOf(

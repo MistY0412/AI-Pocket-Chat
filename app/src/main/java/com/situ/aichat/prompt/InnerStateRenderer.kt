@@ -77,6 +77,27 @@ internal object InnerStateRenderer {
     }
 
     /**
+     * 提示词侧的内心段（微图纸 2026-09-29-内心行心事护栏）：[render] 原样，另当**心事句**（意图句 / 已表达句 / 残留句·即
+     * [IntentExitRenderer.chatCandidate]，与 [render] 同一 variant）真的进了这一行时，下一行附 [InnerStateScripts.INTENT_GUARD]。
+     * 只有算子句 / 场句、或心事句因超长被跳过 ⇒ 与 [render] 逐字相同。琉璃顶栏副标读 [render]，不经这里。
+     */
+    fun renderForPrompt(
+        field: AffectField,
+        pressure: RelationshipPressure,
+        operators: List<PersonaOperator>,
+        userName: String,
+        hour: Int,
+        now: Long,
+        intents: List<CharacterIntent> = emptyList(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): String {
+        val line = render(field, pressure, operators, userName, hour, now, intents, zone)
+        if (line.isEmpty()) return line
+        val worry = IntentExitRenderer.chatCandidate(intents, userName, now, scriptVariant(now, zone)) ?: return line
+        return if (line.contains(worry)) line + "\n" + InnerStateScripts.INTENT_GUARD else line
+    }
+
+    /**
      * c01–c06 → 意图种类（映射照 zh 资源 K4-F3：**c01 = 道歉、c02 = 被哄**，与 [IntentKind] 声明序不同）；其它条件 ⇒ null。
      * [isConditionActive] 与 E20 同源去重共用这一张表。
      */

@@ -26,10 +26,22 @@ internal object BackCardSpec {
     const val HOLD_EXIT_ALPHA = 0.999f
     const val CLOSING_FADE_RATE = 5f
     const val FADE_SAFETY_MS = 34f
-    const val SCRIM_ALPHA_LIGHT = 0.2f
-    /** 深色模式遮罩：用户 2026-09-25 拍板调轻到 0.5（安卓原生 `MAX_SCRIM_ALPHA_DARK` = 0.8，后面那页压得太暗）。 */
-    const val SCRIM_ALPHA_DARK = 0.5f
     const val DEFAULT_CORNER_RADIUS_DP = 34f
+
+    // ── 当前页柔影 / 白边（微图纸 docs/handoff/2026-09-28-预测返回舞台底.md §4·对比稿逐值）──
+    // 对比稿 CSS 模糊 B 按 σ = B/2 换算成安卓 BlurMaskFilter 半径 r（σ = 0.57735r + 0.5px）。
+    /** 柔影下移。 */
+    const val SHADOW_Y_DP = 16f
+    /** 柔影模糊半径（稿 CSS 60dp）。 */
+    const val SHADOW_BLUR_DP = 52f
+    /** 贴边影模糊半径（稿 CSS 6.3dp·不下移）。 */
+    const val CONTACT_BLUR_DP = 5f
+    /** 贴边影浓度 = 柔影浓度 × 本值。 */
+    const val CONTACT_ALPHA_RATIO = 0.35f
+    /** 影 / 白边随卡片缩小浮现的速率：缩到全程 1 / 1.6 处满值。 */
+    const val EDGE_EMERGE_RATE = 1.6f
+    /** 琉璃白边可见宽（描边 2 倍宽居中画，外半被卡片裁掉）。 */
+    const val RIM_DP = 1f
 
     /** `Interpolators.BACK_GESTURE` = PathInterpolator(0.1, 0.1, 0, 1)。 */
     val BackGesture: Easing = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
@@ -115,11 +127,36 @@ internal fun closingCommitAlpha(releaseProgress: Float, t: Float): Float {
     return max(0f, 1f - t.coerceIn(0f, 1f) * BackCardSpec.COMMIT_MS / fadeMs)
 }
 
-/** 遮罩（AOSP：手势期恒为满值；确认后 满值 × (1 − 线性进度)）。 */
-internal fun scrimAlpha(phase: BackCardPhase, t: Float, isDark: Boolean): Float {
-    val full = if (isDark) BackCardSpec.SCRIM_ALPHA_DARK else BackCardSpec.SCRIM_ALPHA_LIGHT
-    return if (phase == BackCardPhase.Committed) full * (1f - t.coerceIn(0f, 1f)) else full
+/**
+ * 遮罩 / 舞台加深 / 柔影的浓度（按脸 × 深浅·微图纸 2026-09-28-预测返回舞台底 §4·对比稿逐值）。
+ * 浅色不再用安卓原生的纯黑 0.2（压在琉璃柔光上发灰），改主题影色的较轻一档；深色遮罩仍 0.5
+ * （用户 2026-09-25 拍板·安卓原生 `MAX_SCRIM_ALPHA_DARK` = 0.8，后面那页压得太暗）。
+ * [stageDeepen] 只压缝里的舞台（画在上一页卡片之下），让舞台比上一页再深一层。
+ */
+internal enum class BackCardTone(val scrim: Float, val stageDeepen: Float, val shadow: Float) {
+    LiuliLight(scrim = 0.16f, stageDeepen = 0.06f, shadow = 0.38f),
+    LiuliDark(scrim = 0.5f, stageDeepen = 0.10f, shadow = 0.55f),
+    ClayLight(scrim = 0.15f, stageDeepen = 0.05f, shadow = 0.24f),
+    ClayDark(scrim = 0.5f, stageDeepen = 0.10f, shadow = 0.60f),
+    ;
+
+    companion object {
+        fun of(liuli: Boolean, dark: Boolean): BackCardTone = when {
+            liuli && dark -> LiuliDark
+            liuli -> LiuliLight
+            dark -> ClayDark
+            else -> ClayLight
+        }
+    }
 }
+
+/** 遮罩与舞台加深的时间系数（AOSP：手势期恒为 1；确认后 1 − 线性进度）。 */
+internal fun scrimFraction(phase: BackCardPhase, t: Float): Float =
+    if (phase == BackCardPhase.Committed) 1f - t.coerceIn(0f, 1f) else 1f
+
+/** 当前页柔影 / 白边的浮现度 0..1：随卡片缩小浮现，静止（scale = 1）恒为 0。 */
+internal fun cardEdgeEmergence(scale: Float): Float =
+    ((1f - scale) / (1f - BackCardSpec.MAX_SCALE) * BackCardSpec.EDGE_EMERGE_RATE).coerceIn(0f, 1f)
 
 /** 某页在某阶段的变换（图纸 §3.2 表）。[clock] = 会话收尾时钟 0..1（Gesture 期不读）。 */
 internal fun backCardTransform(
