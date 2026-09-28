@@ -1,14 +1,12 @@
 package com.situ.aichat.ui
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -28,7 +27,6 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
@@ -37,7 +35,7 @@ import com.situ.aichat.ui.character.MemoryEditScreen
 import com.situ.aichat.ui.designsystem.AppBottomNavHeight
 import com.situ.aichat.ui.designsystem.AppBottomNavItem
 import com.situ.aichat.ui.designsystem.AppNavIcons
-import com.situ.aichat.ui.character.CharacterEditScreen
+import com.situ.aichat.ui.liuli.character.SkinnedCharacterEditScreen
 import com.situ.aichat.ui.liuli.character.SkinnedCharacterProfileScreen
 import com.situ.aichat.ui.offline.OfflineMeetingMemoryScreen
 import com.situ.aichat.ui.ourdays.OurDayPageScreen
@@ -58,9 +56,9 @@ import com.situ.aichat.ui.liuli.home.SkinnedMomentsHubScreen
 import com.situ.aichat.ui.liuli.home.SkinnedProfileScreen
 import com.situ.aichat.ui.liuli.home.rememberLiuliHomeChrome
 import com.situ.aichat.ui.voicecall.VoiceCallScreen
-import com.situ.aichat.ui.diary.ComposeDiaryScreen
-import com.situ.aichat.ui.diary.DiaryDetailScreen
-import com.situ.aichat.ui.diary.DiaryListScreen
+import com.situ.aichat.ui.liuli.diary.SkinnedComposeDiaryScreen
+import com.situ.aichat.ui.liuli.diary.SkinnedDiaryDetailScreen
+import com.situ.aichat.ui.liuli.diary.SkinnedDiaryListScreen
 import com.situ.aichat.ui.liuli.diary.SkinnedDiaryPromptPreviewScreen
 import com.situ.aichat.ui.liuli.diary.SkinnedDiaryPromptSettingsScreen
 import com.situ.aichat.ui.liuli.diary.SkinnedDiarySettingsScreen
@@ -68,13 +66,13 @@ import com.situ.aichat.ui.gift.GiftBoxScreen
 import com.situ.aichat.ui.gift.GiftReactionScreen
 import com.situ.aichat.ui.gift.GiftShopScreen
 import com.situ.aichat.ui.gift.ReceivedGiftDetailScreen
-import com.situ.aichat.ui.moments.ComposeMomentScreen
-import com.situ.aichat.ui.moments.DayMomentsScreen
-import com.situ.aichat.ui.moments.MomentAuthorScreen
-import com.situ.aichat.ui.moments.MomentDetailScreen
-import com.situ.aichat.ui.moments.MomentNotificationListScreen
+import com.situ.aichat.ui.liuli.moments.SkinnedComposeMomentScreen
+import com.situ.aichat.ui.liuli.moments.SkinnedDayMomentsScreen
+import com.situ.aichat.ui.liuli.moments.SkinnedMomentAuthorScreen
+import com.situ.aichat.ui.liuli.moments.SkinnedMomentDetailScreen
+import com.situ.aichat.ui.liuli.moments.SkinnedMomentNotificationListScreen
 import com.situ.aichat.ui.liuli.moments.SkinnedMomentSettingsScreen
-import com.situ.aichat.ui.moments.MomentsListScreen
+import com.situ.aichat.ui.liuli.moments.SkinnedMomentsListScreen
 import com.situ.aichat.ui.pet.PetAdoptionScreen
 import com.situ.aichat.ui.pet.PetDetailScreen
 import com.situ.aichat.ui.pet.PetInventoryScreen
@@ -85,31 +83,34 @@ import com.situ.aichat.ui.liuli.promptmodule.SkinnedPromptModuleSettingsScreen
 import com.situ.aichat.ui.screens.PlaceholderScreen
 import com.situ.aichat.ui.sticker.StickerImportScreen
 import com.situ.aichat.ui.sticker.StickerManagementScreen
-import com.situ.aichat.ui.story.StoryArchiveAllScreen
-import com.situ.aichat.ui.story.StoryArchiveDetailScreen
-import com.situ.aichat.ui.story.StoryBookHubScreen
-import com.situ.aichat.ui.story.StoryBookshelfScreen
+import com.situ.aichat.ui.liuli.story.SkinnedStoryArchiveAllScreen
+import com.situ.aichat.ui.liuli.story.SkinnedStoryArchiveDetailScreen
+import com.situ.aichat.ui.liuli.story.SkinnedStoryBookHubScreen
+import com.situ.aichat.ui.liuli.story.SkinnedStoryBookshelfScreen
 import com.situ.aichat.ui.worldbook.WorldBookDetailScreen
 import com.situ.aichat.ui.worldbook.WorldBookEntryEditScreen
 import com.situ.aichat.ui.liuli.worldbook.SkinnedWorldBookSettingsScreen
 import com.situ.aichat.ui.world.WorldScreen
 import com.situ.aichat.ui.worldbook.WorldBookShelfScreen
-import com.situ.aichat.ui.story.StoryChapterListScreen
-import com.situ.aichat.ui.story.StoryCreationScreen
-import com.situ.aichat.ui.story.StoryFieldEditorScreen
-import com.situ.aichat.ui.story.StoryReaderScreen
-import com.situ.aichat.ui.story.StoryTemplateWallScreen
+import com.situ.aichat.ui.liuli.story.SkinnedStoryChapterListScreen
+import com.situ.aichat.ui.liuli.story.SkinnedStoryCreationScreen
+import com.situ.aichat.ui.liuli.story.SkinnedStoryFieldEditorScreen
+import com.situ.aichat.ui.liuli.story.SkinnedStoryReaderScreen
+import com.situ.aichat.ui.liuli.story.SkinnedStoryTemplateWallScreen
 import com.situ.aichat.ui.liuli.settings.SkinnedAboutScreen
 import com.situ.aichat.ui.liuli.settings.SkinnedAgreementViewScreen
 import com.situ.aichat.ui.liuli.settings.SkinnedApiConfigEditScreen
 import com.situ.aichat.ui.liuli.settings.SkinnedApiConfigScreen
 import com.situ.aichat.ui.liuli.settings.SkinnedQrScanScreen
-import com.situ.aichat.ui.contextlog.ContextLogDetailScreen
-import com.situ.aichat.ui.contextlog.ContextLogListScreen
-import com.situ.aichat.ui.contextlog.ContextLogSegmentsScreen
+import com.situ.aichat.ui.liuli.contextlog.SkinnedContextLogCharacterScreen
+import com.situ.aichat.ui.liuli.contextlog.SkinnedContextLogEntryScreen
+import com.situ.aichat.ui.liuli.contextlog.SkinnedContextLogFailureScreen
+import com.situ.aichat.ui.liuli.contextlog.SkinnedContextLogHomeScreen
+import com.situ.aichat.ui.liuli.contextlog.SkinnedContextLogMapScreen
+import com.situ.aichat.ui.liuli.contextlog.SkinnedContextLogSentScreen
 import com.situ.aichat.ui.liuli.contextlog.SkinnedContextLogSettingsScreen
+import com.situ.aichat.ui.liuli.contextlog.SkinnedContextLogReplyScreen
 import com.situ.aichat.ui.liuli.perflog.SkinnedPerfCollectScreen
-import com.situ.aichat.ui.contextlog.ContextLogTextScreen
 import com.situ.aichat.ui.liuli.settings.SkinnedAppearanceSettingsScreen
 import com.situ.aichat.ui.liuli.settings.SkinnedContentFilterSettingsScreen
 import com.situ.aichat.ui.liuli.settings.SkinnedGrowthSettingsScreen
@@ -131,6 +132,15 @@ import com.situ.aichat.ui.liuli.settings.SkinnedWorldSettingsScreen
 import com.situ.aichat.world.WorldFocusEntry
 import com.situ.aichat.ui.liuli.settings.SkinnedTtsConfigurationScreen
 import com.situ.aichat.ui.liuli.settings.SkinnedVoiceCallSettingsScreen
+import com.situ.aichat.ui.navigation.BackCardHoldEnter
+import com.situ.aichat.ui.navigation.LocalPredictiveBackMotion
+import com.situ.aichat.ui.navigation.appEnterTransition
+import com.situ.aichat.ui.navigation.appExitTransition
+import com.situ.aichat.ui.navigation.appPopEnterTransition
+import com.situ.aichat.ui.navigation.appPopExitTransition
+import com.situ.aichat.ui.navigation.backCardComposable
+import com.situ.aichat.ui.navigation.backCardHoldExit
+import com.situ.aichat.ui.navigation.rememberPredictiveBackMotion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -281,13 +291,8 @@ fun AIChatApp(
         val topLevelRoutes = setOf(
             TopDest.Chats.route, TopDest.Contacts.route, TopDest.Moments.route, TopDest.Profile.route,
         )
-        val navSlide = 300
-        val navFade = 160
-        // 聊天页转场（2026-07-06 拍板·取代旧「壁纸沉浸重构①整页 fade」）：回归 iOS 式 push——聊天页从右整页
-        // 滑入、底页 1/4 视差左推、返回镜像。与其他详情页唯一差别是**不掺 fade**：聊天页全屏不透明（壁纸或底色），
-        // 掺 fade 会让壁纸半透明透出底页（=旧「横滑割裂」真凶）；壁纸铺满含状态栏后、是页面一部分，随整页同步滑。
-        // 冷加载晚到的壁纸淡入兜底在 ChatScreen 壁纸层。
-        fun isChatRoute(route: String?) = route?.startsWith("chat/") == true
+        // 预测返回原生卡片（图纸 2026-09-24-预测性返回原生卡片）：会话状态机；由 NavHost 的 predictivePopExitTransition 喂入。
+        val backMotion = rememberPredictiveBackMotion(navController)
         // A0·叠加层变体：Box 容纳 NavHost + 悬浮底栏叠加层。NavHost 仍按系统栏 inset 垫（保留 consume/E3），
         // 但底栏不再占 Scaffold 的 bottomBar 槽 → innerPadding 不随底栏显隐变化 → 详情页可用高度恒定（无沉降）。
         LiuliHomeHost(
@@ -337,6 +342,7 @@ fun AIChatApp(
             }
             },
         ) {
+        CompositionLocalProvider(LocalPredictiveBackMotion provides backMotion) {
         NavHost(
             navController = navController,
             startDestination = TopDest.Chats.route,
@@ -344,50 +350,16 @@ fun AIChatApp(
             // 各屏自管 inset（M3 Scaffold/TopAppBar 默认 contentWindowInsets 自垫；4 个沉浸屏背景 fillMaxSize
             // 自然铺满系统栏后、顶/底栏各自 statusBarsPadding/navigationBarsPadding）。取代旧 E3 的 padding+consume。
             modifier = Modifier.fillMaxSize(),
-            // 13.3 / nav-shell-1：详情页 push/pop 从右滑入 / 滑出（带视差，≈ iOS NavigationStack；配合 manifest 的
-            // enableOnBackInvokedCallback，预测式返回手势会跟手预览上一屏）；底部 tab 之间切换不横滑、只交叉淡入（≈ iOS TabView）。
-            enterTransition = {
-                val from = initialState.destination.route
-                val to = targetState.destination.route
-                val tab = (from ?: "") in topLevelRoutes && (to ?: "") in topLevelRoutes
-                when {
-                    isChatRoute(from) || isChatRoute(to) -> slideInHorizontally(tween(navSlide)) { it }
-                    tab -> fadeIn(tween(navFade))
-                    else -> slideInHorizontally(tween(navSlide)) { it } + fadeIn(tween(navSlide))
-                }
-            },
-            exitTransition = {
-                val from = initialState.destination.route
-                val to = targetState.destination.route
-                val tab = (from ?: "") in topLevelRoutes && (to ?: "") in topLevelRoutes
-                when {
-                    isChatRoute(from) || isChatRoute(to) -> slideOutHorizontally(tween(navSlide)) { -it / 4 }
-                    tab -> fadeOut(tween(navFade))
-                    else -> slideOutHorizontally(tween(navSlide)) { -it / 4 } + fadeOut(tween(navSlide))
-                }
-            },
-            popEnterTransition = {
-                val from = initialState.destination.route
-                val to = targetState.destination.route
-                val tab = (from ?: "") in topLevelRoutes && (to ?: "") in topLevelRoutes
-                when {
-                    isChatRoute(from) || isChatRoute(to) -> slideInHorizontally(tween(navSlide)) { -it / 4 }
-                    tab -> fadeIn(tween(navFade))
-                    else -> slideInHorizontally(tween(navSlide)) { -it / 4 } + fadeIn(tween(navSlide))
-                }
-            },
-            popExitTransition = {
-                val from = initialState.destination.route
-                val to = targetState.destination.route
-                val tab = (from ?: "") in topLevelRoutes && (to ?: "") in topLevelRoutes
-                when {
-                    isChatRoute(from) || isChatRoute(to) -> slideOutHorizontally(tween(navSlide)) { it }
-                    tab -> fadeOut(tween(navFade))
-                    else -> slideOutHorizontally(tween(navSlide)) { it } + fadeOut(tween(navSlide))
-                }
-            },
+            // 常规转场（push / 非手势 pop）照旧——2026-09-24 原样搬到 ui/navigation/AppNavTransitions.kt（只搬不改）。
+            enterTransition = { appEnterTransition(topLevelRoutes) },
+            exitTransition = { appExitTransition(topLevelRoutes) },
+            popEnterTransition = { appPopEnterTransition(topLevelRoutes) },
+            popExitTransition = { appPopExitTransition(topLevelRoutes) },
+            // 手势返回：导航库只拿占位转场保两页存活，画面由 backCardComposable 的卡片包装自画（占位与会话同生）。
+            predictivePopEnterTransition = { BackCardHoldEnter },
+            predictivePopExitTransition = { edge -> backCardHoldExit(backMotion, edge) },
         ) {
-            composable(TopDest.Chats.route) {
+            backCardComposable(TopDest.Chats.route) {
                 // A1：内容铺满整窗、延伸到半透底栏后；底部留白下沉进列表 contentPadding，末条仍能滑到栏上方（过渡丝滑化·A1）。
                 SkinnedChatListScreen(
                     // 批4 4-7：launchSingleTop 防快速双击同一会话压两个同会话页/双 VM。
@@ -396,7 +368,7 @@ fun AIChatApp(
                     bottomContentPadding = AppBottomNavHeight,
                 )
             }
-            composable(TopDest.Contacts.route) {
+            backCardComposable(TopDest.Contacts.route) {
                 SkinnedContactsScreen(
                     onOpenChat = { conversationUuid -> navController.navigate("chat/$conversationUuid") },
                     onCreateCharacter = { navController.navigate("character/new") },
@@ -407,7 +379,7 @@ fun AIChatApp(
             }
             // P7.2.7 朋友圈（M06）：枢纽（Tab）→ 信息流 → 发布。详情/通知列表/角色动态 → 7.2.8（现路由占位）；
             // 故事 → P11、宠物 → P8（占位）。
-            composable(TopDest.Moments.route) {
+            backCardComposable(TopDest.Moments.route) {
                 SkinnedMomentsHubScreen(
                     onOpenFeed = { navController.navigate("momentsFeed") },
                     onOpenDiary = { navController.navigate("diary") },
@@ -421,8 +393,8 @@ fun AIChatApp(
                     onOpenPetHub = { navController.navigate("momentsPet") { launchSingleTop = true } },
                 )
             }
-            composable("momentsFeed") {
-                MomentsListScreen(
+            backCardComposable("momentsFeed") {
+                SkinnedMomentsListScreen(
                     onBack = { navController.popBackStack() },
                     onCompose = { navController.navigate("momentCompose") },
                     onOpenPost = { uuid -> navController.navigate("moment/$uuid") },
@@ -430,51 +402,51 @@ fun AIChatApp(
                     onOpenCharacterMoments = { uuid -> navController.navigate("characterMoments/$uuid") },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "characterMoments/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) {
-                MomentAuthorScreen(
+                SkinnedMomentAuthorScreen(
                     onBack = { navController.popBackStack() },
                     onOpenPost = { uuid -> navController.navigate("moment/$uuid") },
                 )
             }
-            composable("userMoments") {
-                MomentAuthorScreen(
+            backCardComposable("userMoments") {
+                SkinnedMomentAuthorScreen(
                     onBack = { navController.popBackStack() },
                     onOpenPost = { uuid -> navController.navigate("moment/$uuid") },
                 )
             }
-            composable("momentCompose") {
-                ComposeMomentScreen(onClose = { navController.popBackStack() })
+            backCardComposable("momentCompose") {
+                SkinnedComposeMomentScreen(onClose = { navController.popBackStack() })
             }
-            composable(
+            backCardComposable(
                 route = "moment/{uuid}",
                 arguments = listOf(navArgument("uuid") { type = NavType.StringType }),
             ) {
-                MomentDetailScreen(onBack = { navController.popBackStack() })
+                SkinnedMomentDetailScreen(onBack = { navController.popBackStack() })
             }
-            composable("momentNotifications") {
-                MomentNotificationListScreen(
+            backCardComposable("momentNotifications") {
+                SkinnedMomentNotificationListScreen(
                     onBack = { navController.popBackStack() },
                     onOpenPost = { uuid -> navController.navigate("moment/$uuid") },
                 )
             }
-            composable("momentSettings") {
+            backCardComposable("momentSettings") {
                 SkinnedMomentSettingsScreen(onBack = { navController.popBackStack() })
             }
-            composable("stickerManagement") {
+            backCardComposable("stickerManagement") {
                 StickerManagementScreen(
                     onBack = { navController.popBackStack() },
                     onImport = { navController.navigate("stickerImport") },
                 )
             }
-            composable("stickerImport") {
+            backCardComposable("stickerImport") {
                 StickerImportScreen(onBack = { navController.popBackStack() })
             }
             // P11 互动故事（11.1h）：朋友圈枢纽 → 书架 → 章节列表 → 阅读器。阅读器=11.1i、创建/设定=11.1j（暂占位）。
-            composable("momentsStory") {
-                StoryBookshelfScreen(
+            backCardComposable("momentsStory") {
+                SkinnedStoryBookshelfScreen(
                     onBack = { navController.popBackStack() },
                     onOpenStory = { storyId -> navController.navigate("story/$storyId") },
                     onOpenChapter = { chapterId -> navController.navigate("storyReader/$chapterId") },
@@ -485,22 +457,22 @@ fun AIChatApp(
                 )
             }
             // ST8 结局档案卡：书架档案分组「完结卡」tap 打开（全屏·分享长图 / 导出全文）。
-            composable(
+            backCardComposable(
                 route = "storyArchive/{storyId}",
                 arguments = listOf(navArgument("storyId") { type = NavType.StringType }),
             ) {
-                StoryArchiveDetailScreen(onBack = { navController.popBackStack() })
+                SkinnedStoryArchiveDetailScreen(onBack = { navController.popBackStack() })
             }
             // ST8 结局档案全览：档案区「全部 ›」→ 全部已完结封面网格。
-            composable("storyArchiveAll") {
-                StoryArchiveAllScreen(
+            backCardComposable("storyArchiveAll") {
+                SkinnedStoryArchiveAllScreen(
                     onBack = { navController.popBackStack() },
                     onOpenArchive = { storyId -> navController.navigate("storyArchive/$storyId") },
                 )
             }
             // ST7b 创建两层流：模板墙（默认入口）→ 开书 sheet 直开 / 尾卡·改一改再开 → 高级自定义（storyCreation）。
-            composable("storyTemplateWall") {
-                StoryTemplateWallScreen(
+            backCardComposable("storyTemplateWall") {
+                SkinnedStoryTemplateWallScreen(
                     onBack = { navController.popBackStack() },
                     onOpenCustom = { templateId ->
                         if (templateId == null) navController.navigate("storyCreation")
@@ -510,12 +482,12 @@ fun AIChatApp(
                     onCreated = { navController.popBackStack("momentsStory", inclusive = false) },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "story/{storyId}",
                 arguments = listOf(navArgument("storyId") { type = NavType.StringType }),
             ) { backStackEntry ->
                 val storyId = backStackEntry.arguments?.getString("storyId").orEmpty()
-                StoryChapterListScreen(
+                SkinnedStoryChapterListScreen(
                     onBack = { navController.popBackStack() },
                     // 深链兜底（2026-08-04）：解锁通知落到已删书——书架在栈上就回书架（同书页 onStoryGone 姿势）；
                     // 深链冷启栈上没书架则普通返回（pop 指定路由失败返回 false，绝不能让屏幕停着不动）。
@@ -526,11 +498,11 @@ fun AIChatApp(
                     onOpenSettings = { navController.navigate("storySettings/$storyId") },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "storyReader/{chapterId}",
                 arguments = listOf(navArgument("chapterId") { type = NavType.StringType }),
             ) {
-                StoryReaderScreen(
+                SkinnedStoryReaderScreen(
                     onBack = { navController.popBackStack() },
                     // 卷三 §4.6：⋮ 菜单「书页」——与章节列表屏同一条路由（书页取代旧故事设定屏·卷二 D-10）。
                     onOpenBookHub = { id -> navController.navigate("storySettings/$id") },
@@ -544,24 +516,24 @@ fun AIChatApp(
                     },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "storyCreation?templateId={templateId}",
                 arguments = listOf(navArgument("templateId") { type = NavType.StringType; defaultValue = "" }),
             ) {
                 // templateId 非空 = 从开书 sheet「改一改再开」带模板预填值进来（VM init 按 arg 起底表单）。
-                StoryCreationScreen(
+                SkinnedStoryCreationScreen(
                     onBack = { navController.popBackStack() },
                     // 创建后回书架（新故事以「生成中」卡片出现，首章在前台服务里生成·跳过模板墙）。
                     onCreated = { navController.popBackStack("momentsStory", inclusive = false) },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "storySettings/{storyId}",
                 arguments = listOf(navArgument("storyId") { type = NavType.StringType }),
             ) { backStackEntry ->
                 val storyId = backStackEntry.arguments?.getString("storyId").orEmpty()
                 // 卷二 D-10：书页取代旧故事设定屏（路由名与两处调用点复用，入口零改）。
-                StoryBookHubScreen(
+                SkinnedStoryBookHubScreen(
                     onBack = { navController.popBackStack() },
                     onStoryGone = { navController.popBackStack("momentsStory", inclusive = false) },
                     onOpenChapter = { chapterId -> navController.navigate("storyReader/$chapterId") },
@@ -570,25 +542,25 @@ fun AIChatApp(
                 )
             }
             // 卷二 §11 统一编辑页：书页两 Tab 的全部文本设定（15 字段 + 全局忌口变体）共用这一个全屏长相。
-            composable(
+            backCardComposable(
                 route = "storyFieldEditor/{storyId}/{fieldKey}",
                 arguments = listOf(
                     navArgument("storyId") { type = NavType.StringType },
                     navArgument("fieldKey") { type = NavType.StringType },
                 ),
-            ) { StoryFieldEditorScreen(onBack = { navController.popBackStack() }) }
-            composable("storyGlobalSettings") { // 卷四 §4.2 全局创作偏好子屏（storyId 段 "-" 占位·全局分支不读它）
+            ) { SkinnedStoryFieldEditorScreen(onBack = { navController.popBackStack() }) }
+            backCardComposable("storyGlobalSettings") { // 卷四 §4.2 全局创作偏好子屏（storyId 段 "-" 占位·全局分支不读它）
                 SkinnedStoryGlobalSettingsScreen({ navController.popBackStack() }, { key -> navController.navigate("storyFieldEditor/-/$key") })
             }
             // 宠物（M11）：枢纽列表 → 详情（按是否有宠物显示详情或领养进度）→ 领养。
-            composable("momentsPet") {
+            backCardComposable("momentsPet") {
                 PetListScreen(
                     onOpenPet = { uuid -> navController.navigate("petDetail/$uuid") },
                     onBack = { navController.popBackStack() },
                 )
             }
             // W9a 世界系统星球层：全屏 GL 星球（非 topRoute → 底栏自然隐藏）。入口=动态页临时行 / 世界通知深链。
-            composable("world") {
+            backCardComposable("world") {
                 WorldScreen(
                     onBack = { navController.popBackStack() },
                     onOpenChat = { conversationUuid -> navController.navigate("chat/$conversationUuid") { launchSingleTop = true } },
@@ -597,24 +569,24 @@ fun AIChatApp(
                 )
             }
             // 世界系统 W13 设置二级页（图纸 §4.3/§4.4）。
-            composable("worldSettings") {
+            backCardComposable("worldSettings") {
                 SkinnedWorldSettingsScreen(onBack = { navController.popBackStack() })
             }
             // 世界书 WB7（UI 名「设定集」）：书架 → 书详情；条目编辑器随 WB7b、触发设置随 WB7c。
-            composable("worldBooks") {
+            backCardComposable("worldBooks") {
                 WorldBookShelfScreen(
                     onBack = { navController.popBackStack() },
                     onOpenBook = { bookUuid -> navController.navigate("worldBook/$bookUuid") },
                     onOpenSettings = { navController.navigate("worldBookSettings") },
                 )
             }
-            composable("worldBookSettings") {
+            backCardComposable("worldBookSettings") {
                 SkinnedWorldBookSettingsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenMemorySettings = { navController.navigate("memorySettings") },
                 )
             }
-            composable(
+            backCardComposable(
                 "worldBook/{bookUuid}",
                 arguments = listOf(navArgument("bookUuid") { type = NavType.StringType }),
             ) { backStackEntry ->
@@ -631,7 +603,7 @@ fun AIChatApp(
                     },
                 )
             }
-            composable(
+            backCardComposable(
                 "worldBookEntry/{bookUuid}?entryUuid={entryUuid}&guide={guide}",
                 arguments = listOf(
                     navArgument("bookUuid") { type = NavType.StringType },
@@ -649,7 +621,7 @@ fun AIChatApp(
             ) {
                 WorldBookEntryEditScreen(onDone = { navController.popBackStack() })
             }
-            composable(
+            backCardComposable(
                 "petDetail/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) { backStackEntry ->
@@ -667,20 +639,20 @@ fun AIChatApp(
                     onReactionConsumed = { backStackEntry.savedStateHandle["petReaction"] = null },
                 )
             }
-            composable(
+            backCardComposable(
                 "petAdoption/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) {
                 PetAdoptionScreen(onClose = { navController.popBackStack() })
             }
             // P9.3c 宠物商店 / 背包（按 characterUuid 定位宠物）。
-            composable(
+            backCardComposable(
                 "petShop/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) {
                 PetShopScreen(onClose = { navController.popBackStack() })
             }
-            composable(
+            backCardComposable(
                 "petInventory/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) {
@@ -691,23 +663,23 @@ fun AIChatApp(
                 )
             }
             // P9.2d 礼物店（M09）。无参=店内选对象；giftShop/{uuid}=带入角色（聊天等入口，暂未接）。
-            composable("userWallet") {
+            backCardComposable("userWallet") {
                 UserWalletScreen(
                     onBack = { navController.popBackStack() },
                     onOpenGiftShop = { navController.navigate("giftShop") },
                     onOpenRedeemCode = { navController.navigate("redeemCode") },
                 )
             }
-            composable("redeemCode") {
+            backCardComposable("redeemCode") {
                 SkinnedRedeemCodeScreen(onClose = { navController.popBackStack() })
             }
-            composable("giftShop") {
+            backCardComposable("giftShop") {
                 GiftShopScreen(
                     onClose = { navController.popBackStack() },
                     onNavigateToReaction = { recordUuid -> navController.navigate("giftReaction/$recordUuid?send=true") },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "giftShop/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) {
@@ -717,7 +689,7 @@ fun AIChatApp(
                 )
             }
             // 反应页：send=true 送礼流程（完成回上一页）；send=false 收礼盒回放（d-5，标准返回）。
-            composable(
+            backCardComposable(
                 route = "giftReaction/{recordUuid}?send={send}",
                 arguments = listOf(
                     navArgument("recordUuid") { type = NavType.StringType },
@@ -732,20 +704,20 @@ fun AIChatApp(
                 )
             }
             // 收礼盒（Profile 入口）：收到/送出分段；点卡分流 DIY 详情 / 收礼详情 / 反应回放。
-            composable("giftBox") {
+            backCardComposable("giftBox") {
                 GiftBoxScreen(
                     onBack = { navController.popBackStack() },
                     onOpenReaction = { recordUuid -> navController.navigate("giftReaction/$recordUuid?send=false") },
                     onOpenReceived = { recordUuid -> navController.navigate("receivedGift/$recordUuid") },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "receivedGift/{recordUuid}",
                 arguments = listOf(navArgument("recordUuid") { type = NavType.StringType }),
             ) {
                 ReceivedGiftDetailScreen(onBack = { navController.popBackStack() })
             }
-            composable(TopDest.Profile.route) {
+            backCardComposable(TopDest.Profile.route) {
                 SkinnedProfileScreen(
                     onEditProfile = { navController.navigate("userProfile/edit") },
                     onOpenUserMoments = { navController.navigate("userMoments") },
@@ -757,7 +729,7 @@ fun AIChatApp(
                 )
             }
             // Fable5「我」页重构：独立设置页（从 ProfileScreen 抽出·9 组重分组）。
-            composable("settings") {
+            backCardComposable("settings") {
                 SkinnedSettingsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenApiConfig = { navController.navigate("apiConfig") },
@@ -787,7 +759,7 @@ fun AIChatApp(
                     onOpenAbout = { navController.navigate("about") },
                 )
             }
-            composable("apiConfig") { backStackEntry ->
+            backCardComposable("apiConfig") { backStackEntry ->
                 // 13.10b 扫码导入：扫码屏把识别出的二维码文本放回本条目的 savedStateHandle，回到此屏后预填表单。
                 val scanned by backStackEntry.savedStateHandle
                     .getStateFlow<String?>(KEY_SCANNED_API_CONFIG, null)
@@ -800,7 +772,7 @@ fun AIChatApp(
                     onScanConsumed = { backStackEntry.savedStateHandle[KEY_SCANNED_API_CONFIG] = null },
                 )
             }
-            composable("apiConfig/scan") {
+            backCardComposable("apiConfig/scan") {
                 SkinnedQrScanScreen(
                     onResult = { text ->
                         navController.previousBackStackEntry
@@ -810,16 +782,16 @@ fun AIChatApp(
                     onBack = { navController.popBackStack() },
                 )
             }
-            composable("apiFunctions") {
+            backCardComposable("apiFunctions") {
                 SkinnedApiFunctionAssignmentScreen(onBack = { navController.popBackStack() })
             }
-            composable("ttsConfig") {
+            backCardComposable("ttsConfig") {
                 SkinnedTtsConfigurationScreen(onBack = { navController.popBackStack() })
             }
-            composable("voiceCallSettings") {
+            backCardComposable("voiceCallSettings") {
                 SkinnedVoiceCallSettingsScreen(onBack = { navController.popBackStack() })
             }
-            composable(
+            backCardComposable(
                 route = "apiConfig/edit/{uuid}",
                 arguments = listOf(navArgument("uuid") { type = NavType.StringType }),
             ) { backStackEntry ->
@@ -828,10 +800,10 @@ fun AIChatApp(
                     onBack = { navController.popBackStack() },
                 )
             }
-            composable("userProfile/edit") {
+            backCardComposable("userProfile/edit") {
                 UserProfileEditScreen(onClose = { navController.popBackStack() })
             }
-            composable(
+            backCardComposable(
                 route = "backup?focusFolder={focusFolder}",
                 arguments = listOf(navArgument("focusFolder") { type = NavType.BoolType; defaultValue = false }),
             ) { entry ->
@@ -841,153 +813,179 @@ fun AIChatApp(
                     autoPickFolder = entry.arguments?.getBoolean("focusFolder") == true,
                 )
             }
-            composable("backgroundReliability") {
+            backCardComposable("backgroundReliability") {
                 SkinnedBackgroundReliabilityScreen(onBack = { navController.popBackStack() })
             }
-            composable("calendarAwareness") {
+            backCardComposable("calendarAwareness") {
                 SkinnedCalendarAwarenessScreen(onBack = { navController.popBackStack() })
             }
-            composable("notificationSettings") {
+            backCardComposable("notificationSettings") {
                 SkinnedNotificationSettingsScreen(onBack = { navController.popBackStack() })
             }
-            composable("immersiveSettings") {
+            backCardComposable("immersiveSettings") {
                 SkinnedImmersiveSettingsScreen(onBack = { navController.popBackStack() })
             }
-            composable("appearance") {
+            backCardComposable("appearance") {
                 SkinnedAppearanceSettingsScreen(onBack = { navController.popBackStack() })
             }
             // SETTINGS_REORG D3：记忆设置 + 记忆提示词二合一 hub，沿用 memorySettings 路由。
-            composable("memorySettings") {
+            backCardComposable("memorySettings") {
                 SkinnedMemoryHubScreen(onBack = { navController.popBackStack() })
             }
-            composable("systemToggles") {
+            backCardComposable("systemToggles") {
                 SkinnedSystemTogglesScreen(onBack = { navController.popBackStack() })
             }
-            composable("growthSettings") {
+            backCardComposable("growthSettings") {
                 SkinnedGrowthSettingsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenObservatory = { navController.navigate("kernelObservatory") },
                 )
             }
             // 活人感内核卷零：开发者调试页（DEBUG 守卫在 Screen 内部，本文件只接线）。
-            composable("kernelObservatory") {
+            backCardComposable("kernelObservatory") {
                 SkinnedKernelObservatoryScreen(onBack = { navController.popBackStack() })
             }
-            composable("replyRuleSettings") {
+            backCardComposable("replyRuleSettings") {
                 SkinnedReplyRuleSettingsScreen(onBack = { navController.popBackStack() })
             }
-            composable("contentFilterSettings") {
+            backCardComposable("contentFilterSettings") {
                 SkinnedContentFilterSettingsScreen(onBack = { navController.popBackStack() })
             }
-            // 批 D·D-3 上下文日志：列表 / 详情 / 分段 / 全文 / 保留设置（id 经 route arg → ViewModel SavedStateHandle）。
-            composable("contextLog") {
-                ContextLogListScreen(
+            // 四期·图纸四：上下文日志——首页三分段（tab 可空：带参数时覆盖一次并记住）/ 角色页 / 条目页四种 / 回复全文 / 设置（两张脸选脸包装）。
+            backCardComposable(
+                route = "contextLog?tab={tab}",
+                arguments = listOf(navArgument("tab") { type = NavType.StringType; nullable = true; defaultValue = null }),
+            ) {
+                SkinnedContextLogHomeScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenDetail = { id -> navController.navigate("contextLog/detail/$id") },
+                    onOpenCharacter = { key -> navController.navigate("contextLog/character/${Uri.encode(key)}") },
+                    onOpenEntry = { id, failed -> navController.navigate(if (failed) "contextLog/failure/$id" else "contextLog/entry/$id") },
                     onOpenSettings = { navController.navigate("contextLog/settings") },
                 )
             }
-            composable("contextLog/detail/{id}") {
-                ContextLogDetailScreen(
+            backCardComposable("contextLog/character/{key}") {
+                SkinnedContextLogCharacterScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenSegments = { id -> navController.navigate("contextLog/segments/$id") },
-                    onOpenContextText = { id -> navController.navigate("contextLog/text/$id/context") },
-                    onOpenResponseText = { id -> navController.navigate("contextLog/text/$id/response") },
+                    onOpenEntry = { id, failed -> navController.navigate(if (failed) "contextLog/failure/$id" else "contextLog/entry/$id") },
                 )
             }
-            composable("contextLog/segments/{id}") {
-                ContextLogSegmentsScreen(onBack = { navController.popBackStack() })
-            }
-            composable("contextLog/text/{id}/{kind}") { backStackEntry ->
-                ContextLogTextScreen(
-                    isContext = backStackEntry.arguments?.getString("kind") != "response",
+            backCardComposable("contextLog/entry/{id}") {
+                SkinnedContextLogEntryScreen(
                     onBack = { navController.popBackStack() },
+                    onOpenEntry = { id, failed -> navController.navigate(if (failed) "contextLog/failure/$id" else "contextLog/entry/$id") },
+                    onOpenMap = { id -> navController.navigate("contextLog/map/$id") },
+                    onOpenSent = { id -> navController.navigate("contextLog/sent/$id") },
+                    onOpenReply = { id -> navController.navigate("contextLog/reply/$id") },
                 )
             }
-            composable("contextLog/settings") {
+            backCardComposable("contextLog/map/{id}") {
+                SkinnedContextLogMapScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenSaver = { navController.navigate("promptModules") },
+                )
+            }
+            backCardComposable("contextLog/sent/{id}") {
+                SkinnedContextLogSentScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenLogSettings = { navController.navigate("contextLog/settings") },
+                    onOpenMap = { id -> navController.navigate("contextLog/map/$id") },
+                )
+            }
+            backCardComposable("contextLog/failure/{id}") {
+                SkinnedContextLogFailureScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenApiSettings = { navController.navigate("apiConfig") },
+                )
+            }
+            backCardComposable("contextLog/reply/{id}") {
+                SkinnedContextLogReplyScreen(onBack = { navController.popBackStack() })
+            }
+            backCardComposable("contextLog/settings") {
                 SkinnedContextLogSettingsScreen(onBack = { navController.popBackStack() })
             }
             // 性能采集（性能专项卷 0）：手机自采性能数字 + 一键导出报告。设置 ⑧「数据与诊断」组·高级门后。
-            composable("perfCollect") {
+            backCardComposable("perfCollect") {
                 SkinnedPerfCollectScreen(onBack = { navController.popBackStack() })
             }
-            composable("about") {
+            backCardComposable("about") {
                 SkinnedAboutScreen(
                     onBack = { navController.popBackStack() },
                     onOpenAgreement = { navController.navigate("agreementView") },
                 )
             }
-            composable("agreementView") {
+            backCardComposable("agreementView") {
                 SkinnedAgreementViewScreen(onBack = { navController.popBackStack() })
             }
-            composable("promptModules") {
+            backCardComposable("promptModules") {
                 SkinnedPromptModuleSettingsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenImmersiveSettings = { navController.navigate("immersiveSettings") },
+                    onOpenContextLog = { navController.navigate("contextLog?tab=trend") },
                 )
             }
             // P7.1 日记本（M07）。读侧 7.1.4：列表 + 详情；写侧 ComposeDiaryScreen → 7.1.5（撰写/编辑暂用占位）。
-            composable("diary") {
-                DiaryListScreen(
+            backCardComposable("diary") {
+                SkinnedDiaryListScreen(
                     onBack = { navController.popBackStack() },
                     onCompose = { navController.navigate("diaryCompose") },
                     onOpenEntry = { uuid -> navController.navigate("diary/$uuid") },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "diary/{uuid}",
                 arguments = listOf(navArgument("uuid") { type = NavType.StringType }),
             ) {
-                DiaryDetailScreen(
+                SkinnedDiaryDetailScreen(
                     onBack = { navController.popBackStack() },
                     onEdit = { uuid -> navController.navigate("diaryCompose/$uuid") },
                 )
             }
             // 写侧（7.1.5）：撰写 / 编辑共用 ComposeDiaryScreen（编辑经 {uuid}），保存/放弃后返回。
-            composable("diaryCompose") {
-                ComposeDiaryScreen(
+            backCardComposable("diaryCompose") {
+                SkinnedComposeDiaryScreen(
                     onClose = { navController.popBackStack() },
                     onNavigateToApiConfig = { navController.navigate("apiConfig") },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "diaryCompose/{uuid}",
                 arguments = listOf(navArgument("uuid") { type = NavType.StringType }),
             ) {
-                ComposeDiaryScreen(
+                SkinnedComposeDiaryScreen(
                     onClose = { navController.popBackStack() },
                     onNavigateToApiConfig = { navController.navigate("apiConfig") },
                 )
             }
-            composable("diarySettings") {
+            backCardComposable("diarySettings") {
                 SkinnedDiarySettingsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenWritingRules = { navController.navigate("diaryWritingRules") },
                 )
             }
-            composable("diaryWritingRules") {
+            backCardComposable("diaryWritingRules") {
                 SkinnedDiaryPromptSettingsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenPreviewMine = { navController.navigate("diaryPromptPreview/mine") },
                     onOpenPreviewExchange = { navController.navigate("diaryPromptPreview/exchange") },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "diaryPromptPreview/{section}",
                 arguments = listOf(navArgument("section") { type = NavType.StringType }),
             ) {
                 SkinnedDiaryPromptPreviewScreen(onBack = { navController.popBackStack() })
             }
-            composable(
+            backCardComposable(
                 route = "promptModules/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) {
                 SkinnedPromptModuleSettingsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenImmersiveSettings = { navController.navigate("immersiveSettings") },
+                    onOpenContextLog = { navController.navigate("contextLog?tab=trend") },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "chat/{conversationUuid}",
                 arguments = listOf(navArgument("conversationUuid") { type = NavType.StringType }),
             ) {
@@ -1014,14 +1012,14 @@ fun AIChatApp(
                     onOpenPromises = { uuid -> navController.navigate("promises/$uuid") },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "voiceCall/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) {
                 VoiceCallScreen(onCallFinished = { navController.popBackStack() })
             }
-            composable("character/new") {
-                CharacterEditScreen(
+            backCardComposable("character/new") {
+                SkinnedCharacterEditScreen(
                     onCancel = { navController.popBackStack() },
                     onSaved = { conversationUuid ->
                         if (conversationUuid != null) {
@@ -1034,7 +1032,7 @@ fun AIChatApp(
                     },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "character/edit/{characterUuid}?focusVoice={focusVoice}",
                 arguments = listOf(
                     navArgument("characterUuid") { type = NavType.StringType },
@@ -1042,7 +1040,7 @@ fun AIChatApp(
                     navArgument("focusVoice") { type = NavType.BoolType; defaultValue = false },
                 ),
             ) { backStackEntry ->
-                CharacterEditScreen(
+                SkinnedCharacterEditScreen(
                     onCancel = { navController.popBackStack() },
                     onSaved = { navController.popBackStack() },
                     onEditModules = { uuid -> navController.navigate("promptModules/$uuid") },
@@ -1052,7 +1050,7 @@ fun AIChatApp(
                 )
             }
             // 14.1 角色资料页（只读·点亮成长智能）。入口=联系人头像 / 聊天顶栏标题。
-            composable(
+            backCardComposable(
                 route = "characterProfile/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) {
@@ -1068,14 +1066,14 @@ fun AIChatApp(
                 )
             }
             // 记忆手动编辑（资料页共同记忆卡入口·图纸 2026-09-01 件③）。
-            composable(
+            backCardComposable(
                 route = "memoryEdit/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) {
                 MemoryEditScreen(onClose = { navController.popBackStack() })
             }
             // 记忆星空（资料页「故事」Tab 入口卡目标·全屏可漫游星空·转场走 NavHost 全局默认·J5）。
-            composable(
+            backCardComposable(
                 route = "starfield/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) {
@@ -1085,21 +1083,21 @@ fun AIChatApp(
                     onOpenPromises = { uuid -> navController.navigate("promises/$uuid") },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "offlineMeetings/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) {
                 OfflineMeetingMemoryScreen(onBack = { navController.popBackStack() })
             }
             // 记忆改造三期：角色资料页「我们的约定」账本子页。
-            composable(
+            backCardComposable(
                 route = "promises/{characterUuid}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }),
             ) {
                 PromiseLedgerScreen(onBack = { navController.popBackStack() })
             }
             // 14.2 全天行程视图（资料页日程卡「查看全天行程」目标）。
-            composable(
+            backCardComposable(
                 route = "scheduleFullDay/{characterUuid}?date={date}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }, navArgument("date") { type = NavType.StringType; nullable = true; defaultValue = null }),
             ) {
@@ -1109,7 +1107,7 @@ fun AIChatApp(
                 )
             }
             // 「我们的日子」卷三（图纸 §3.6）：日历页（两入口共用·可选预选角色 + 日期）/ 一天的页（"all" = 全部模式）。
-            composable(
+            backCardComposable(
                 route = "ourDays?character={character}&date={date}",
                 arguments = listOf(
                     navArgument("character") { type = NavType.StringType; nullable = true; defaultValue = null },
@@ -1121,7 +1119,7 @@ fun AIChatApp(
                     onOpenDay = { uuid, dayKey -> navController.navigate("ourDays/day/$uuid/$dayKey") },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "ourDays/day/{characterUuid}/{dayKey}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }, navArgument("dayKey") { type = NavType.StringType }),
             ) {
@@ -1135,16 +1133,17 @@ fun AIChatApp(
                     onOpenSchedule = { uuid, dayKey -> navController.navigate("scheduleFullDay/$uuid?date=$dayKey") },
                 )
             }
-            composable(
+            backCardComposable(
                 route = "dayMoments/{characterUuid}/{dayKey}",
                 arguments = listOf(navArgument("characterUuid") { type = NavType.StringType }, navArgument("dayKey") { type = NavType.StringType }),
             ) {
-                DayMomentsScreen(
+                SkinnedDayMomentsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenPost = { uuid -> navController.navigate("moment/$uuid") },
                 )
             }
         }
+        } // end CompositionLocalProvider（预测返回卡片）
         } // end LiuliHomeHost（NavHost + 悬浮底栏叠加层）
     }
 }

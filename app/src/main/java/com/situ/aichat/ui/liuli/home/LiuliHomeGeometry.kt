@@ -36,8 +36,14 @@ internal object LiuliHomeGeometry {
     val rowPadV: Dp = 12.dp
     /** 头像 ↔ 文字 / 通用行内小缝。 */
     val rowGap: Dp = 12.dp
-    /** 分隔发丝起点 = 20 + 54 + 12 = 86。 */
-    val dividerInset: Dp = gutter + rowAvatar + rowGap
+    /** 分段卡里的行左右内距（卷三 §4.7：卡外左右已留 [gutter] 20，卡内行再留 16）。 */
+    val rowPadH: Dp = 16.dp
+    /** 光环 54 内的头像（卷三 §4.7：光环 2dp × 2）。 */
+    val rowAvatarInner: Dp = 50.dp
+    /** 分隔发丝起点（卡内起算·卷三 §4.7）= 16 + 54 + 12 = 82。 */
+    val dividerInset: Dp = rowPadH + rowAvatar + rowGap
+    /** 置顶卡与其余卡之间的间隔（卷三 §4.7）。 */
+    val groupGap: Dp = 16.dp
     /** 未读丸：高 20（min 宽同值）、左右 7。 */
     val unreadHeight: Dp = 20.dp
     val unreadSidePadding: Dp = 7.dp
@@ -81,4 +87,18 @@ internal object LiuliHomeGeometry {
     val tileCorner: Dp = 12.dp
     /** 卡内 chevron 尺寸。 */
     val chevron: Dp = 16.dp
+
+    // ── 联系人两列卡（卷三 §4.9·用户选甲） ──────────────────────────────────────────
+    /** 光环外径 64、内头像 60（卷三 §4.9）。 */
+    val contactRing: Dp = 64.dp
+    val contactAvatar: Dp = 60.dp
+    /** 卡内距：上 16 / 下 14 / 左右 12（卷三 §4.9）。 */
+    val contactPadTop: Dp = 16.dp
+    val contactPadBottom: Dp = 14.dp
+    val contactPadH: Dp = 12.dp
+    /** 两卡之间与两行之间的缝（卷三 §4.9）。 */
+    val contactGridGap: Dp = 12.dp
+    /** 头像 ↔ 名字、名字 ↔ 关系标签 ↔ 近况的行距（卷三 §4.9）。 */
+    val contactNameGap: Dp = 8.dp
+    val contactLineGap: Dp = 6.dp
 }

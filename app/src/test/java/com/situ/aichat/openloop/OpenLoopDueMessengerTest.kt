@@ -193,6 +193,20 @@ class OpenLoopDueMessengerTest {
         coVerify(exactly = 0) { openLoopRepository.markResolved(any(), any()) }
     }
 
+    // ── 四期·图纸一 §3.6（T2-4·E33）：她自己的打算不发「就是今天」 ──
+
+    @Test fun planChar_neverDelivers() {
+        coEvery { openLoopRepository.byUuid("loop1") } returns loop().copy(typeRaw = OpenLoopType.PLAN_CHAR)
+        stubLlm("今天去进货啦")
+        run()
+        coVerify(exactly = 0) { conversationRepo.get(any()) } // 守卫在会话查询之前短路
+        verifyCompletion(0)
+        // persistAndNotify 的两个外部效果（落库 / 弹通知）都不发生；loop 也不置 resolved。
+        coVerify(exactly = 0) { messageRepo.upsert(any()) }
+        verify(exactly = 0) { Notifier.post(any(), any()) }
+        coVerify(exactly = 0) { openLoopRepository.markResolved(any(), any()) }
+    }
+
     // ── happy path：落库 + 通知 + 置 resolved ──
 
     @Test fun happyPath_persistsNotifiesResolves() {

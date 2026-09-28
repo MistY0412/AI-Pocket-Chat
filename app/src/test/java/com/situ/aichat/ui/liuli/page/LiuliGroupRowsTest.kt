@@ -199,7 +199,7 @@ class LiuliGroupRowsTest {
                 LiuliStatusDotRow(
                     title = "深层记忆",
                     status = "已就绪",
-                    dotColor = LiuliPalette.tileMemory,
+                    dotColor = LiuliPalette.tileMemory.start,
                     subtitle = "向量检索可用",
                     divider = false,
                 )

@@ -41,7 +41,6 @@ import com.situ.aichat.story.StoryCreationCatalog
 import com.situ.aichat.story.StoryCreationLogic
 import com.situ.aichat.story.StoryNarrativePerson
 import com.situ.aichat.story.StoryRoleType
-import com.situ.aichat.story.StoryWritingTechniques
 import com.situ.aichat.ui.components.CharacterAvatar
 import com.situ.aichat.ui.designsystem.AppButton
 import com.situ.aichat.ui.designsystem.AppButtonStyle
@@ -58,37 +57,8 @@ import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTopBar
 import com.situ.aichat.ui.designsystem.appCardSurface
 
-private enum class StoryEditField(val titleRes: Int, val placeholderRes: Int, val subtitleRes: Int?, val maxLength: Int?) {
-    // 世界观/剧情方向上限 4000（2026-08-04 用户拍板·由 2000 放宽）：书页后编辑路本就不限长（HubCreativeTextField
-    // 传 maxLength=null），此处只是创建时闸口，放宽不产生「后编辑被截」的不一致。
-    WORLD(R.string.story_field_world_title, R.string.story_field_world_placeholder, null, 4000),
-    PLOT(R.string.story_field_plot_title, R.string.story_field_plot_placeholder, null, 4000),
-    GENRE_TECH(R.string.story_field_genre_tech_title, R.string.story_field_genre_tech_placeholder, R.string.story_field_genre_tech_subtitle, null),
-    WRITER(R.string.story_field_writer_title, R.string.story_field_writer_placeholder, R.string.story_field_writer_subtitle, null),
-    RULES(R.string.story_field_rules_title, R.string.story_field_rules_placeholder, R.string.story_field_rules_subtitle, null),
-    PERSONA(R.string.story_field_persona_title, R.string.story_field_persona_placeholder, null, 2000),
-}
-
 /** 节奏栏输入闸（卷四 §4.4·E6）：越界的这一笔**整笔拒收**（原值不动），绝不静默截一半；规矩同编辑页 `setText`。 */
 internal fun acceptsPacingInput(typed: String): Boolean = typed.length <= CustomStoryPrompts.PACING_MAX_CHARS
-
-private fun StoryCreationForm.valueFor(field: StoryEditField) = when (field) {
-    StoryEditField.WORLD -> worldSetting
-    StoryEditField.PLOT -> plotDirection
-    StoryEditField.GENRE_TECH -> customGenreTechniques
-    StoryEditField.WRITER -> customWriterIdentity
-    StoryEditField.RULES -> customWritingRules
-    StoryEditField.PERSONA -> customUserPersona
-}
-
-private fun StoryCreationForm.withField(field: StoryEditField, value: String) = when (field) {
-    StoryEditField.WORLD -> copy(worldSetting = value)
-    StoryEditField.PLOT -> copy(plotDirection = value)
-    StoryEditField.GENRE_TECH -> copy(customGenreTechniques = value)
-    StoryEditField.WRITER -> copy(customWriterIdentity = value)
-    StoryEditField.RULES -> copy(customWritingRules = value)
-    StoryEditField.PERSONA -> copy(customUserPersona = value)
-}
 
 /**
  * 故事创建屏 = 高级自定义表单（ST7b·契约 §3.1 第二层 / §6.2「自己从头写」）。表单分区：类型 chips/自定义 →
@@ -111,13 +81,7 @@ fun StoryCreationScreen(
 
     var editingField by remember { mutableStateOf<StoryEditField?>(null) }
     // D-7：本书专属角色（非空名的那些）同样满足「至少一个角色」——纯专属角色也能开书。
-    val canCreate = StoryCreationLogic.canCreateStory(
-        form.isCustomGenre,
-        form.customGenreName,
-        form.includeUserRole,
-        form.selectedRoles.size,
-        form.customRoles.count { it.name.isNotBlank() },
-    )
+    val canCreate = storyCreationCanCreate(form)
 
     val listState = rememberLazyListState()
 
@@ -163,24 +127,7 @@ fun StoryCreationScreen(
         }
     }
 
-    editingField?.let { field ->
-        StoryTextEditorSheet(
-            title = stringResource(field.titleRes),
-            subtitle = field.subtitleRes?.let { stringResource(it) },
-            placeholder = stringResource(field.placeholderRes),
-            initialText = form.valueFor(field),
-            maxLength = field.maxLength,
-            fillDefaultLabel = if (field == StoryEditField.WRITER || field == StoryEditField.RULES) stringResource(R.string.story_editor_fill_default) else null,
-            fillDefault = when (field) {
-                StoryEditField.WRITER -> { { StoryWritingTechniques.writerIdentity(form.writingStyle) } }
-                // 只填风格原则：忌口由「文字忌口」字段单独负责，两者正交（修双重注入·提案 §5）
-                StoryEditField.RULES -> { { StoryWritingTechniques.writingPrinciples } }
-                else -> null
-            },
-            onConfirm = { value -> viewModel.update { it.withField(field, value) } },
-            onDismiss = { editingField = null },
-        )
-    }
+    editingField?.let { field -> StoryTextEditorSheet(storyEditFieldSheetSpec(field, form, viewModel::update)) { editingField = null } }
 
     error?.let { msg ->
         AppDialog(
@@ -204,7 +151,7 @@ private fun GenreSection(form: StoryCreationForm, update: ((StoryCreationForm) -
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             StoryCreationCatalog.genres.forEach { genre ->
-                val selected = form.selectedGenre == genre && !form.isCustomGenre
+                val selected = storyGenreChipSelected(form, genre)
                 AppChoiceChip(
                     selected = selected,
                     onClick = { update { it.copy(selectedGenre = genre, isCustomGenre = false) } },
@@ -239,15 +186,10 @@ private fun CustomPromptSection(
     SectionCard(stringResource(R.string.story_create_custom_prompt_section)) {
         LabeledDropdown(
             label = stringResource(R.string.story_create_reference_template),
-            options = listOf<String?>(null) + StoryCreationCatalog.genres,
+            options = storyReferenceGenreOptions(),
             selected = form.referenceGenre,
             display = { it ?: stringResource(R.string.story_create_reference_none) },
-            onSelect = { genre ->
-                update {
-                    if (genre != null) it.copy(referenceGenre = genre, customGenreTechniques = StoryWritingTechniques.genreTechniques(genre))
-                    else it.copy(referenceGenre = null)
-                }
-            },
+            onSelect = { genre -> update { storyFormWithReferenceGenre(it, genre) } },
         )
         TextEditRow(stringResource(R.string.story_field_genre_tech_title), form.customGenreTechniques) { onEdit(StoryEditField.GENRE_TECH) }
         // 卷四 §4.4：写作身份三档预设 chips（代填动作不是单选态，故已填也不高亮·与统一编辑页共用同一件）。
@@ -278,10 +220,7 @@ private fun CharacterSection(
         }
 
         ToggleRow(stringResource(R.string.story_create_include_user), form.includeUserRole) { on ->
-            update {
-                val name = if (on && nickname.isNotBlank()) nickname else it.userRoleName
-                it.copy(includeUserRole = on, userRoleName = name)
-            }
+            update { storyFormWithIncludeUser(it, on, nickname) }
         }
 
         if (form.includeUserRole) {
@@ -296,9 +235,9 @@ private fun CharacterSection(
 
             LabeledDropdown(
                 label = stringResource(R.string.story_create_persona_source),
-                options = listOf(UserPersonaSource.PROFILE, UserPersonaSource.CUSTOM),
+                options = storyPersonaSources,
                 selected = form.userPersonaSource,
-                display = { stringResource(if (it == UserPersonaSource.PROFILE) R.string.story_create_persona_profile else R.string.story_create_persona_custom) },
+                display = { stringResource(storyPersonaSourceLabelRes(it)) },
                 onSelect = { v -> update { it.copy(userPersonaSource = v) } },
             )
             if (form.userPersonaSource == UserPersonaSource.PROFILE) {
@@ -348,19 +287,7 @@ private fun CharacterRow(ch: CharacterEntity, form: StoryCreationForm, update: (
             }
             AppSwitch(
                 checked = selected,
-                onCheckedChange = { on ->
-                    update {
-                        val roles = it.selectedRoles.toMutableMap()
-                        val descs = it.roleDescriptions.toMutableMap()
-                        if (on) {
-                            roles[ch.uuid] = defaultRoleType(it)
-                        } else {
-                            roles.remove(ch.uuid)
-                            descs.remove(ch.uuid)
-                        }
-                        it.copy(selectedRoles = roles, roleDescriptions = descs)
-                    }
-                },
+                onCheckedChange = { on -> update { storyFormToggleCharacter(it, ch.uuid, on) } },
             )
         }
         if (selected) {
@@ -378,10 +305,6 @@ private fun CharacterRow(ch: CharacterEntity, form: StoryCreationForm, update: (
         }
     }
 }
-
-/** 默认角色定位：首个选中角色（无其他角色 + 用户未参演）→ 主角，否则配角（1:1 iOS defaultRoleType）。 */
-private fun defaultRoleType(form: StoryCreationForm): String =
-    if (form.selectedRoles.isEmpty() && !form.includeUserRole) StoryRoleType.PROTAGONIST else StoryRoleType.SUPPORTING
 
 // ── 高级设置 ──
 
@@ -406,7 +329,7 @@ private fun AdvancedSection(
             TextEditRow(stringResource(R.string.story_field_plot_title), form.plotDirection) { onEdit(StoryEditField.PLOT) }
             LabeledDropdown(
                 label = stringResource(R.string.story_create_narrative),
-                options = listOf(StoryNarrativePerson.SECOND, StoryNarrativePerson.FIRST, StoryNarrativePerson.THIRD),
+                options = storyNarrativeOptions,
                 selected = form.narrativePerson,
                 display = { narrativeName(it) },
                 onSelect = { v -> update { it.copy(narrativePerson = v) } },
@@ -496,7 +419,7 @@ private fun TextEditRow(title: String, value: String, showValueAsStatus: Boolean
             Text(
                 title,
                 style = AppTheme.typography.body,
-                color = if (value.isEmpty() && !showValueAsStatus) c.text.secondary else c.text.primary,
+                color = if (storyTextEditTitleMuted(value, showValueAsStatus)) c.text.secondary else c.text.primary,
             )
             if (value.isNotEmpty()) {
                 Text(value, style = AppTheme.typography.secondary, color = c.text.secondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -591,7 +514,7 @@ internal fun chatInfluenceDetail(weight: String) = stringResource(
 )
 
 @Composable
-private fun userRoleTypeHint(roleType: String) = stringResource(
+internal fun userRoleTypeHint(roleType: String) = stringResource(
     when (roleType) {
         StoryRoleType.PROTAGONIST -> R.string.story_user_role_hint_protagonist
         StoryRoleType.ANTAGONIST -> R.string.story_user_role_hint_antagonist

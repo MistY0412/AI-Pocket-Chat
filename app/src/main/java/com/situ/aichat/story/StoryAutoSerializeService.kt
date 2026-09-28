@@ -41,7 +41,12 @@ class StoryAutoSerializeService @Inject constructor(
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    /**
+     * 懒取：本类是 AppViewModel 的依赖、在主线程构造，构造期取 SharedPreferences = 主线程读盘（稳定性防线 B 冷启实测·
+     * 图纸 docs/handoff/2026-09-28-启动主线程读盘清零.md ②）。读写只发生在 [onAppForeground] 派进 [scope] 的那一趟里，首次取也就落在后台线程。
+     */
+    private val prefs by lazy { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
 
     /** 单次检查互斥（= iOS `StoryScheduleService.isRunning` 锁），防回前台多次叠跑。 */
     private val isRunning = AtomicBoolean(false)

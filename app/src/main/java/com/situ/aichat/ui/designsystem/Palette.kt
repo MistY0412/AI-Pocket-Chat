@@ -135,39 +135,52 @@ internal object Palette {
     val SadInk = Color(0xFF4E5C68)    // 雾蓝功能深档（故事图标·浅档）
     val ShyInk = Color(0xFF7E5258)    // 暖玫功能深档（宠物图标·浅档）
 
-    // ── 琉璃主题（第二张脸配色·见 FABLE5_THEME_LIULI_PROPOSAL.md §4.2/§4.3）：冷灰瓷白 / 近黑 + 钴蓝。 ──
-    // 昼（琉璃·瓷白）
-    val GlassMist = Color(0xFFF6F7FB)            // 昼 surface 底（≥4.54 托住 economy.gold·作者修订值）
-    val GlassSunken = Color(0xFFE8EAF0)          // 昼 surface sunken（搜索槽 / 凹陷）
-    val GlassStroke = Color(0xFFDDE0E8)          // 昼 surface stroke（≈ 墨 10% over 底·实色）
-    val GlassBubbleStroke = Color(0xFFE9ECF3)    // 昼 AI 气泡发丝（≈ 墨 6% over 白）
-    val InkCool = Color(0xFF111318)              // 昼 text primary
-    val InkCoolSoft = Color(0xFF5F6470)          // 昼 text secondary（5.9 on 白）
-    val InkCoolFaint = Color(0xFF9A9FAB)         // 昼 text tertiary（纯装饰）
-    val Cobalt26 = Color(0xFF2570E8)             // 昼 accent 装饰 / 大元素（白字 4.6）
-    val Cobalt26Text = Color(0xFF0A5FCB)         // 昼 钴蓝文字 on 白 6.0 / on sunken 5.0（作者修订值）
-    val Cobalt26Container = Color(0xFFE3EEFD)    // 昼 选中浅染
-    val Cobalt26OnContainer = Color(0xFF0B4FB0)  // 昼 container 上字（7.0）
-    val Cobalt26GradStart = Color(0xFF2570E8)    // 渐变起点（两档同·白字 4.6）
-    val Cobalt26GradEnd = Color(0xFF1557CC)      // 渐变终点（两档同·白字 6.4）
-    val Cobalt26DeepEnd = Color(0xFF0F44A3)      // 恒深档终点（两档同）
-    val GlazeGlass = Color(0xFFFFFFFF)           // 昼 药丸面顶（D-15 甲：白瓷药丸仍在未迁屏出现）
-    val GlazeGlassShade = Color(0xFFF4F6FA)      // 昼 药丸面底
-    // 夜（琉璃·夜·近黑非纯黑 D-9）
-    val NightGlass = Color(0xFF0B0D12)           // 夜 surface 底
-    val NightGlassRaised = Color(0xFF16191F)     // 夜 surface raised / 纸面
-    val NightGlassSunken = Color(0xFF1F232B)     // 夜 surface sunken
-    val NightGlassStroke = Color(0xFF2A2F39)     // 夜 stroke / AI 气泡发丝
-    val NightGlassBubble = Color(0xFF1C2028)     // 夜 AI 气泡（深石板）
-    val MoonWhite = Color(0xFFF2F4F8)            // 夜 text primary
-    val MoonWhiteSoft = Color(0xFFA3A9B5)        // 夜 text secondary（7.5 on raised）
-    val MoonWhiteFaint = Color(0xFF6C7280)       // 夜 text tertiary（纯装饰）
-    val Cobalt26Bright = Color(0xFF3B86FF)       // 夜 accent 装饰 / tint（配 NightGlass 墨字 5.6·白字仅 3.5 禁）
-    val Cobalt26TextDark = Color(0xFF6FA8FF)     // 夜 钴蓝文字 on 近黑 8.1
-    val Cobalt26ContainerDark = Color(0xFF17304F) // 夜 选中浅染
-    val Cobalt26OnContainerDark = Color(0xFFB9D3FF) // 夜 container 上字（8.8）
-    val GlazeGlassDark = Color(0xFF343B48)       // 夜 药丸面顶（冷灰抬升一阶）
-    val GlazeGlassDarkShade = Color(0xFF2A303C)  // 夜 药丸面底
+    // ── 琉璃 2.0 · 晨光（第二张脸配色·设计稿 liuli2_design_spec_mockup.html P 表·卷一图纸 §4.1；对比度微调见 §0.2-3） ──
+    // 昼（晨光）
+    val DawnBase = Color(0xFFF8F6FC)             // 稿 base #F6F3FB 提亮一丝（托住 economy.gold ≥ 4.5）
+    val DawnSunken = Color(0xFFECE9F1)           // = DawnInk 6% over DawnBase（稿 segBg）
+    val DawnStroke = Color(0xFFE3E1E9)           // = DawnInk 10% over DawnBase
+    val DawnBubbleStroke = Color(0xFFF2F2F4)     // = DawnInk 6% over 白
+    val DawnInk = Color(0xFF2A2440)              // 稿 ink
+    val DawnInkSoft = Color(0xFF544E70)          // 卷三 §0.2-5 裸柔光底 ≥ 4.5
+    val DawnInkFaint = Color(0xFFA9A3BF)         // 稿 faint（纯装饰）
+    val DawnShadow = Color(0xFF5A4696)           // 昼卡片影·稿 shadow（卷二半透明卡柔影以 14% 叠用）
+    val DawnIris = Color(0xFF6B5BE8)             // 用户选乙·主色渐变起点 / 主色实底（白字 4.9）
+    val DawnOrchid = Color(0xFF9656CF)           // 用户选乙·渐变中段 55%（白字 4.6）
+    val DawnRose = Color(0xFFB2508F)             // 用户选乙·渐变末端（白字 4.7）
+    val DawnIrisText = Color(0xFF4B3CBE)         // 卷三 §0.2-5 裸柔光底 ≥ 4.5
+    val DawnIrisContainer = Color(0xFFEDEBFC)    // = DawnIris 12% over 白
+    val DawnIrisOnContainer = Color(0xFF4636B0)  // container 上的字
+    val DawnGlowPeach = Color(0xFFFFCDB8)        // 稿光晕 ①
+    val DawnGlowLilac = Color(0xFFD6C3FF)        // 稿光晕 ②
+    val DawnGlowSky = Color(0xFFBDE0FF)          // 稿光晕 ③
+    val DawnGlowRose = Color(0xFFFFD6EE)         // 稿光晕 ④
+    val DawnPaper = Color(0xFFFFFEFB)             // 卷六设计稿 .paper 顶（稿纸暖白）
+    val DawnPaperShade = Color(0xFFFBF7EF)       // 卷六设计稿 .paper 底
+    // 夜（暮色）
+    val DuskBase = Color(0xFF14121E)             // 稿 dark base
+    val DuskRaised = Color(0xFF1D1A2E)           // = #241F3A 58% over DuskBase（稿 card）
+    val DuskCard = Color(0xFF241F3A)             // 夜卡片底·稿 card（卷二半透明卡以 58% 叠用）
+    val DuskSunken = Color(0xFF24232E)           // = 白 7% over DuskBase（稿 segBg）
+    val DuskStroke = Color(0xFF2C2A34)           // = 白 10% over DuskBase
+    val DuskBubble = Color(0xFF2E2848)           // 稿 aiB 去透明
+    val DuskBubbleStroke = Color(0xFF3F3957)     // = 白 8% over DuskBubble
+    val DuskFrost = Color(0xFF1E1A30)            // 稿 glassFrost（夜毛玻璃染色）
+    val DuskInk = Color(0xFFF3EFFF)              // 稿 dark ink
+    val DuskInkSoft = Color(0xFFC7C3DF)          // 卷三 §0.2-5 裸柔光底 ≥ 4.5
+    val DuskInkFaint = Color(0xFF6F6890)         // 稿 dark faint
+    val DuskIris = Color(0xFFB3A6FF)             // 稿 dark acc（配 DuskBase 深字 8.6）
+    val DuskIrisText = Color(0xFFC8BEFF)         // 卷三 §0.2-5 裸柔光底 ≥ 4.5
+    val DuskIrisContainer = Color(0xFF2D2A42)    // = DuskIris 16% over DuskBase
+    val DuskIrisOnContainer = Color(0xFFDCD4FF)  // container 上的字
+    val DuskGlaze = Color(0xFF47464F)            // = 白 16% over DuskSunken（稿 segOn）
+    val DuskGlazeShade = Color(0xFF3C3B45)       // = 白 11% over DuskSunken
+    val DuskGlowViolet = Color(0xFF4A3590)       // 稿夜光晕 ①
+    val DuskGlowPlum = Color(0xFF6B2D6A)         // 稿夜光晕 ②
+    val DuskGlowNavy = Color(0xFF1E4A7A)         // 稿夜光晕 ③
+    val DuskGlowIndigo = Color(0xFF3F2C80)       // 稿夜光晕 ④
+    val DuskPaper = Color(0xFF211E2C)             // 卷六设计稿 夜 .paper 顶
+    val DuskPaperShade = Color(0xFF1C1926)       // 卷六设计稿 夜 .paper 底
 
     // ── 通用 ──
     val Scrim = Color(0xFF000000)

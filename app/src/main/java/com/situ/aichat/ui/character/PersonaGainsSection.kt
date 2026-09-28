@@ -32,7 +32,6 @@ import com.situ.aichat.ui.designsystem.AppButtonStyle
 import com.situ.aichat.ui.designsystem.AppSegmentedControl
 import com.situ.aichat.ui.designsystem.AppTextField
 import com.situ.aichat.ui.designsystem.AppTheme
-import java.util.UUID
 
 // 活人感内核·卷一《人设编译器》「她吃哪套」三层（图纸 §4.3 · D-4 / D-10）：
 // ①专属项（置顶·可删）②手写新增（三护栏）③系统 27 项按九组分组（无删除键·设「不吃这套」即等于关闭）。
@@ -56,7 +55,7 @@ internal fun PersonaGainsSection(gains: PersonaGains, onChange: (PersonaGains) -
         modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
     )
     // 摘要行：系统项里「与常人不同」的条数 + 专属项条数（专属为 0 时后半句整句省略）。
-    val differing = gains.system.count { it.value != PersonaVocab.LEVEL_NORMAL }
+    val differing = gains.differingCount()
     Text(
         text = if (gains.custom.isEmpty()) {
             stringResource(R.string.persona_gains_summary_short, differing)
@@ -99,9 +98,9 @@ private fun CustomGainsBlock(gains: PersonaGains, onChange: (PersonaGains) -> Un
                     null
                 },
                 onLevelChange = { lv ->
-                    onChange(gains.copy(custom = gains.custom.map { if (it.id == item.id) it.copy(level = lv) else it }))
+                    onChange(gains.withCustomLevel(item.id, lv))
                 },
-                onDelete = { onChange(gains.copy(custom = gains.custom.filterNot { it.id == item.id })) },
+                onDelete = { onChange(gains.withoutCustom(item.id)) },
             )
         }
     }
@@ -112,15 +111,14 @@ private fun CustomGainsBlock(gains: PersonaGains, onChange: (PersonaGains) -> Un
 @Composable
 private fun CustomGainAdder(gains: PersonaGains, onChange: (PersonaGains) -> Unit) {
     val colors = AppTheme.colors
-    val full = gains.custom.size >= PersonaGains.MAX_CUSTOM
+    val full = gains.isCustomFull()
     var expanded by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
 
     // 查重口径：27 项标签 ∪ 已有专属标签，去空白 + 全小写比较。
     val systemLabels = PersonaVocab.GAIN_KEYS.map { stringResource(PersonaVocab.GAINS.getValue(it)) }
-    val taken = (systemLabels + gains.custom.map { it.label }).associateBy { it.trim().lowercase() }
-    val duplicateOf = taken[draft.trim().lowercase()]
-    val submittable = draft.isNotBlank() && duplicateOf == null && !full
+    val duplicateOf = customGainDuplicateOf(draft, systemLabels, gains.custom)
+    val submittable = customGainSubmittable(draft, duplicateOf, full)
 
     Row(
         Modifier
@@ -140,7 +138,7 @@ private fun CustomGainAdder(gains: PersonaGains, onChange: (PersonaGains) -> Uni
         AppTextField(
             value = draft,
             // 护栏：输入上限 12 字——**超出不接收**（而不是接收后截断，免得用户以为写进去了）。
-            onValueChange = { if (it.length <= CustomGain.MAX_LABEL_LENGTH) draft = it },
+            onValueChange = { if (acceptsCustomGainDraft(it)) draft = it },
             modifier = Modifier.fillMaxWidth(),
             label = stringResource(R.string.persona_gains_add_label),
             placeholder = stringResource(R.string.persona_gains_add_placeholder),
@@ -149,16 +147,7 @@ private fun CustomGainAdder(gains: PersonaGains, onChange: (PersonaGains) -> Uni
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             AppButton(
                 onClick = {
-                    onChange(
-                        gains.copy(
-                            custom = gains.custom + CustomGain(
-                                id = UUID.randomUUID().toString(),
-                                label = draft.trim(),
-                                level = PersonaVocab.LEVEL_SENSITIVE, // D-10：新项默认「很敏感」
-                                origin = CustomGain.ORIGIN_MANUAL,
-                            ),
-                        ),
-                    )
+                    onChange(gains.withNewCustom(draft)) // D-10：新项默认「很敏感」
                     draft = ""
                     expanded = false
                 },
@@ -201,10 +190,10 @@ private fun CustomGainAdder(gains: PersonaGains, onChange: (PersonaGains) -> Uni
 private fun SystemGainsBlock(gains: PersonaGains, onChange: (PersonaGains) -> Unit) {
     val colors = AppTheme.colors
     var showAll by remember { mutableStateOf(false) }
-    val normalCount = PersonaVocab.GAIN_KEYS.count { gains.system[it] == null || gains.system[it] == PersonaVocab.LEVEL_NORMAL }
+    val normalCount = gains.normalSystemCount()
 
     PersonaVocab.GAIN_GROUPS.forEach { group ->
-        val visibleKeys = group.keys.filter { showAll || (gains.system[it] ?: PersonaVocab.LEVEL_NORMAL) != PersonaVocab.LEVEL_NORMAL }
+        val visibleKeys = gains.visibleSystemKeys(group, showAll)
         if (visibleKeys.isEmpty()) return@forEach
         Text(
             text = stringResource(group.labelRes),
@@ -218,11 +207,7 @@ private fun SystemGainsBlock(gains: PersonaGains, onChange: (PersonaGains) -> Un
                 level = gains.system[key] ?: PersonaVocab.LEVEL_NORMAL,
                 badge = null,
                 // 无删除键（D-4：设「不吃这套」即等于关闭）。回到「正常」= 从 map 里摘掉（缺席即 1·Y-7）。
-                onLevelChange = { lv ->
-                    val next = gains.system.toMutableMap()
-                    if (lv == PersonaVocab.LEVEL_NORMAL) next.remove(key) else next[key] = lv
-                    onChange(gains.copy(system = next))
-                },
+                onLevelChange = { lv -> onChange(gains.withSystemLevel(key, lv)) },
                 onDelete = null,
             )
         }
@@ -286,7 +271,7 @@ private fun GainRow(
             }
         }
         AppSegmentedControl(
-            options = LEVELS,
+            options = PERSONA_GAIN_LEVELS,
             selected = level.coerceIn(PersonaVocab.LEVEL_NUMB, PersonaVocab.LEVEL_SENSITIVE),
             onSelect = onLevelChange,
             modifier = Modifier.fillMaxWidth(),
@@ -294,6 +279,3 @@ private fun GainRow(
         )
     }
 }
-
-/** 三档次序恒为 不吃这套 / 正常 / 很敏感（= 档位整数 0/1/2 的自然序）。 */
-private val LEVELS = listOf(PersonaVocab.LEVEL_NUMB, PersonaVocab.LEVEL_NORMAL, PersonaVocab.LEVEL_SENSITIVE)

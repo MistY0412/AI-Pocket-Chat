@@ -2,6 +2,8 @@ package com.situ.aichat.tts.provider
 
 import android.content.Context
 import com.situ.aichat.tts.TtsProviderType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * MiniMax voice-tag "front door" gate (1:1 iOS `MiniMaxVoiceTagsCapability.swift`). Decides — before
@@ -58,6 +60,13 @@ object MiniMaxVoiceTagsSettings {
     /** Defaults to true (covers fresh installs + upgrades, same as iOS's "no key written → true"). */
     fun isEnabled(context: Context): Boolean =
         prefs(context).getBoolean(KEY_ENABLED, true)
+
+    /**
+     * Same as [isEnabled], but reads on the IO thread — for coroutines running on the main thread (the chat turn's voice
+     * plan is assembled on viewModelScope's Main.immediate; stability guard B / StrictMode disk reads).
+     */
+    suspend fun loadEnabled(context: Context): Boolean =
+        withContext(Dispatchers.IO) { isEnabled(context) }
 
     fun setEnabled(context: Context, value: Boolean) {
         prefs(context).edit().putBoolean(KEY_ENABLED, value).apply()

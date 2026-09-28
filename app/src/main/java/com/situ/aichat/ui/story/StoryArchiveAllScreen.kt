@@ -58,9 +58,7 @@ fun StoryArchiveAllScreen(
     val c = AppTheme.colors
 
     // 菜单开着时书被并行删除：格子连菜单一起消失、onDismiss 不再回调——兜底清态，防 scrim 卡住。
-    LaunchedEffect(archived) {
-        menuStoryId?.let { open -> if (archived.none { it.id == open }) menuStoryId = null }
-    }
+    LaunchedEffect(archived) { if (storyMenuStale(menuStoryId, archived)) menuStoryId = null }
 
     val gridState = rememberLazyGridState()
     Scaffold(
@@ -124,7 +122,7 @@ fun StoryArchiveAllScreen(
 }
 
 @Composable
-private fun ArchiveGridCell(story: StoryEntity, onClick: () -> Unit, onLongPress: () -> Unit) {
+internal fun ArchiveGridCell(story: StoryEntity, onClick: () -> Unit, onLongPress: () -> Unit) {
     val c = AppTheme.colors
     Column(
         Modifier.clickableScale(onClick = onClick, onLongClick = onLongPress),

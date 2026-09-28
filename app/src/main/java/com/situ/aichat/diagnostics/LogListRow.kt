@@ -25,4 +25,12 @@ data class LogListRow(
     val cacheHitTokens: Int = 0,
     val cacheMissTokens: Int = 0,
     val isTokenEstimated: Boolean = true,
+    // —— 四期·图纸三（v51）：对话 / 轮次关联 + 服务商 + 失败分类（列表按对话→每一轮归组、失败看得懂要用） ——
+    val conversationUuid: String? = null,
+    val characterUuid: String? = null,
+    val turnId: String? = null,
+    val anchorMessageUuid: String? = null,
+    val providerType: String? = null,
+    val failureKind: String? = null,
+    val httpStatus: Int? = null,
 )

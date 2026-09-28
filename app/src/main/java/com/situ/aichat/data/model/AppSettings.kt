@@ -198,6 +198,8 @@ data class AppSettings(
     // 口吻（活人感一期 P1）
     /** 自然短句口吻：开 → 回复风格块追加「像手机打字那样说话」全局规则（pb_style_l3）；关 → 风格块与旧值逐字节一致。默认开，书面风角色可关。 */
     val textingToneEnabled: Boolean = true,
+    /** 省钱模式（时间感知四期·图纸二）：开 → 每轮都会变的检索内容挪到最新用户消息前、聊天片段改叙述句、朋友圈首行只写日期。默认关。 */
+    val cacheSaverEnabled: Boolean = false,
 
     // 主动消息通知（P6.1c）
     /** 全局主动消息通知开关（关 = 不为任何角色调度续火花 / 主动消息）。默认开（实际仍受系统 POST_NOTIFICATIONS 授权约束）。 */

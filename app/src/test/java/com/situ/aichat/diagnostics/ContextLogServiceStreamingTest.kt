@@ -1,6 +1,7 @@
 package com.situ.aichat.diagnostics
 
 import com.situ.aichat.data.local.dao.LogDao
+import com.situ.aichat.data.local.dao.LogStatsDao
 import com.situ.aichat.data.model.ApiProviderType
 import com.situ.aichat.data.model.AppSettings
 import com.situ.aichat.data.remote.llm.ApiConfigValues
@@ -51,7 +52,7 @@ class ContextLogServiceStreamingTest {
         logDao = mockk(relaxed = true)
         settingsRepository = mockk()
         every { settingsRepository.appSettings } returns flowOf(AppSettings())
-        service = ContextLogService(llmClient, logDao, settingsRepository, Json)
+        service = ContextLogService(llmClient, logDao, settingsRepository, Json, mockk<LogStatsDao>(relaxed = true))
     }
 
     private fun stubStream(vararg tokens: StreamToken) {

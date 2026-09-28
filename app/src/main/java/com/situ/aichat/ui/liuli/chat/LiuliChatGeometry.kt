@@ -21,7 +21,7 @@ internal object LiuliChatGeometry {
     val worldPillHeight: Dp = 24.dp
     /** 日期胶囊：世界胶囊底 + 8dp（无胶囊 = 顶栏底 + 8dp）。 */
     val datePillTop: Dp = 8.dp
-    /** 列表左右 gutter：12dp（尾巴伸出 9dp 后仍留 3dp 安全边）。 */
+    /** 列表左右 gutter：12dp（= 暖陶 `ChatMessageList` 左右 12）。 */
     val listHorizontal: Dp = 12.dp
     /** 首条 / 末条气泡与输入区实测顶缘之间的呼吸（复核 R1 🔴-1：底留白改跟随输入区实测高）。 */
     val listBottomGap: Dp = 12.dp
@@ -71,9 +71,9 @@ internal object LiuliChatGeometry {
     val panelTop: Dp = stackGap
     /** 面板底缘距导航栏顶（= [inputBottom]·同一坐标系）。 */
     val panelBottom: Dp = inputBottom
-    /** 面板瓦片视觉边长与圆角（契约 §5.2）。 */
-    val panelTileSize: Dp = 44.dp
-    val panelTileCorner: Dp = 14.dp
+    /** 面板瓦片视觉边长与圆角（契约 §5.2·卷四 §4.7 改 60 / 18）。 */
+    val panelTileSize: Dp = 60.dp
+    val panelTileCorner: Dp = 18.dp
     /** 沉浸菜单：卡宽恒定、屏边距、泡下间隙（契约 §5.7·暖陶屏边距 6 → 琉璃 12）。 */
     val menuWidth: Dp = 200.dp
     val menuMargin: Dp = 12.dp
@@ -98,16 +98,9 @@ internal object LiuliChatGeometry {
     val cardIconCorner: Dp = 11.dp
     /** 卡脚按钮高（对版稿 `.cbt{h34}`·圆角走 pill）。 */
     val cardButtonHeight: Dp = 34.dp
-    /** 贴纸边长与圆角（契约 §5.5：暖陶 120 → 琉璃 110·A-7）。 */
-    val stickerSize: Dp = 110.dp
-    val stickerCorner: Dp = 24.dp
-    /** 图片泡的宽上限（真实宽 = min(本值, bubbleMaxWidth)·A-3）。 */
-    val imageMaxWidth: Dp = 200.dp
     /** 长文折叠底部渐隐带高（对版稿 `.fold::after{h36}`·A-1）。 */
     val foldFade: Dp = 36.dp
-    /** 语音泡：播放圆直径 / 波形条宽 / 条间距 / 波形高（对版稿 `.voice`·A-5）。 */
-    val voicePlay: Dp = 30.dp
+    /** 波形条宽 / 条间距（对版稿 `.voice`·A-5；卷三起语音泡用暖陶组件，这两个值只剩 `LiuliVoiceWaveform` → 草稿条在用）。 */
     val voiceBarWidth: Dp = 3.dp
     val voiceBarGap: Dp = 2.dp
-    val voiceBarHeight: Dp = 22.dp
 }

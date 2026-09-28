@@ -56,8 +56,8 @@ internal fun LiuliCalendarCard(
             elevation = CARD_SHADOW_ELEVATION,
             shape = LiuliShapes.medium,
             clip = false,
-            ambientColor = Palette.InkCool.copy(alpha = CARD_SHADOW_ALPHA),
-            spotColor = Palette.InkCool.copy(alpha = CARD_SHADOW_ALPHA),
+            ambientColor = Palette.DawnInk.copy(alpha = CARD_SHADOW_ALPHA),
+            spotColor = Palette.DawnInk.copy(alpha = CARD_SHADOW_ALPHA),
         )
     }
     Column(

@@ -77,7 +77,7 @@ class StoryFieldEditorViewModelTest {
 
     private fun captureCustomPrompts(): () -> String? {
         var captured: String? = SENTINEL
-        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg(); Unit }
+        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg() }
         return { captured.takeIf { it != SENTINEL } }
     }
 
@@ -286,7 +286,6 @@ class StoryFieldEditorViewModelTest {
         coEvery { repo.updateStorySummaryUserEdit(any(), any(), any()) } answers {
             assertTrue("写库期间 saving 应为真", vm.saving.value)
             reentered = runBlocking { vm.save() }
-            Unit
         }
         assertTrue(runBlocking { vm.save() })
         assertEquals(false, reentered)

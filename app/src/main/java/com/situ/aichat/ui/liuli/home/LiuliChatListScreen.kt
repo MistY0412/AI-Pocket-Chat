@@ -1,10 +1,15 @@
 package com.situ.aichat.ui.liuli.home
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -12,7 +17,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -26,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -38,11 +44,16 @@ import com.situ.aichat.ui.chat.rememberRelativeTimeStrings
 import com.situ.aichat.ui.designsystem.AppTopBarIcons
 import com.situ.aichat.ui.liuli.designsystem.LiuliCircleButton
 import com.situ.aichat.ui.liuli.designsystem.LiuliDialog
+import com.situ.aichat.ui.liuli.designsystem.LiuliMaterials
 import com.situ.aichat.ui.liuli.designsystem.LiuliSearchSlot
+import com.situ.aichat.ui.liuli.designsystem.liuliCardSegment
+import com.situ.aichat.ui.liuli.designsystem.liuliSegmentPosition
 import com.situ.aichat.ui.liuli.designsystem.rememberLiuliInstantSheetState
+import com.situ.aichat.ui.liuli.page.LIULI_ROW_DIVIDER_TAG
 import com.situ.aichat.ui.liuli.page.LiuliLargeTitle
 import com.situ.aichat.ui.liuli.page.LiuliSectionHeader
 import com.situ.aichat.ui.liuli.page.rememberLargeTitleCollapsed
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import com.situ.aichat.util.DateFormatters
 import com.situ.aichat.util.rememberTimeTick
 
@@ -192,6 +203,8 @@ internal fun LiuliChatListContent(
                 if (pinned.isNotEmpty()) {
                     item(key = "pinned-header") { LiuliSectionHeader(stringResource(R.string.chat_list_section_pinned)) }
                     chatRows(pinned, scheduleStatus, nowMillis, relStrings, onOpenChat, onTogglePin, onRequestDelete, onQuickReply)
+                    // 置顶卡与其余卡之间的间隔（卷三 §4.8·两组都在才插）。
+                    if (unpinned.isNotEmpty()) item(key = "group-gap") { Spacer(Modifier.height(LiuliHomeGeometry.groupGap)) }
                 }
                 chatRows(unpinned, scheduleStatus, nowMillis, relStrings, onOpenChat, onTogglePin, onRequestDelete, onQuickReply)
             }
@@ -226,8 +239,25 @@ private fun LazyListScope.chatRows(
     onRequestDelete: (ChatListViewModel.Row) -> Unit,
     onQuickReply: (ChatListViewModel.Row) -> Unit,
 ) {
-    items(rows, key = { it.conversation.uuid }) { row ->
-        Column(Modifier.animateItem()) {
+    itemsIndexed(rows, key = { _, row -> row.conversation.uuid }) { index, row ->
+        val position = liuliSegmentPosition(index, rows.size)
+        Column(
+            Modifier
+                .animateItem()
+                .padding(horizontal = LiuliHomeGeometry.gutter)
+                .liuliCardSegment(position, dark = LocalIsDarkTheme.current),
+        ) {
+            if (index > 0) {
+                // 行间分隔（卡内·自头像后起）：画在本段顶端、不随行左右滑动。
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = LiuliHomeGeometry.dividerInset)
+                        .testTag(LIULI_ROW_DIVIDER_TAG) // 纯装饰无语义节点，打标才能在测试里量起点（生产零影响）
+                        .height(0.5.dp)
+                        .background(LiuliMaterials.divider(LocalIsDarkTheme.current)),
+                )
+            }
             LiuliChatListRow(
                 row = row,
                 scheduleStatus = scheduleStatus[row.conversation.characterUuid],
@@ -238,7 +268,6 @@ private fun LazyListScope.chatRows(
                 onRequestDelete = { onRequestDelete(row) },
                 onQuickReply = { onQuickReply(row) },
             )
-            LiuliRowDivider()
         }
     }
 }

@@ -58,6 +58,14 @@ internal fun DiaryCommentThread.canReply(): Boolean =
 internal fun canLeaveExchangeNote(comments: List<DiaryCommentEntity>): Boolean =
     comments.none { it.isFromUser && it.parentCommentId == null }
 
+/** 评论作者名（纯函数·T1）：用户 → [meLabel]；角色 → 活名，查不到 → [aiLabel]。 */
+internal fun diaryCommentAuthorName(
+    comment: DiaryCommentEntity,
+    charactersByUuid: Map<String, CharacterEntity>,
+    meLabel: String,
+    aiLabel: String,
+): String = if (comment.isFromUser) meLabel else comment.characterUuid?.let { charactersByUuid[it]?.name } ?: aiLabel
+
 /**
  * 评论线程区（详情页·R3）：根评论行 + 回复行缩进 42dp + 「回复」入口（限 1 轮·发出后角色稍后回应，
  * 响应式 Flow 自动刷新）。删除沿用 DiaryCommentRow 长按（回复行同样可删）。
@@ -85,8 +93,12 @@ internal fun DiaryCommentThreadSection(
                     }
                 }
                 if (thread.canReply()) {
-                    val rootAuthor = thread.root.characterUuid?.let { charactersByUuid[it]?.name }
-                        ?: stringResource(R.string.diary_comment_author_ai)
+                    val rootAuthor = diaryCommentAuthorName(
+                        thread.root,
+                        charactersByUuid,
+                        stringResource(R.string.diary_role_me),
+                        stringResource(R.string.diary_comment_author_ai),
+                    )
                     ReplyAffordance(
                         rootAuthorName = rootAuthor,
                         rootId = thread.root.id,
@@ -107,10 +119,12 @@ private fun CommentThreadRow(
 ) {
     val character = comment.characterUuid?.let { charactersByUuid[it] }
     DiaryCommentRow(
-        authorName = when {
-            comment.isFromUser -> stringResource(R.string.diary_role_me)
-            else -> character?.name ?: stringResource(R.string.diary_comment_author_ai)
-        },
+        authorName = diaryCommentAuthorName(
+            comment,
+            charactersByUuid,
+            stringResource(R.string.diary_role_me),
+            stringResource(R.string.diary_comment_author_ai),
+        ),
         authorAvatarPath = character?.avatarPath,
         content = comment.content,
         timestampMillis = comment.timestamp,

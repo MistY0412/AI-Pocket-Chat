@@ -6,6 +6,7 @@ import androidx.room.Query
 import com.situ.aichat.data.local.entity.LogEntryEntity
 import com.situ.aichat.diagnostics.CallLogRecord
 import com.situ.aichat.diagnostics.LogListRow
+import com.situ.aichat.diagnostics.LogShapeRow
 import com.situ.aichat.diagnostics.LogToolInfoRow
 import kotlinx.coroutines.flow.Flow
 
@@ -25,12 +26,15 @@ interface LogDao {
      * 列表页：最新 [limit] 条倒序（Flow 实时刷新）。**轻投影** [LogListRow]——绝不 SELECT *：
      * 全量记录后正文列单条可达数十万字，整实体进列表 Flow = 每次刷新搬几十 MB（见 [LogListRow] KDoc）。
      */
-    @Query(
-        "SELECT id, timestampMillis, characterName, modelName, isSuccess, source, messageCount, " +
-            "durationMillis, errorMessage, promptTokens, completionTokens, cacheHitTokens, cacheMissTokens, " +
-            "isTokenEstimated FROM log_entries ORDER BY timestampMillis DESC, id DESC LIMIT :limit",
-    )
+    @Query("SELECT $LIST_COLUMNS FROM log_entries ORDER BY timestampMillis DESC, id DESC LIMIT :limit")
     fun recent(limit: Int): Flow<List<LogListRow>>
+
+    /** 省钱卡命中行（四期·图纸二 §3.5）：某来源最近 [limit] 条**成功**记录，轻投影同 [recent]。 */
+    @Query(
+        "SELECT $LIST_COLUMNS FROM log_entries WHERE source = :source AND isSuccess = 1 " +
+            "ORDER BY timestampMillis DESC, id DESC LIMIT :limit",
+    )
+    fun recentSuccessBySource(source: String, limit: Int): Flow<List<LogListRow>>
 
     /** 详情/分段页：按 id 取单条（D-3 UI；不存在返回 null）。 */
     @Query("SELECT * FROM log_entries WHERE id = :id")
@@ -58,13 +62,14 @@ interface LogDao {
 
     /**
      * 一键去隐私·SQL 步：清既有日志的正文（[LogEntryEntity.fullContext]/[LogEntryEntity.responseContent]/
-     * [LogEntryEntity.contextSegmentsJson]），保留时间/角色/模型/耗时/token 等元数据，返回受影响条数。
+     * [LogEntryEntity.contextSegmentsJson]/[LogEntryEntity.requestJson]），保留时间/角色/模型/耗时/token 等元数据，返回受影响条数。
      * **不动 toolInfoJson**——其内「名与计数=元数据恒存、参数预览=内容」只能代码级重消毒，
      * 完整入口 = [com.situ.aichat.diagnostics.ContextLogService.purgeSensitiveText]（复核 R1 补）。
+     * **不动 shapeJson / sendAdaptationJson**（四期·图纸三：只有指纹 / 计数，不含正文）。
      */
     @Query(
-        "UPDATE log_entries SET fullContext = '', responseContent = NULL, contextSegmentsJson = '' " +
-            "WHERE fullContext != '' OR responseContent IS NOT NULL OR contextSegmentsJson != ''",
+        "UPDATE log_entries SET fullContext = '', responseContent = NULL, contextSegmentsJson = '', requestJson = '' " +
+            "WHERE fullContext != '' OR responseContent IS NOT NULL OR contextSegmentsJson != '' OR requestJson != ''",
     )
     suspend fun purgeFullText(): Int
 
@@ -82,4 +87,19 @@ interface LogDao {
      */
     @Query("SELECT source, isSuccess, timestampMillis FROM log_entries WHERE timestampMillis >= :sinceMillis")
     suspend fun recordsSince(sinceMillis: Long): List<CallLogRecord>
+
+    /** 缓存断点（四期·图纸三 §3.7）：同一对话、同一来源、在它之前的最近一条成功记录的形状与分段。 */
+    @Query(
+        "SELECT id, timestampMillis, shapeJson, contextSegmentsJson FROM log_entries WHERE conversationUuid = :conversationUuid " +
+            "AND source = :source AND isSuccess = 1 AND (timestampMillis < :beforeTimestampMillis OR " +
+            "(timestampMillis = :beforeTimestampMillis AND id < :beforeId)) ORDER BY timestampMillis DESC, id DESC LIMIT 1",
+    )
+    suspend fun previousComparable(conversationUuid: String, source: String, beforeTimestampMillis: Long, beforeId: Long): LogShapeRow?
+
+    companion object {
+        /** 列表轻投影 [LogListRow] 的列清单（[recent] / [recentSuccessBySource] 共用·四期·图纸三单源）。 */
+        const val LIST_COLUMNS = "id, timestampMillis, characterName, modelName, isSuccess, source, messageCount, " +
+            "durationMillis, errorMessage, promptTokens, completionTokens, cacheHitTokens, cacheMissTokens, " +
+            "isTokenEstimated, conversationUuid, characterUuid, turnId, anchorMessageUuid, providerType, failureKind, httpStatus"
+    }
 }

@@ -82,6 +82,7 @@ class ScheduleLivenessInputTest {
         openLoops = listOf("用户下周面试"),
         recentMeetingAfterglow = ScheduleLivenessContext.AfterglowLine("昨天", "公园", "野餐"),
         recentDaysDigest = listOf("7月11日：上午画画、下午散步"),
+        ownPlans = listOf("14:00 进一批咖啡豆"),
     )
 
     // ── 满配段序（图纸 §3.3 表）──
@@ -101,6 +102,7 @@ class ScheduleLivenessInputTest {
             "【TA的长期记忆】",
             "【最近几天做过什么】",
             "【今天的约定】（这是TA今天必须兑现的真实约定）",
+            "【TA自己说过的打算】（TA之前在聊天里亲口说过、要在今天做的事）",
             "【近期已定的约定】（还没到日子，今天不要安排）",
             "【TA心里惦记的事】",
             "【最近见面】",
@@ -115,6 +117,14 @@ class ScheduleLivenessInputTest {
         }
         assertTrue(user.contains("- 今天15:00和用户见面，地点：美术馆，一起看展"))
         assertTrue(user.contains("- 陪用户去配眼镜"))
+        // 四期·图纸一 §3.7：【TA自己说过的打算】紧跟【今天的约定】块之后（中间只隔一个空行）。
+        assertTrue(
+            user.contains(
+                "同一件事若出现两条，只安排一次。\n\n【TA自己说过的打算】（TA之前在聊天里亲口说过、要在今天做的事）\n" +
+                    "- 14:00 进一批咖啡豆\n" +
+                    "这些是TA自己的安排，请排进今天的日程；原话里说了时间就按那个时间排。和【今天的约定】冲突时，以约定为准。",
+            ),
+        )
         assertTrue(user.contains("- 一起看烟花（7月20日）"))
         assertTrue(user.contains("昨天你们线下见过面：野餐（在公园）。"))
         assertTrue(user.contains("13. innerThought 的分寸："))
@@ -154,7 +164,7 @@ class ScheduleLivenessInputTest {
         // 故用块特有标记（头行全文/块内独有行）断言缺席，不用裸块名。
         for (header in listOf(
             "最近热衷：", "最近心情走向：", "关系阶段：", "【TA的长期记忆】", "【最近几天做过什么】",
-            "【今天的约定】（这是TA", "【近期已定的约定】（", "【TA心里惦记的事】", "【最近见面】", "【TA的经济状况】",
+            "【今天的约定】（这是TA", "【TA自己说过的打算】", "【近期已定的约定】（", "【TA心里惦记的事】", "【最近见面】", "【TA的经济状况】",
         )) {
             assertFalse("零素材不应出现: $header", user.contains(header))
         }
@@ -175,19 +185,22 @@ class ScheduleLivenessInputTest {
     }
 
     @Test
-    fun `F 禁令收窄_新文案逐字_旧文案绝迹`() {
+    fun `F 禁令再收窄_四期新文案逐字_旧文案绝迹`() {
         val user = genService.buildPrompt(
             req().copy(recentConversationSummary = "你：明天一起去看展\n夏晴子：好呀"),
         ).second
-        // 图纸二·人称指名：:269 的「和你」→「和${request.userName}」；此处 req() 默认 userName="用户"，故渲染「和用户」。
+        // 图纸二·人称指名：「和${request.userName}」；此处 req() 默认 userName="用户"，故渲染「和用户」。
+        // 四期·图纸一 §3.7 / M12：只禁自造与用户的约定，TA 自己的打算放行。
         assertTrue(
             user.contains(
                 "⚠️ 这段聊天只用来了解TA最近的生活状态和心情，可作为 innerThought 的素材。" +
-                    "不要从聊天里自行提取约定排进日程——今天要赴的约定一律以【今天的约定】为准。" +
+                    "不要从聊天里自造和用户的约定排进日程——今天要赴的约定一律以【今天的约定】为准；" +
+                    "TA自己说过要做的事（进货、看牙这类）可以照常排进日程。" +
                     "禁止在 activity 里写「和用户发消息/聊天/分享」之类的互动动作，禁止虚构任何对话引用。",
             ),
         )
         assertFalse(user.contains("只有当上方聊天记录里明确约定过某件事"))
+        assertFalse(user.contains("不要从聊天里自行提取约定排进日程"))
     }
 
     // ── E8 backfill 精简 ──
@@ -208,6 +221,7 @@ class ScheduleLivenessInputTest {
         assertFalse(user.contains("关系阶段：")) // 块特有行（裸块名会被规则 13 误伤）
         assertFalse(user.contains("【TA的长期记忆】"))
         assertFalse(user.contains("【今天的约定】（这是TA")) // 块头全文（裸块名会被规则 12 例外句误伤）
+        assertFalse("E36：backfill 无打算段", user.contains("【TA自己说过的打算】"))
         assertTrue(user.contains("【TA的经济状况】：宽裕"))
         assertTrue(user.contains("【注意】")) // 既有 backfill 注意块仍在
     }

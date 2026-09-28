@@ -28,6 +28,7 @@ import com.situ.aichat.ui.chat.chatListPreviewText
 import com.situ.aichat.ui.components.CharacterAvatar
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
+import com.situ.aichat.ui.liuli.designsystem.LiuliAvatarRing
 import com.situ.aichat.util.DateFormatters
 
 /** 行内小件的落值（§3.2「列表行」）：钉 14 · 状态点 4 · 名与状态 / 状态与时间之间的缝。 */
@@ -82,9 +83,14 @@ fun LiuliChatListRow(
         modifier = modifier,
         onRowLongClick = onQuickReply,
         actionFace = { action, faceModifier, onClick -> LiuliSwipeActionFace(action, faceModifier, onClick) },
+        translucentContent = true,
     ) {
         LiuliListRow(
-            avatar = { CharacterAvatar(name = row.displayName, avatarPath = row.character?.avatarPath, size = LiuliHomeGeometry.rowAvatar) },
+            avatar = {
+                LiuliAvatarRing(LiuliHomeGeometry.rowAvatar) {
+                    CharacterAvatar(name = row.displayName, avatarPath = row.character?.avatarPath, size = LiuliHomeGeometry.rowAvatarInner)
+                }
+            },
             primary = {
                 if (conv.isPinned) {
                     Icon(
@@ -123,7 +129,7 @@ fun LiuliChatListRow(
                 Text(
                     DateFormatters.relativeTimeString(conv.lastMessageDate ?: conv.creationDate, nowMillis, relStrings),
                     style = AppTypography.captionNumeric.copy(fontSize = 12.sp),
-                    color = colors.text.tertiary,
+                    color = colors.text.secondary,
                 )
             },
             secondary = {

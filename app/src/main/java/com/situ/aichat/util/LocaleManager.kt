@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import android.os.LocaleList
+import android.os.StrictMode
 import java.util.Locale
 
 /**
@@ -83,8 +84,24 @@ object LocaleManager {
      * - 曾选「跟随系统」/ 框架 applicationLocales 仍为空者：按**当前系统语言**归一到 zh-CN/en（保留其当下实际所见的语言）。
      * 幂等：一旦设过显式 locale，applicationLocales 即非空 → 后续启动直接 no-op（已无清空它的入口）。
      * 由 [com.situ.aichat.AIChatApplication.onCreate] 调用。
+     *
+     * **有意在主线程同步做**（启动主线程读盘清零 ⑤·图纸 docs/handoff/2026-09-28-启动主线程读盘清零.md）：真读写盘只发生在
+     * 装完后第一次启动（或老用户迁移）——读旧语言选择 + 系统落盘本 App 的语言（后者是 system_server 那边写、经 Binder 回传给
+     * StrictMode）。这一步要赶在第一个界面创建前做完：此刻改语言，系统只记下、不重建当前进程的界面（新装的第一个进程仍按
+     * 系统语言显示、下次启动起是中文——既有行为，修前修后装机截图一致）；挪去后台就晚于界面创建，系统可能把正在显示的
+     * 协议 / 引导页整页重建一次。所以不挪，只对 StrictMode 声明放行磁盘读写（限本函数、finally 原样还原），让体检报告只剩真问题。
+     * Android 13+ 之后每次启动查到系统里已有本 App 语言就返回、不碰盘。
      */
     fun ensureDefaultLocale(context: Context) {
+        val callerPolicy = StrictMode.allowThreadDiskWrites() // 同时放行读与写
+        try {
+            applyDefaultLocale(context)
+        } finally {
+            StrictMode.setThreadPolicy(callerPolicy)
+        }
+    }
+
+    private fun applyDefaultLocale(context: Context) {
         if (!usesFramework) {
             // <33：把可能残留的「跟随系统」([SYSTEM]) 选择迁成显式标签（wrap() 才能锁定单一语言解析）。
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

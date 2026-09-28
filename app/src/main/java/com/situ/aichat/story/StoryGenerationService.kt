@@ -9,6 +9,7 @@ import com.situ.aichat.data.model.CustomStoryPrompts
 import com.situ.aichat.data.model.MaxOutputLength
 import com.situ.aichat.data.remote.llm.ApiConfigValues
 import com.situ.aichat.data.remote.llm.LlmClient
+import com.situ.aichat.data.remote.llm.LlmRequestCapture
 import com.situ.aichat.data.remote.llm.StreamToken
 import com.situ.aichat.data.remote.llm.UsageDto
 import com.situ.aichat.diagnostics.ContextLogService
@@ -18,6 +19,7 @@ import com.situ.aichat.data.repository.ApiFunctionRouter
 import com.situ.aichat.data.repository.SettingsRepository
 import com.situ.aichat.data.repository.StoryRepository
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -125,10 +127,11 @@ class StoryGenerationService @Inject constructor(
 
         // 批 D 上下文日志：主生成（流式创作），捕获末帧 usage + 计时；收流后落一条（source=STORY_GENERATION·
         // 用户级 characterName=""·重任务截断），失败原样重抛前先记。fire-and-forget，不影响创作流。
+        val requestCapture = LlmRequestCapture() // 四期·图纸三：实际发出的请求
         val turnStart = System.currentTimeMillis()
         var usage: UsageDto? = null
         try {
-            llmClient.streamChat(
+            withContext(requestCapture) { llmClient.streamChat(
                 messages = request.messages,
                 config = config,
                 temperature = request.temperature,
@@ -147,11 +150,11 @@ class StoryGenerationService @Inject constructor(
                         if (preview.isNotEmpty()) onPreview(preview, buffer.length)
                     }
                 }
-            }
+            } }
         } catch (e: kotlin.coroutines.cancellation.CancellationException) {
             throw e
         } catch (e: Throwable) {
-            contextLog.recordError(LogSource.STORY_GENERATION, "", config.modelName, request.messages, e)
+            contextLog.recordError(LogSource.STORY_GENERATION, "", config.modelName, request.messages, e, capture = requestCapture)
             throw e
         }
 
@@ -163,7 +166,7 @@ class StoryGenerationService @Inject constructor(
         // 流成功（即便清洗后为空也算一次真实 LLM 调用，记原始输出）；空检查在落库之后。
         contextLog.recordSuccess(
             LogSource.STORY_GENERATION, "", config.modelName, request.messages, buffer.toString(),
-            System.currentTimeMillis() - turnStart, usage,
+            System.currentTimeMillis() - turnStart, usage, capture = requestCapture,
         )
         val cleaned = StoryTextCleaning.cleanContentThinkingTags(buffer.toString())
         Log.d(TAG, "创作输出：${cleaned.length} 字")

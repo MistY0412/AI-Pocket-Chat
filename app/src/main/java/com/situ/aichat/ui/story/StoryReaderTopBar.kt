@@ -185,7 +185,7 @@ private fun TitleCapsule(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                storyTitle?.takeIf { it.isNotBlank() } ?: stringResource(R.string.story_reader_untitled),
+                storyReaderCapsuleTitle(storyTitle),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 fontFamily = FontFamily.Serif,
@@ -194,9 +194,9 @@ private fun TitleCapsule(
                 color = titleColor,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            chapter?.let {
+            storyReaderChapterSuffix(chapter)?.let {
                 Text(
-                    "· " + stringResource(R.string.story_reader_chapter_n, it.chapterNumber),
+                    it,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     color = secondaryColor,

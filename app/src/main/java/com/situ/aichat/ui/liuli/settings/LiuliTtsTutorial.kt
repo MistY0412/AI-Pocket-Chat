@@ -24,7 +24,9 @@ import androidx.compose.ui.unit.dp
 import com.situ.aichat.tts.TtsProviderType
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
-import com.situ.aichat.ui.liuli.designsystem.liuliCardSurface
+import com.situ.aichat.ui.liuli.designsystem.liuliCardMaterial
+import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import com.situ.aichat.ui.settings.tutorialContent
 
 /** 教程卡内距 / 行间缝 / 雪佛龙尺寸（逐字照暖陶 `TtsProviderTutorial` 的 12 / 6 / 默认 24）。 */
@@ -46,7 +48,7 @@ internal fun LiuliTtsTutorialCard(provider: TtsProviderType, modifier: Modifier 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .liuliCardSurface()
+            .liuliCardMaterial(LiuliShapes.medium, LocalIsDarkTheme.current)
             .clickable(role = Role.Button) { expanded = !expanded }
             .padding(CARD_PAD),
         verticalArrangement = Arrangement.spacedBy(CARD_GAP),

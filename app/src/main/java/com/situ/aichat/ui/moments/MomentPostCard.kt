@@ -43,6 +43,7 @@ import com.situ.aichat.data.local.entity.MomentPostWithRelations
 import com.situ.aichat.data.model.MomentAuthorType
 import com.situ.aichat.data.model.imagePaths
 import com.situ.aichat.moments.MomentCommentTreeBuilder
+import com.situ.aichat.moments.MomentMentionRules
 import com.situ.aichat.ui.components.AppMotion
 import com.situ.aichat.ui.components.CharacterAvatar
 import com.situ.aichat.ui.components.LocalAppHaptics
@@ -74,6 +75,14 @@ fun MomentPostCard(
     onToggleLike: () -> Unit,
     modifier: Modifier = Modifier,
     onCharacterTap: ((String) -> Unit)? = null,
+    /** 卡面材质（琉璃 2.0 卷六·二「材质外给」：默认 = 暖陶承托，琉璃传半透明卡）。 */
+    surface: Modifier = Modifier.appCardSurface(),
+    /** 点击面（排在材质裁切之后 → ripple 不漏圆角）。暖陶把点击放在外层 [modifier] / 外包 Box 上，不传本形参。 */
+    interaction: Modifier = Modifier,
+    /** 评论小笺的底（默认 = 暖陶 sunken 圆角 8 内衬；琉璃传 segTrack）。 */
+    noteSurface: Modifier = Modifier.clip(AppShapes.small).background(AppTheme.colors.surface.sunken),
+    /** 头部头像的外框（默认 = 原样画头像；琉璃传光环）。 */
+    avatarFrame: @Composable (avatar: @Composable () -> Unit) -> Unit = { it() },
 ) {
     val entity = post.post
     val likes = post.likes
@@ -101,7 +110,8 @@ fun MomentPostCard(
         // 圆角 16 单源在内；内边距 16 / 元素间距 12 沿用。
         modifier = modifier
             .fillMaxWidth()
-            .appCardSurface()
+            .then(surface)
+            .then(interaction)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -125,6 +135,7 @@ fun MomentPostCard(
             } else {
                 null
             },
+            avatarFrame = avatarFrame,
         )
 
         if (entity.content.isNotEmpty()) {
@@ -135,6 +146,8 @@ fun MomentPostCard(
         if (images.isNotEmpty()) {
             MomentImageGrid(imagePaths = images)
         }
+        val mentionNames = remember(entity.mentionedCharacterUuidsJson, characterDict) { MomentMentionRules.displayNames(entity, characterDict) }
+        if (mentionNames.isNotEmpty()) MomentMentionLine(mentionNames)
 
         InteractionBar(
             likesCount = likes.size,
@@ -153,6 +166,7 @@ fun MomentPostCard(
                 characterDict = characterDict,
                 meLabel = meLabel,
                 aiLabel = aiLabel,
+                noteSurface = noteSurface,
             )
         }
     }
@@ -165,6 +179,7 @@ private fun HeaderRow(
     avatarPath: String?,
     timeText: String,
     onTap: (() -> Unit)?,
+    avatarFrame: @Composable (avatar: @Composable () -> Unit) -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Row(
@@ -177,7 +192,9 @@ private fun HeaderRow(
                 Modifier
             },
         ) {
-            CharacterAvatar(name = monogramName, avatarPath = avatarPath, size = 34.dp) // moments-ui-8：1:1 iOS AvatarSize.mini(34)
+            avatarFrame {
+                CharacterAvatar(name = monogramName, avatarPath = avatarPath, size = 34.dp) // moments-ui-8：1:1 iOS AvatarSize.mini(34)
+            }
             Spacer(Modifier.width(10.dp))
             Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = AppTheme.colors.text.primary)
         }
@@ -314,14 +331,14 @@ private fun CommentPreview(
     characterDict: Map<String, CharacterEntity>,
     meLabel: String,
     aiLabel: String,
+    noteSurface: Modifier,
 ) {
     // 「评论小笺」（契约 §2.1·D4 拍板）：分隔线退场，预览坐进 sunken 圆角 8 内衬（手账内衬感）；
     // 「查看全部」深陶 accent.text（×sunken 实测 4.53:1 ≥4.5·ColorContrastTest 看门）。
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(AppShapes.small)
-            .background(AppTheme.colors.surface.sunken)
+            .then(noteSurface)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {

@@ -23,7 +23,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,11 +77,11 @@ fun StoryFieldEditorScreen(
     var confirmRestore by remember { mutableStateOf(false) }
 
     // 路由参数不认识（老链接 / 脏参数）→ 不渲染半截页，直接退出。
-    LaunchedEffect(viewModel.invalid) { if (viewModel.invalid) onBack() }
+    StoryFieldEditorInvalidEffect(viewModel.invalid, onBack)
 
     val s = state
     fun leave() {
-        if (s?.dirty == true) confirmDiscard = true else onBack()
+        if (storyFieldEditorNeedsConfirm(s)) confirmDiscard = true else onBack()
     }
     BackHandler { leave() }
 
@@ -109,12 +108,7 @@ fun StoryFieldEditorScreen(
             ) {
                 // 副标题（原在顶栏 title 槽第二行·取值表达式原样搬含空白守卫）：横向内边距由外层 Column
                 // 已给的 16dp 承担，这里只补竖向 8dp（图纸 §4.7·落值登记 §11 D-5）。
-                val subtitle = when {
-                    s.field == null -> null
-                    s.isArchive -> s.bookTitle
-                    else -> stringResource(R.string.story_field_editor_sub_book)
-                }
-                subtitle?.takeIf { it.isNotBlank() }?.let {
+                storyFieldEditorSubtitle(s)?.let {
                     Text(
                         it,
                         style = AppTypography.settingsRowSubtitle,
@@ -212,24 +206,19 @@ private fun ModeSegment(mode: StoryFieldMode, onSelect: (StoryFieldMode) -> Unit
         selected = mode,
         onSelect = onSelect,
         modifier = Modifier.fillMaxWidth(),
-        label = {
-            stringResource(
-                when (it) {
-                    StoryFieldMode.FOLLOW -> R.string.story_field_mode_follow
-                    StoryFieldMode.CUSTOM -> R.string.story_field_mode_custom
-                    StoryFieldMode.OFF -> R.string.story_field_mode_off
-                },
-            )
-        },
+        label = { stringResource(storyFieldModeLabelRes(it)) },
     )
 }
 
 /** 「跟随全局」态：把这一层**实际会注入**的文本原样摊开（只读·凹陷底），不让用户猜跟随的是什么。 */
 @Composable
-private fun InheritedPreview(text: String?) {
+internal fun InheritedPreview(
+    text: String?,
+    surface: Modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(AppTheme.colors.surface.sunken),
+) {
     val c = AppTheme.colors
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.surface.sunken).padding(12.dp),
+        Modifier.fillMaxWidth().then(surface).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(

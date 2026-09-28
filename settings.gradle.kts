@@ -21,8 +21,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "AI Pocket Chat"
 include(":app")
-// :baselineprofile 暂停（依赖升级 2026-06·M3）：最新【稳定版】baselineprofile/benchmark 1.4.1 与 AGP 9.2.1
-// 不兼容（BaselineProfileAppTargetPlugin → "Module :app is not a supported android module"），唯一支持 AGP 9.x
-// 的是 1.5.0-alpha。按「只用最新稳定版」拍板暂停该模块（损失冷启动 baseline profile 优化·非功能性）。
-// 待官方稳定版 1.5 发布后恢复：取消下行注释 + 恢复 app/build.gradle.kts 的 baselineprofile 插件与 baselineProfile(project) 依赖。
-// include(":baselineprofile")
+// :baselineprofile 已恢复（依赖升级轮三 2026-09-24）：2026-06 因 benchmark 只有 1.5.0-alpha 支持 AGP 9.x 而暂停，
+// 1.5.0 正式版发布后恢复。本模块只做 Baseline Profile 生成 + 启动宏基准；重新生成 profile 须连设备跑，量化以真机批为准。
+include(":baselineprofile")

@@ -9,9 +9,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -87,7 +89,7 @@ class LiuliFoldedTextTest {
         compose.setContent {
             CompositionLocalProvider(LocalAppHaptics provides haptics) {
                 var expanded by remember { mutableStateOf(false) }
-                Box(Modifier.width(260.dp)) {
+                Box(Modifier.width(260.dp).testTag(FOLD_BOX)) {
                     LiuliFoldableText(
                         text = text,
                         style = AppTypography.body,
@@ -97,7 +99,6 @@ class LiuliFoldedTextTest {
                         expanded = expanded,
                         onExpand = { state.expand("m1"); expanded = true },
                         fadeColor = Color.White,
-                        stamp = { androidx.compose.material3.Text("21:43") },
                     )
                 }
             }
@@ -140,26 +141,23 @@ class LiuliFoldedTextTest {
         assertTrue(state.isExpanded("m1"))
     }
 
-    /** 折叠态时间戳与「展开全文」同一行（§4.10）——戳恒在，折与不折都读得到。 */
-    @Test fun stamp_staysVisibleWhileFolded() {
-        setFoldable(linesOf(20))
-        compose.onNodeWithText("21:43").assertIsDisplayed()
-    }
-
     /**
      * 复核 R1 🔴-1（REDLINES「a11y 48dp」）：「展开全文」是新交互面——点击面 ≥ 48 高、居中外溢，
-     * 版位仍是一行字：戳与之底对齐，所以戳底必须落在 48 框**内部**（框的下半截外溢到戳底之下）；
-     * 若版位被撑成 48，戳底会与框底重合。（Robolectric 字形度量是假的，故不拿字高本身当期望值。）
+     * 版位仍是一行字：48 框的下半截必须外溢到折叠件整体底边之下；若版位被撑成 48，框底会与件底重合。
+     * （卷三：戳已挪到泡下，改拿折叠件自身的底边作参照；Robolectric 字形度量是假的，故不拿字高本身当期望值。）
      */
     @Test fun expandLabel_has48dpTouchTarget_withoutGrowingTheRow() {
         setFoldable(linesOf(20))
         val label = compose.onNodeWithText("展开全文").getUnclippedBoundsInRoot()
-        val stamp = compose.onNodeWithText("21:43").getUnclippedBoundsInRoot()
+        val box = compose.onNodeWithTag(FOLD_BOX).getUnclippedBoundsInRoot()
         assertTrue("触达高 ${label.bottom - label.top} 应 ≥ 48", (label.bottom - label.top).value >= 47.5f)
         assertTrue(
-            "版位没被撑高：戳底 ${stamp.bottom} 应在触达框底 ${label.bottom} 之上（框外溢到戳下面），而不是与之重合",
-            stamp.bottom.value < label.bottom.value - 3f,
+            "版位没被撑高：触达框底 ${label.bottom} 应外溢到折叠件底 ${box.bottom} 之下，而不是与之重合",
+            label.bottom.value > box.bottom.value + 3f,
         )
-        assertTrue("外溢对称：框顶 ${label.top} 应高于戳顶 ${stamp.top}", label.top.value < stamp.top.value)
+    }
+
+    private companion object {
+        const val FOLD_BOX = "foldBox"
     }
 }

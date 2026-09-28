@@ -1,5 +1,6 @@
 package com.situ.aichat.prompt
 
+import com.situ.aichat.prompt.timesense.TimeSenseLines
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -9,7 +10,8 @@ import java.time.temporal.ChronoUnit
 /**
  * 时间锚（方案 G2 → 布局审计刀2「现在卡」改造，2026-07-11 过审）：生成 `<time_context>` 块 =
  * 客观时间事实（当前时刻/星期/间隔）+ **间隔五档措辞**。设计要点：
- * - 间隔行自带方向：「{userLabel}隔了约 X 才回你」（项目里最后一条消息恒为角色的，方向恒定——用户补充拍板）；
+ * - 间隔行自带方向：「{userLabel}隔了约 X 回你」（项目里最后一条消息恒为角色的，方向恒定——用户补充拍板；四期去「才」）；
+ *   在线文字聊天自四期起由 [TimeSenseLines.gapLine]「这条消息距离上条过去了约 X」取代（语音通话仍用本行）；
  * - 用户称呼**块级单源** [USER_LABEL_FALLBACK] 规则：有昵称叫昵称、空才叫「对方」，相识行与间隔行共用（图纸 §13）；
  * - 五档取代旧的一刀切「重新拿起手机」段：短憩(<10min 静默)/小隔(10min–2h 仅间隔行)/半日(≥2h，
  *   按时长分"这几个小时/这大半天")/跨夜(隔 1 自然日且 ≥6h)/数日(2–7 天)/久别(>7 天)；
@@ -41,10 +43,11 @@ object TimeAnchorFormatter {
     internal const val USER_LABEL_FALLBACK = "对方"
 
     /**
-     * @param directionalGapLine 间隔行措辞:true=「{userLabel}隔了约X才回你」(即时聊天,最后一条恒为角色的,方向成立);
+     * @param directionalGapLine 间隔行措辞:true=「{userLabel}隔了约X回你」(即时聊天,最后一条恒为角色的,方向成立);
      * false=中性「距离你上条回复：约X」——**延迟生成路**(进程恢复补生成)必须用中性:那段延迟是系统的,
      * 方向化会把锅甩给用户(T5 复核🟡④·2026-07-11 修)。
      * @param userLabel 块内对用户的统一称呼：昵称非空即昵称，空则 [USER_LABEL_FALLBACK]；相识行与方向化间隔行共用。
+     * @param sense 四期·图纸一 §3.5：日子行 / 「这条消息距离上条」行 / 作息行 + 两句附言；非 null 时取代旧间隔行。
      */
     fun buildTimeAnchor(
         now: Instant,
@@ -52,10 +55,13 @@ object TimeAnchorFormatter {
         directionalGapLine: Boolean = true,
         acquaintance: AcquaintanceFacts? = null,
         userLabel: String = USER_LABEL_FALLBACK,
+        /** 四期：非 null = 在线文字聊天（非通话 / 非延迟 / 非线下）。 */
+        sense: TimeSenseLines? = null,
     ): String {
         val lines = mutableListOf<String>()
         lines.add(formatCurrentMoment(now))
-        // 相识行（图纸 §4.2）：现在卡第二行，紧随「现在：…」——与现在日期并排，模型可自算周年。
+        sense?.let { lines.addAll(it.calendarLines) }
+        // 相识行（图纸 §4.2）：紧随「现在：…」与日子行——与现在日期并排，模型可自算周年。
         val acqLine = acquaintance?.let { acquaintanceLine(it, now, userLabel) }
         acqLine?.let { lines.add(it) }
 
@@ -63,12 +69,18 @@ object TimeAnchorFormatter {
         if (lastAssistantTime == null) {
             // D-9：相识行在场时不出「第一次对话」句——老角色新开对话串，两句同段自相矛盾。
             if (acqLine == null) lines.add("这是你们的第一次对话")
-            return wrap(lines, tierNote = null)
+            sense?.rhythmLine?.let { lines.add(it) }
+            return wrap(lines, tierNote = null, sense = sense, ongoing = false)
         }
 
-        formatSinceLastAssistant(now, lastAssistantTime, directionalGapLine, userLabel)?.let { lines.add(it) }
+        if (sense != null) {
+            sense.gapLine?.let { lines.add(it) }
+            sense.rhythmLine?.let { lines.add(it) }
+        } else {
+            formatSinceLastAssistant(now, lastAssistantTime, directionalGapLine, userLabel)?.let { lines.add(it) }
+        }
         val seconds = Duration.between(lastAssistantTime, now).seconds
-        return wrap(lines, gapTierNote(now, lastAssistantTime, seconds))
+        return wrap(lines, gapTierNote(now, lastAssistantTime, seconds), sense, ongoing = true)
     }
 
     /**
@@ -85,7 +97,7 @@ object TimeAnchorFormatter {
     }
 
     /**
-     * 间隔行（自带方向）：间隔 < 10 分钟返回 null（正常聊天节奏不显示）；否则「{userLabel}隔了约 X 才回你」。
+     * 间隔行（自带方向）：间隔 < 10 分钟返回 null（正常聊天节奏不显示）；否则「{userLabel}隔了约 X 回你」（四期去「才」）。
      * 旧「（跨夜）/（跨日）」后缀已废——跨夜语义由五档措辞承担，不再叠标注。
      */
     fun formatSinceLastAssistant(
@@ -99,9 +111,19 @@ object TimeAnchorFormatter {
         if (seconds < 600) return null
         val duration = gapDurationForLine(seconds)
         // 相识天数 R1 用户拍板（图纸 §13）：方向化间隔行改用块级 [userLabel]，与相识行同一个称呼；
-        // 昵称为空时退回 [USER_LABEL_FALLBACK] = 旧文案「对方隔了…才回你」逐字不变。
+        // 昵称为空时退回 [USER_LABEL_FALLBACK]（「对方隔了…回你」）。四期·图纸一 §3.5 M7 去「才」（不带情绪预设）。
         // 中性变体（延迟生成路）不提人，保持原样。
-        return if (directional) "${userLabel}隔了${duration}才回你" else "距离你上条回复：$duration"
+        return if (directional) "${userLabel}隔了${duration}回你" else "距离你上条回复：$duration"
+    }
+
+    /**
+     * 精确间隔（四期·图纸一 §3.3 锁定）：< 60 分钟按分钟四舍五入「约 N 分钟」（至少 1）；否则同 [gapDurationForLine]
+     * （约 N 小时 / 天 / 周 / 个月 / 一年多）。历史停顿标记与现在卡「这条消息距离上条」行共用；返回值**自带「约」**。
+     */
+    internal fun formatGapPrecise(seconds: Long): String {
+        val minutes = Math.round(seconds / 60.0).toInt()
+        if (minutes < 60) return "约 ${minutes.coerceAtLeast(1)} 分钟"
+        return gapDurationForLine(seconds)
     }
 
     /** 间隔行用时长文案：复用 [formatDuration]，仅 ≥1 年档改成能嵌进句子的「一年多」。 */
@@ -233,13 +255,16 @@ object TimeAnchorFormatter {
     }
 
     /**
-     * 包成 <time_context> 块 + 事实后附言：基础护栏一句始终在；[tierNote] 非空时接续同段（五档措辞 + 保命附言）。
+     * 包成 <time_context> 块 + 事实后附言：基础护栏一句始终在；四期（[sense] 非 null）按条件接「停顿降温句」
+     * （[ongoing] = 已有角色消息）与「日子提一次」句；[tierNote] 非空时接续同段（五档措辞 + 保命附言）。
      * 「（这段是给你看的，不要在回复里输出。）」已移至 currentMoment 末尾（现在卡合并后全卡只留一处）。
      */
-    private fun wrap(lines: List<String>, tierNote: String?): String {
+    private fun wrap(lines: List<String>, tierNote: String?, sense: TimeSenseLines? = null, ongoing: Boolean = false): String {
         val xmlBlock = "<time_context>\n${lines.joinToString("\n")}\n</time_context>"
         val note = buildString {
             append("↑ 以上是此刻的真实时间，以它为准。")
+            if (sense != null && ongoing) append(TimeSenseLines.PAUSE_DAMPENER)
+            if (sense != null && sense.calendarLines.isNotEmpty()) append(TimeSenseLines.CALENDAR_ONCE_NOTE)
             if (tierNote != null) append(tierNote)
         }
         return "$xmlBlock\n$note"
@@ -268,6 +293,7 @@ object TimeAnchorFormatter {
     internal const val TOPIC_PRIORITY_NOTE =
         "开口先回应对方这条消息本身；对方开了新话题就跟着新话题走，别硬把话题拉回上次。"
 
+    /** 四期·图纸一 §4 M7b（09-27 拍板）：删括号例子，防弱模型把例子当真事照抄。 */
     internal const val PERSISTENT_NOTE =
-        "长期、持续的事（还在感冒、人在外地）本来就会延续——具体哪些还算数、此刻你是什么状态，你按现在的时间自己判断。"
+        "前面聊到的长期、持续的事，本来就会延续——具体哪些还算数、此刻你是什么状态，你按现在的时间自己判断。"
 }

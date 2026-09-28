@@ -14,11 +14,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.RectangleShape
 import com.situ.aichat.ui.liuli.designsystem.LiuliButton
 import com.situ.aichat.ui.liuli.designsystem.LiuliButtonStyle
+import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
 import com.situ.aichat.ui.liuli.glass.LiuliGlassSpec
-import com.situ.aichat.ui.liuli.glass.LiuliGlassStyle
 import com.situ.aichat.ui.liuli.glass.liuliGlass
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import androidx.compose.foundation.layout.heightIn
@@ -60,7 +59,7 @@ fun LiuliSaveBar(
                 },
             )
             // 方角玻璃：栏是横贯到底的一条，不是药丸（契约「Panel 档玻璃 rect」）。
-            .liuliGlass(RectangleShape, dark = dark, style = LiuliGlassStyle.Panel),
+            .liuliGlass(LiuliShapes.rect, dark = dark),
     ) {
         Box(Modifier.fillMaxWidth().height(LiuliGlassSpec.hairlineWidth).background(hairline))
         Row(

@@ -56,6 +56,15 @@ class LiuliSecondaryFacesTest {
         assertEquals(wrapped - 1, wrapper)
     }
 
+    @Test fun 编辑页包装与暖陶同签名() {
+        // 琉璃 2.0 卷五 §3.7：暖陶 CharacterEditScreen = 6 个回调 / 开关 + 1 个 VM 默认形参。
+        val wrapper = declaredParams(FACES_CHARACTER, "SkinnedCharacterEditScreen")
+        val wrapped = declaredParams(WARM_CHARACTER_EDIT, "CharacterEditScreen")
+        assertEquals(6, wrapper)
+        assertEquals("暖陶编辑页 = 6 参 + 1 个 VM 默认形参", 7, wrapped)
+        assertEquals(wrapped - 1, wrapper)
+    }
+
     private companion object {
         const val FACES_SETTINGS = "com.situ.aichat.ui.liuli.settings.LiuliSettingsFacesKt"
         const val FACES_CHARACTER = "com.situ.aichat.ui.liuli.character.LiuliCharacterFacesKt"
@@ -63,5 +72,6 @@ class LiuliSecondaryFacesTest {
         const val WARM_APPEARANCE = "com.situ.aichat.ui.settings.AppearanceSettingsScreenKt"
         const val WARM_NOTIFICATION = "com.situ.aichat.ui.settings.NotificationSettingsScreenKt"
         const val WARM_CHARACTER = "com.situ.aichat.ui.character.CharacterProfileScreenKt"
+        const val WARM_CHARACTER_EDIT = "com.situ.aichat.ui.character.CharacterEditScreenKt"
     }
 }

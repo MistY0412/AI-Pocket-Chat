@@ -48,10 +48,11 @@ fun AIPocketChatTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // 动态取色默认翻转为品牌调色板（Monet 降为 opt-in·设计语言 §1.5）；管线/开关保留，沉没成本零。
     dynamicColor: Boolean = false,
-    // 界面「脸」（暖陶默认 / 琉璃·与深浅正交·见 FABLE5_THEME_LIULI_PROPOSAL.md §7.1）。
+    // 界面「脸」（暖陶 / 琉璃·与深浅正交·见 FABLE5_THEME_LIULI_PROPOSAL.md §7.1）。产品里 AppRoot 总是显式传用户的脸
+    // （默认琉璃 = AppSkin.DEFAULT）；这里的暖陶只是没传时的兜底——单测 / 预览不传就画暖陶那张脸，别改成 DEFAULT。
     skin: AppSkin = AppSkin.CLAY,
-    // 琉璃玻璃透明度档（只影响琉璃的玻璃片；暖陶下无消费者）。
-    glassTier: GlassTier = GlassTier.CLEAR,
+    // 琉璃玻璃质感档（默认通透·只影响琉璃的玻璃片；暖陶下无消费者）。
+    glassTier: GlassTier = GlassTier.SHEER,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = when {

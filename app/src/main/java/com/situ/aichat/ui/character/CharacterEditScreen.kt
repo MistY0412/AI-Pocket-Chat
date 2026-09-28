@@ -1,9 +1,5 @@
 package com.situ.aichat.ui.character
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -62,9 +57,6 @@ import com.situ.aichat.ui.designsystem.AppChoiceChip
 import com.situ.aichat.ui.designsystem.AppSegmentedControl
 import com.situ.aichat.ui.designsystem.AppSwitch
 import com.situ.aichat.ui.worldbook.WorldBookBindingSection
-import com.situ.aichat.util.AvatarStore
-import com.situ.aichat.util.WallpaperStore
-import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Calendar
 import java.util.Date
@@ -98,21 +90,8 @@ fun CharacterEditScreen(
     val compiling by viewModel.compiling.collectAsStateWithLifecycle()
     val personaNeedsSave by viewModel.personaNeedsSave.collectAsStateWithLifecycle()
 
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    var pendingAvatarCropUri by remember { mutableStateOf<Uri?>(null) }
-    val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        // 选完图先进圆形取景裁剪屏（甲 3）；「就这样」才存裁好的成品图，「取消」不改原头像。
-        pendingAvatarCropUri = uri
-    }
-    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
-    // 本次编辑会话内裁剪产生的中间成品图路径（只含本会话 WallpaperStore.save 出来的·绝不含 DB 在用路径）；
-    // 重选/移除时即时回收防孤儿（复核 confirmed MED）；取消/退出不保存遗留的由冷启 WallpaperMaintenanceService 兜底。
-    val sessionCroppedWallpapers = remember { mutableListOf<String>() }
-    val pickWallpaper = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        // 选完图先进裁剪取景编辑器（契约 §10 C1）；「完成」才存裁好的成品图，「取消」不改。
-        pendingCropUri = uri
-    }
+    // 头像 / 壁纸「选图 → 裁剪 → 存」流程（琉璃 2.0 卷五 §3.1：抽成两张脸共用件）。
+    val media = rememberCharacterEditMediaFlow(viewModel)
 
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -161,7 +140,7 @@ fun CharacterEditScreen(
                             avatarPath = state.avatarPath,
                             size = 96.dp,
                             modifier = Modifier.clickable {
-                                pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                media.pickAvatar()
                             },
                         )
                         Surface(color = MaterialTheme.colorScheme.primary, shape = CircleShape) {
@@ -170,7 +149,7 @@ fun CharacterEditScreen(
                                 contentDescription = stringResource(R.string.char_avatar_change),
                                 tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.padding(6.dp).clickable {
-                                    pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    media.pickAvatar()
                                 },
                             )
                         }
@@ -187,12 +166,8 @@ fun CharacterEditScreen(
             SectionHeader(stringResource(R.string.char_section_wallpaper))
             WallpaperPicker(
                 wallpaperPath = state.chatWallpaperPath,
-                onPick = { pickWallpaper.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                onRemove = {
-                    sessionCroppedWallpapers.forEach { WallpaperStore.delete(it) }
-                    sessionCroppedWallpapers.clear()
-                    viewModel.update { it.copy(chatWallpaperPath = null) }
-                },
+                onPick = media.pickWallpaper,
+                onRemove = media.removeWallpaper,
             )
             Text(
                 stringResource(R.string.char_wallpaper_hint),
@@ -485,11 +460,11 @@ fun CharacterEditScreen(
 
             // ---- 见面回忆（角色档案，仅编辑模式 → 10.2e M16；也是兜底 Toast 指向的页面） ----
             if (viewModel.isEditing) {
-                SectionHeader("见面回忆")
+                SectionHeader(CharacterEditText.MEETINGS_SECTION)
                 AppButton(onClick = { viewModel.editingUuid?.let(onOpenOfflineMeetings) }, style = AppButtonStyle.Text) {
-                    Text("查看见面回忆")
+                    Text(CharacterEditText.MEETINGS_OPEN)
                 }
-                SectionFooter("线下见面的纪念卡、只读回顾与规则兜底摘要的手动重试。")
+                SectionFooter(CharacterEditText.MEETINGS_FOOTER)
             }
 
             Spacer(Modifier.height(24.dp))
@@ -520,58 +495,6 @@ fun CharacterEditScreen(
         }
     }
 
-    // 头像圆形取景裁剪屏（甲 3·选图后调整取景·「就这样」才存成品图）。
-    pendingAvatarCropUri?.let { uri ->
-        AvatarCropScreen(
-            uri = uri,
-            onCancel = { pendingAvatarCropUri = null },
-            onConfirm = { cropped ->
-                scope.launch {
-                    AvatarStore.save(context, cropped)?.let { path -> viewModel.update { it.copy(avatarPath = path) } }
-                }
-                pendingAvatarCropUri = null
-            },
-        )
-    }
-
-    // 聊天壁纸裁剪取景编辑器（契约 §10·选图后全屏调整取景·完成存裁好成品图）。
-    pendingCropUri?.let { uri ->
-        WallpaperCropScreen(
-            imageUri = uri,
-            onCancel = { pendingCropUri = null },
-            onConfirm = { cropped ->
-                scope.launch {
-                    WallpaperStore.save(context, cropped)?.let { path ->
-                        // 即时回收本会话上一张中间成品图（只删本会话 save 出来的·绝不碰 DB 在用壁纸）。
-                        sessionCroppedWallpapers.forEach { WallpaperStore.delete(it) }
-                        sessionCroppedWallpapers.clear()
-                        sessionCroppedWallpapers.add(path)
-                        viewModel.update { it.copy(chatWallpaperPath = path) }
-                    }
-                }
-                pendingCropUri = null
-            },
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-private object PastOrPresentDates : SelectableDates {
-    override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis <= System.currentTimeMillis()
-    override fun isSelectableYear(year: Int): Boolean = year <= Calendar.getInstance().get(Calendar.YEAR)
-}
-
-/** 2000-01-01 local, matching iOS's default birthday seed. */
-private fun defaultBirthdayMillis(): Long =
-    Calendar.getInstance().apply {
-        clear()
-        set(2000, Calendar.JANUARY, 1)
-    }.timeInMillis
-
-private fun yearsSince(millis: Long): Int {
-    val birth = Calendar.getInstance().apply { timeInMillis = millis }
-    val now = Calendar.getInstance()
-    var age = now.get(Calendar.YEAR) - birth.get(Calendar.YEAR)
-    if (now.get(Calendar.DAY_OF_YEAR) < birth.get(Calendar.DAY_OF_YEAR)) age--
-    return age
+    // 头像圆形取景裁剪屏 + 聊天壁纸裁剪取景编辑器（两枚全屏裁剪 Dialog·与主题无关·卷五 §3.1 共用件）。
+    CharacterEditMediaDialogs(media)
 }

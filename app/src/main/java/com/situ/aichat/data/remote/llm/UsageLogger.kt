@@ -15,8 +15,8 @@ object UsageLogger {
 
     fun log(usage: UsageDto, providerType: ApiProviderType, modelName: String) {
         val reasoning = usage.completionTokensDetails?.reasoningTokens ?: 0
-        val cacheHit = usage.promptCacheHitTokens ?: 0
-        val cacheMiss = usage.promptCacheMissTokens ?: 0
+        val cacheHit = UsageCacheTokens.hit(usage) ?: 0
+        val cacheMiss = UsageCacheTokens.miss(usage) ?: 0
         val prompt = usage.promptTokens ?: 0
         val completion = usage.completionTokens ?: 0
 
@@ -36,8 +36,8 @@ object UsageLogger {
      * High rate ⇒ stable prompt prefix (system / fixed history) ⇒ much cheaper.
      */
     fun cacheHitRate(usage: UsageDto): Double? {
-        val hit = usage.promptCacheHitTokens ?: 0
-        val miss = usage.promptCacheMissTokens ?: 0
+        val hit = UsageCacheTokens.hit(usage) ?: 0
+        val miss = UsageCacheTokens.miss(usage) ?: 0
         val total = hit + miss
         if (total <= 0) return null
         return hit.toDouble() / total.toDouble()

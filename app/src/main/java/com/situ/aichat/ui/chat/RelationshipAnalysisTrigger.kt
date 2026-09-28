@@ -13,6 +13,7 @@ import com.situ.aichat.data.remote.llm.ApiConfigValues
 import com.situ.aichat.data.repository.ApiConfigRepository
 import com.situ.aichat.data.repository.CharacterRepository
 import com.situ.aichat.data.repository.CharacterWriteLock
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.prompt.growth.AffectKernel
 import com.situ.aichat.prompt.growth.AnalysisPacing
 import com.situ.aichat.prompt.growth.GrowthAnalysisCoordinator
@@ -23,7 +24,9 @@ import com.situ.aichat.prompt.growth.RelationshipAnalysisCoordinator
 import com.situ.aichat.prompt.growth.RelationshipAnalysisError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * 「回合后台分析触发」之成长+关系簇协作者——从 ChatViewModel 抽出（对齐 iOS ChatViewModel+Growth.swift），方法体字节级不变。
@@ -63,12 +66,14 @@ internal class RelationshipAnalysisTrigger(
         userName: String,
         /** 卷四层 ①（K-5）：本轮用户消息正文（扫全清词·修缮卷 J4 只剩全清）；空 = 跳过该层（语音回合·N-5）。 */
         userText: String = "",
+        /** 本轮日志关联（四期·图纸三·可选尾参）：launch 时带上，下游 LLM 调用的日志归到这一轮。 */
+        trace: LogTrace? = null,
     ) {
         if (!settings.growthSystemEnabled) return
         val interval = settings.growthAnalysisInterval
         if (interval <= 0) return
 
-        scope.launch {
+        scope.launch(trace ?: EmptyCoroutineContext) {
             // 卷三 §3.4 表1：每轮 tick 场（内核自有 Mutex·不进 CharacterWriteLock）；tick 内部已吞异常，这里再兜一层（外部行为清单 9）。
             runCatching { affectKernel.tick(characterUuid, System.currentTimeMillis()) }
             // 卷四 §3.4：紧跟着 tick 意图（自有 Mutex·与场锁顺序拿不嵌套·K-16）；队列不变则 0 写（K-15）。
@@ -112,7 +117,7 @@ internal class RelationshipAnalysisTrigger(
             val before = characterRepo.get(characterUuid)?.relationshipQuality ?: RelationshipQuality()
             val result = growthCoordinator.analyzeAndPersist(characterUuid, config, userName, settings)
             // 成长分析完成 → 检查是否链式触发关系评估
-            checkGrowthDrivenRelationshipTrigger(characterUuid, result, before, settings, userName)
+            checkGrowthDrivenRelationshipTrigger(characterUuid, result, before, settings, userName, currentCoroutineContext()[LogTrace])
         } catch (e: GrowthAnalysisError) {
             // 确定性错误（无消息 / 解析失败）：不重试，只留一条观测行（修缮卷 D-13：此前零日志 = 解析失败静默吞）
             Log.w("GrowthAnalysis", "成长分析确定性失败：${e.javaClass.simpleName} ${e.message}")
@@ -126,9 +131,9 @@ internal class RelationshipAnalysisTrigger(
     // MARK: - 关系评估触发（对齐 iOS ChatViewModel+Growth.swift 关系段）
 
     /** AI 回复完成后：递增 relationshipMessageCount，再检查关系评估保底触发。 */
-    fun incrementRelationshipRoundAndCheck(characterUuid: String, settings: AppSettings, userName: String) {
+    fun incrementRelationshipRoundAndCheck(characterUuid: String, settings: AppSettings, userName: String, trace: LogTrace? = null) {
         if (!settings.relationshipAutoAdvanceEnabled) return
-        scope.launch {
+        scope.launch(trace ?: EmptyCoroutineContext) {
             // relationshipMessageCount 每条消息写 → 每角色写锁内重读最新+1 列级写回，防与成长/结构化递增及分析回写互相覆盖。
             val character = characterWriteLock.withCharacterLock(characterUuid) {
                 val c = characterRepo.get(characterUuid) ?: return@withCharacterLock null
@@ -169,7 +174,7 @@ internal class RelationshipAnalysisTrigger(
 
     /**
      * 成长分析完成后链式触发关系评估：本次有 relationshipChange/majorEvent 事件 OR 关系维度跨阶段线，
-     * 且距上次评估已聊 ≥30 轮。
+     * 且距上次评估已聊 ≥30 轮。[trace] = 成长那一轮的日志关联（四期·图纸三：这里在类 scope 上重新 launch，须显式带上）。
      */
     private fun checkGrowthDrivenRelationshipTrigger(
         characterUuid: String,
@@ -177,10 +182,11 @@ internal class RelationshipAnalysisTrigger(
         before: RelationshipQuality,
         settings: AppSettings,
         userName: String,
+        trace: LogTrace?,
     ) {
         if (!settings.relationshipAutoAdvanceEnabled) return
         if (isAnalyzingRelationship) return
-        scope.launch {
+        scope.launch(trace ?: EmptyCoroutineContext) {
             val relConfig = apiConfigRepo.resolveConfigValues(ApiFunction.RELATIONSHIP_ANALYSIS) ?: return@launch
             val character = characterRepo.get(characterUuid) ?: return@launch
             // 活人感一期 P3：首次评估门槛 10 轮（从未评估过），之后回 30（现状值）。

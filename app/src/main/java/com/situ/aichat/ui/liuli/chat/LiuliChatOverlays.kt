@@ -10,10 +10,10 @@ import androidx.compose.animation.shrinkOut
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,14 +27,18 @@ import com.situ.aichat.data.local.entity.MeetingAppointmentEntity
 import com.situ.aichat.data.model.AppSettings
 import com.situ.aichat.ui.chat.ChatImageViewerHost
 import com.situ.aichat.ui.chat.ChatOfflineReviewOverlay
+import com.situ.aichat.ui.chat.ChatSendFlightOverlay
 import com.situ.aichat.ui.chat.ChatSheetsState
 import com.situ.aichat.ui.chat.ChatViewModel
-import com.situ.aichat.ui.designsystem.AppSnackbarHost
+import com.situ.aichat.ui.liuli.designsystem.LiuliOnGlassDark
+import com.situ.aichat.ui.liuli.designsystem.LiuliOnGlassLight
+import com.situ.aichat.ui.liuli.designsystem.LiuliSnackbarHost
+import com.situ.aichat.ui.liuli.glass.LocalLiuliGlassHost
 import com.situ.aichat.ui.liuli.chat.sheets.LiuliChatSheets
 
 /**
- * 屏顶叠层（图纸 2026-09-05 卷二A §2.3 借用清单·卷二B 换脸两件）：发送飞入覆盖层（琉璃版
- * [LiuliSendFlightOverlay]）、沉浸菜单、见面回顾（**永久共用**·恒暗剧场不随主题）、图片查看器
+ * 屏顶叠层（图纸 2026-09-05 卷二A §2.3 借用清单·卷二B 换脸两件）：发送飞入覆盖层（卷三起复用暖陶
+ * [ChatSendFlightOverlay]·起点是玻璃输入胶囊）、沉浸菜单、见面回顾（**永久共用**·恒暗剧场不随主题）、图片查看器
  * （保留·脱主题）、snackbar。声明顺序与暖陶 `ChatScreen.kt:766-794` 逐字相同——层级即声明序。
  *
  * 自 [LiuliChatLayout] 只搬不改抽出（该文件的 §2.1 行数预算）。
@@ -59,11 +63,17 @@ internal fun BoxScope.LiuliChatBorrowedOverlays(
     /** 面板区 / 键盘的当前高度（布局 lambda 里取值·组合期绝不读 ime）。 */
     inputRegionPx: () -> Int,
     reduceMotion: Boolean,
+    /** 下组玻璃件的深浅与加厚（卷三 §0.2-8）：飞入起点字色与提示条都跟它。 */
+    tones: LiuliChatChromeTones,
 ) {
     val offlineReviewInfo by viewModel.offlineReviewInfo.collectAsStateWithLifecycle()
     val offlineReviewMessages by viewModel.offlineReviewMessages.collectAsStateWithLifecycle()
 
-    LiuliSendFlightOverlay(state = session.sendFlight)
+    ChatSendFlightOverlay(
+        state = session.sendFlight,
+        wallpaper = null,
+        glassSourceTextColor = if (tones.bottomDark) LiuliOnGlassDark.primary else LiuliOnGlassLight.primary,
+    )
     val navBarInsets = WindowInsets.navigationBars
     val density = LocalDensity.current
     LiuliImmersiveMenuOverlay(
@@ -101,16 +111,19 @@ internal fun BoxScope.LiuliChatBorrowedOverlays(
         offlineRecoveryVisible = offlineRecoveryVisible,
         onOpenStickerManagement = onOpenStickerManagement,
     )
-    // 暖陶 Scaffold 把 snackbar 摆在 bottomBar（托盘 + 面板区）之上；琉璃托盘是 overlay 浮件，这里手动让位：
-    // 导航栏 → 面板 / 键盘（offset）→ 输入区实测高（padding）。
-    AppSnackbarHost(
-        session.snackbarHost,
-        Modifier
-            .align(Alignment.BottomCenter)
-            .navigationBarsPadding()
-            .offset { IntOffset(0, -inputRegionPx()) }
-            .padding(bottom = inputOverlayHeight),
-    )
+    // 卷四：琉璃玻璃提示条。取景宿主只提供给它自己（§0.2-6：别漏进弹层窗口）；深浅 / 加厚随下组玻璃件。
+    // 行内自带导航栏让位与底距，故外面不再叠 navigationBarsPadding。
+    CompositionLocalProvider(LocalLiuliGlassHost provides session.glassHost) {
+        LiuliChromeTone(tones.bottomDark, tones.thick) {
+            LiuliSnackbarHost(
+                session.snackbarHost,
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset { IntOffset(0, -inputRegionPx()) }
+                    .padding(bottom = inputOverlayHeight),
+            )
+        }
+    }
 }
 
 /**

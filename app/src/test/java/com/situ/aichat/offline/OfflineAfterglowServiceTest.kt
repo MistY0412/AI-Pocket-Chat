@@ -23,6 +23,7 @@ import com.situ.aichat.data.repository.OfflineMeetingMemoryRepository
 import com.situ.aichat.data.repository.SettingsRepository
 import com.situ.aichat.diagnostics.ContextLogService
 import com.situ.aichat.diagnostics.LogSource
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.notification.Notifier
 import com.situ.aichat.proactive.ProactiveReplyDeliverer
 import com.situ.aichat.prompt.memory.VectorMemoryService
@@ -35,8 +36,11 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.currentCoroutineContext
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
@@ -326,5 +330,22 @@ class OfflineAfterglowServiceTest {
         stubLlm("今天真的很开心呀")
         run()
         coVerify(exactly = 1) { messageRepo.upsert(match { it.content == "今天真的很开心呀" }) }
+    }
+
+    // ── 时间感知四期·图纸三 T2-6（E14）：余温两次尝试同一轮 trace ──
+
+    @Test fun logTrace_twoAttemptsShareOneTurn() {
+        val seen = mutableListOf<LogTrace?>()
+        val replies = ArrayDeque(listOf("【不合格】", "今天真开心，下次还想一起去～"))
+        coEvery {
+            contextLog.completion(eq(LogSource.OFFLINE_AFTERGLOW), any(), any(), any(), any(), any(), any(), any(), any())
+        } coAnswers { seen += currentCoroutineContext()[LogTrace]; replies.removeFirst() }
+        run()
+        verifyCompletion(2)
+        assertEquals("conv", seen[0]?.conversationUuid)
+        assertEquals("char", seen[0]?.characterUuid)
+        assertNull("余温没有用户消息锚点", seen[0]?.anchorMessageUuid)
+        assertNotNull(seen[0]?.turnId)
+        assertEquals("两次尝试同 turnId", seen[0]?.turnId, seen[1]?.turnId)
     }
 }

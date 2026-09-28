@@ -30,12 +30,12 @@ class LiuliPageGeometryTest {
     }
 
     @Test fun 分组行族落值() {
-        assertEquals(16.dp, LiuliPageGeometry.groupCorner)
+        assertEquals(20.dp, LiuliPageGeometry.groupCorner)
         assertEquals(16.dp, LiuliPageGeometry.groupPadH)
         assertEquals(52.dp, LiuliPageGeometry.rowMin)
         assertEquals(64.dp, LiuliPageGeometry.rowTwoLine)
         assertEquals(28.dp, LiuliPageGeometry.tile)
-        assertEquals(7.dp, LiuliPageGeometry.tileCorner)
+        assertEquals(8.dp, LiuliPageGeometry.tileCorner)
         assertEquals(12.dp, LiuliPageGeometry.tileGap)
         assertEquals(8.dp, LiuliPageGeometry.groupHeaderBottom)
         assertEquals(6.dp, LiuliPageGeometry.groupFooterTop)
@@ -43,9 +43,7 @@ class LiuliPageGeometryTest {
     }
 
     @Test fun 详情页落值() {
-        assertEquals(280.dp, LiuliPageGeometry.hero)
-        assertEquals(130.dp, LiuliPageGeometry.heroScrim)
-        assertEquals(88.dp, LiuliPageGeometry.heroCollapseTail)
+        assertEquals(204.dp, LiuliPageGeometry.profileHead) // 卷四 §4.9
         assertEquals(56.dp, LiuliPageGeometry.action)
         assertEquals(68.dp, LiuliPageGeometry.actionSlot)
         assertEquals(16.dp, LiuliPageGeometry.actionGap)
@@ -122,5 +120,15 @@ class LiuliPageGeometryTest {
             LiuliPageGeometry.stepperButton / 2
         assertEquals(72.dp, centerGap)
         assertTrue(centerGap > LiuliPageGeometry.touchTarget)
+    }
+
+    /** 琉璃 2.0 卷六·一 §3.11（T1-7）：屏边渐进模糊尾巴 / 浮动胶囊钮 / 悬浮底条的六个新落值（从图纸与设计稿 D3 `.gbar` 独立抄录）。 */
+    @Test fun 卷六屏边与浮件落值() {
+        assertEquals(12.dp, LiuliPageGeometry.edgeTail)
+        assertEquals(48.dp, LiuliPageGeometry.fabPill)
+        assertEquals(56.dp, LiuliPageGeometry.floatingBar)
+        assertEquals(12.dp, LiuliPageGeometry.floatingBarInset)
+        assertEquals(12.dp, LiuliPageGeometry.floatingBarGap)
+        assertEquals(68.dp, LiuliPageGeometry.floatingBarReserve)
     }
 }

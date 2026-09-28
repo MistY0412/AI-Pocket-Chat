@@ -71,7 +71,7 @@ internal class VoiceCallTtsPipeline(
     fun feedToken(token: String) {
         if (token.isEmpty()) return
         sentenceBuffer += token
-        val result = VoiceCallTtsLogic.cutSentences(sentenceBuffer)
+        val result = VoiceCallTtsLogic.cutSentencesHoldingSystemNote(sentenceBuffer) // 【系统说明】整块回声不念（四期·图纸一 复核 R1）
         sentenceBuffer = result.remainder
         for (sentence in result.sentences) appendSentence(sentence)
     }

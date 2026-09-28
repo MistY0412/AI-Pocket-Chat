@@ -66,15 +66,8 @@ internal fun DrawScope.drawMeetingSky(spec: SkySpec, seed: Int, moon: MoonRender
         val r = minOf(11.dp.toPx(), size.width * 0.11f)
         val cx = size.width - r - 16.dp.toPx() - rnd.nextFloat() * 6.dp.toPx()
         val cy = 26.dp.toPx() + rnd.nextFloat() * 6.dp.toPx()
-        drawCircle(MeetingSky.Moon.copy(alpha = spec.moonAlpha), radius = r, center = Offset(cx, cy))
-        // 阴影盘只在月盘内绘制（clipPath），偏移 = 2r×照亮率：朔全遮 → 望离场；盈亏定滑出方向。
         val skyAtMoon = lerp(spec.stops[0], spec.stops[1], ((cy / size.height) * 2f).coerceIn(0f, 1f))
-        val shadowOffset = 2f * r * moon.illumination
-        val shadowCx = if (moon.waxing) cx - shadowOffset else cx + shadowOffset
-        val disc = Path().apply { addOval(Rect(center = Offset(cx, cy), radius = r)) }
-        clipPath(disc) {
-            drawCircle(skyAtMoon, radius = r * 1.02f, center = Offset(shadowCx, cy))
-        }
+        drawMoonDisc(Offset(cx, cy), r, spec.moonAlpha, moon, skyAtMoon)
     }
 
     when (spec.weather) {
@@ -129,6 +122,16 @@ internal fun DrawScope.drawMeetingSky(spec: SkySpec, seed: Int, moon: MoonRender
             size = Size(size.width, size.height - top),
         )
     }
+}
+
+/** 月亮盘（月色盘 + 盘内阴影盘·偏移 2r × 照亮率·盈亏定方向）——见面回忆与发布页共用（乙 §3.4.1·只搬不改）。 */
+internal fun DrawScope.drawMoonDisc(center: Offset, radius: Float, alpha: Float, moon: MoonRender, skyAtMoon: Color) {
+    drawCircle(MeetingSky.Moon.copy(alpha = alpha), radius = radius, center = center)
+    // 阴影盘只在月盘内绘制（clipPath），偏移 = 2r×照亮率：朔全遮 → 望离场；盈亏定滑出方向。
+    val shadowOffset = 2f * radius * moon.illumination
+    val shadowCx = if (moon.waxing) center.x - shadowOffset else center.x + shadowOffset
+    val disc = Path().apply { addOval(Rect(center = center, radius = radius)) }
+    clipPath(disc) { drawCircle(skyAtMoon, radius = radius * 1.02f, center = Offset(shadowCx, center.y)) }
 }
 
 private fun DrawScope.skyBand(xF: Float, yF: Float, wF: Float, hF: Float, color: Color) {

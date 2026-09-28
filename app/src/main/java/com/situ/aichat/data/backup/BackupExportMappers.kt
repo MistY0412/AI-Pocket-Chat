@@ -27,6 +27,7 @@ import com.situ.aichat.data.local.entity.StoryChapterEntity
 import com.situ.aichat.data.local.entity.StoryCharacterRoleEntity
 import com.situ.aichat.data.local.entity.StoryEntity
 import com.situ.aichat.data.local.entity.UserWalletEntity
+import com.situ.aichat.data.model.mentionedCharacterUuids
 import java.io.File
 
 // ════════════════════════════════ Entity → Export 映射（导出侧；从 BackupService 抽出·刀1·只搬不改） ════════════════════════════════
@@ -280,6 +281,7 @@ internal fun MomentPostEntity.toExport(imageArchiveKeys: List<String>?) = Moment
     triggerTypeRaw = triggerTypeRaw,
     relatedGiftId = relatedGiftId,
     imageArchiveKeys = imageArchiveKeys,
+    mentionedCharacterUuids = mentionedCharacterUuids.ifEmpty { null },
 )
 
 internal fun MomentCommentEntity.toExport() = MomentCommentExport(

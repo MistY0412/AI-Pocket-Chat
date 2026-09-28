@@ -50,7 +50,7 @@ class PromiseLedgerService @Inject constructor(
         now: Long,
     ): String? {
         val normalized = normalize(content)
-        val existing = openLoopRepository.openLoopsForCharacter(characterUuid)
+        val existing = openLoopRepository.openLoopsForChat(characterUuid)
             .firstOrNull { normalize(it.content) == normalized }
         if (existing != null) return existing.uuid
         if (dueAtMillis == null || dueAtMillis <= now) return null

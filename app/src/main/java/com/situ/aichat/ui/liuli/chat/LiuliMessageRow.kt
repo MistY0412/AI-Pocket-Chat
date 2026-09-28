@@ -2,6 +2,7 @@ package com.situ.aichat.ui.liuli.chat
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.situ.aichat.R
 import com.situ.aichat.data.local.entity.CustomStickerEntity
 import com.situ.aichat.data.local.entity.MessageEntity
@@ -36,6 +38,7 @@ import com.situ.aichat.prompt.CalendarItemParser
 import com.situ.aichat.prompt.DirtyMessageDetector
 import com.situ.aichat.prompt.memory.MemoryService
 import com.situ.aichat.sticker.StickerTagParser
+import com.situ.aichat.ui.chat.BubbleInlineTimestamp
 import com.situ.aichat.ui.chat.MessageRowActions
 import com.situ.aichat.ui.chat.messageCanBeQuoted
 import com.situ.aichat.ui.chat.rememberBubbleMaxWidth
@@ -51,6 +54,9 @@ import com.situ.aichat.util.DateFormatters
  * 门与语义**逐条照抄**暖陶 `MessageRow`（F4）：前置返回三件（系统事件 / 通话记录 / 离场分隔线）→
  * 见面期隐藏兜底 → 五解析 `remember` → 脏消息整行不渲染 → 贴纸两态 → 合并朗读句 → 右滑引用两道闸 →
  * 行级 a11y 动作面 → 长按上报气泡窗口边界；`when` 分派序与 F4 ⑥ 逐条同。琉璃只换长相。
+ *
+ * 琉璃 2.0 卷三 §0.2-1：叶子气泡改用暖陶组件（形状 / 大小 / 间距 / 位置照暖陶·只换颜色材质），行结构照
+ * `MessageRow`——`Column(spacedBy 4)` 里「右滑盒（气泡）+ 泡下时间戳」，卡片也带时间戳。
  */
 @Composable
 internal fun LiuliMessageRow(
@@ -66,8 +72,6 @@ internal fun LiuliMessageRow(
     actions: MessageRowActions,
     canRegenerate: Boolean,
     deliveryRead: Boolean?,
-    /** 本条是否连发段末条（带尾巴·判据 [isRunLast]）。 */
-    tail: Boolean,
     /** M3b ④：飞行目标行每次布局上报边界。 */
     flightTracking: Boolean,
     /** 卷二B：表情回应的纯瞬态爆点（A-8·不入库不进上下文）。 */
@@ -199,58 +203,69 @@ internal fun LiuliMessageRow(
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Top,
     ) {
-        // chat-ui-4 右滑引用两道闸（照抄）：① 已显形 ② 正文有话可引（判据单源 messageCanBeQuoted·卡片恒 false）。
-        val canQuote = remember(message.messageUUID, message.content) { messageCanBeQuoted(message) }
-        LiuliSwipeToReplyBox(
-            enabled = message.isContentRevealed && canQuote,
-            onTriggered = { actions.onQuote(message) },
+        Column(
+            horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(4.dp), // = 暖陶 MessageRow（泡与时间戳之间）
         ) {
-            // M2 Y2 收编（照抄 F4）：条件与沉浸菜单同源；恒调用、由 eligible 决定给不给。
-            val a11yMenuEligible = bubbleSentence != null && message.isContentRevealed &&
-                !message.isVoiceMessage && !hasStickerTags
-            val a11yMenuActions = rememberMessageRowA11yActions(message, isUser, canRegenerate, actions, a11yMenuEligible)
-            Box(
-                modifier = Modifier
-                    .onGloballyPositioned {
-                        bubbleBounds = it.boundsInWindow()
-                        if (flightTracking) actions.onFlightBubblePositioned(message, bubbleBounds)
-                    }
-                    .then(
-                        if (a11yMenuActions.isNotEmpty()) {
-                            Modifier.semantics(mergeDescendants = true) { customActions = a11yMenuActions }
-                        } else {
-                            Modifier
-                        },
-                    ),
+            // chat-ui-4 右滑引用两道闸（照抄）：① 已显形 ② 正文有话可引（判据单源 messageCanBeQuoted·卡片恒 false）。
+            val canQuote = remember(message.messageUUID, message.content) { messageCanBeQuoted(message) }
+            LiuliSwipeToReplyBox(
+                enabled = message.isContentRevealed && canQuote,
+                onTriggered = { actions.onQuote(message) },
             ) {
-                LiuliMessageContent(
-                    message = message,
-                    isUser = isUser,
-                    kind = kind,
-                    parsed = LiuliParsedCards(giftCard, redPacket, offlineCard, proposal, change, isCard),
-                    stickerState = LiuliStickerState(isStickerOnly, hasStickerTags),
-                    characterName = characterName,
-                    customStickers = customStickers,
-                    isVoicePlaying = isVoicePlaying,
-                    voiceProgress = voiceProgress,
-                    voiceCascadePlay = voiceCascadePlay,
-                    actions = actions,
-                    deliveryRead = deliveryRead,
-                    tail = tail,
-                    bubbleMaxWidth = bubbleMaxWidth,
-                    bubbleSentence = bubbleSentence,
-                    openMenu = openMenu,
-                    onDoubleReact = onDoubleReact,
-                    fold = fold,
-                )
-                // 徽章画在气泡那一格**之外**（不被泡的 clip 裁掉），且 matchParentSize 让它不参与定尺。
-                LiuliReactionBurst(
-                    burst = reaction.burst,
-                    messageUuid = message.messageUUID,
-                    reduceMotion = reduceMotion,
-                    modifier = Modifier.matchParentSize(),
-                )
+                // M2 Y2 收编（照抄 F4）：条件与沉浸菜单同源；恒调用、由 eligible 决定给不给。
+                val a11yMenuEligible = bubbleSentence != null && message.isContentRevealed &&
+                    !message.isVoiceMessage && !hasStickerTags
+                val a11yMenuActions = rememberMessageRowA11yActions(message, isUser, canRegenerate, actions, a11yMenuEligible)
+                Box(
+                    modifier = Modifier
+                        .onGloballyPositioned {
+                            bubbleBounds = it.boundsInWindow()
+                            if (flightTracking) actions.onFlightBubblePositioned(message, bubbleBounds)
+                        }
+                        .then(
+                            if (a11yMenuActions.isNotEmpty()) {
+                                Modifier.semantics(mergeDescendants = true) { customActions = a11yMenuActions }
+                            } else {
+                                Modifier
+                            },
+                        ),
+                ) {
+                    LiuliMessageContent(
+                        message = message,
+                        isUser = isUser,
+                        kind = kind,
+                        parsed = LiuliParsedCards(giftCard, redPacket, offlineCard, proposal, change, isCard),
+                        stickerState = LiuliStickerState(isStickerOnly, hasStickerTags),
+                        characterName = characterName,
+                        customStickers = customStickers,
+                        isVoicePlaying = isVoicePlaying,
+                        voiceProgress = voiceProgress,
+                        voiceCascadePlay = voiceCascadePlay,
+                        actions = actions,
+                        bubbleMaxWidth = bubbleMaxWidth,
+                        bubbleSentence = bubbleSentence,
+                        openMenu = openMenu,
+                        onDoubleReact = onDoubleReact,
+                        fold = fold,
+                    )
+                    // 徽章画在气泡那一格**之外**（不被泡的 clip 裁掉），且 matchParentSize 让它不参与定尺。
+                    LiuliReactionBurst(
+                        burst = reaction.burst,
+                        isUser = isUser,
+                        messageUuid = message.messageUUID,
+                        reduceMotion = reduceMotion,
+                        modifier = Modifier.matchParentSize(),
+                    )
+                }
             }
+            // 泡下时间戳（照暖陶 MessageRow:448–453 逐字）：有合并读屏句时隐藏（时间 / 回执已并入句中）。
+            BubbleInlineTimestamp(
+                timestampMs = message.timestamp,
+                isUser = isUser,
+                read = deliveryRead,
+                a11yHidden = bubbleSentence != null,
+            )
         }
     }
 }

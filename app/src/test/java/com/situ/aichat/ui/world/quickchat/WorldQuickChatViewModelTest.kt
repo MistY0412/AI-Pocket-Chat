@@ -1,5 +1,6 @@
 package com.situ.aichat.ui.world.quickchat
 
+import androidx.lifecycle.viewModelScope
 import com.situ.aichat.data.local.dao.ScheduleDao
 import com.situ.aichat.data.local.dao.WorldDao
 import com.situ.aichat.data.local.entity.CharacterDailyScheduleEntity
@@ -20,6 +21,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.job
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -36,6 +38,8 @@ import java.io.IOException
  * send→sendAndAwait 恰一次 / 失败→failed·retry→retryReply 且 sendAndAwait 仍恰一次 / **忙碌→用户消息即时落库 + 延迟门满才起
  * retryReply + 在途去重** / 断网异常→failed 不崩 / confirmMeet 异常→no-op / respond 返 null→meetcard 显示 / 开着新回复→再 markRead。
  * 无 coroutines-test 依赖 → 真 IO + 轮询（同 WorldViewModelTest）；忙碌延迟经可控 [busyGate] 精确验。
+ * **等待点铁律**（PITFALLS §1e）：每个 await 必须落在协程真正的最后一步、且带「事件确已发生」的证据——初始态本就满足的
+ * 条件（如 `!typing`）满负载下会在协程起跑前瞬间成立；负向断言不盲睡，改等门内信号 / VM 协程全部收尾。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -75,6 +79,12 @@ class WorldQuickChatViewModelTest {
     /** 轮询版 coVerify：满足返 true、未满足吞异常返 false（供 [await] 等 MockK 调用计数达标）。 */
     private fun verified(block: () -> Unit): Boolean = try { block(); true } catch (e: Throwable) { false }
 
+    /**
+     * 等 VM 发起的协程全部真跑完（`viewModelScope` 下再无子协程·launch 当场挂上、跑完才摘）——「什么都不该发生」类负向断言的
+     * 终态等待点，替代盲睡（满负载下睡不够 = 假绿，且协程会在测后继续跑）。仅用于初遇（Meet）态：Known 态有常驻消息订阅永不收尾。
+     */
+    private fun awaitVmIdle(msg: String) = await(msg) { vm.viewModelScope.coroutineContext.job.children.none() }
+
     /** 令角色当刻忙碌（当前事件 isPhoneAvailable=false）。 */
     private fun makeBusy() {
         coEvery { scheduleDao.scheduleFor(any(), any()) } returns mockk<CharacterDailyScheduleEntity> { every { uuid } returns "sch" }
@@ -100,7 +110,9 @@ class WorldQuickChatViewModelTest {
         coEvery { quickReply.sendAndAwait(CONV, "你好") } returns true
         openAndWait()
         vm.send("你好")
-        await("回合结束") { !vm.ui.value.typing }
+        // 等回合真跑完（sendAndAwait 已调 + typing 复位）——只等 !typing 在协程把 typing 置真之前（初始态）就成立，
+        // coVerify 会抢在 sendAndAwait 之前（2026-09-28 一键体检满负载实红；拖慢 IO 派发即必现）。
+        await("回合结束") { verified { coVerify(exactly = 1) { quickReply.sendAndAwait(CONV, "你好") } } && !vm.ui.value.typing }
         coVerify(exactly = 1) { quickReply.sendAndAwait(CONV, "你好") }
         assertFalse(vm.ui.value.failed)
     }
@@ -114,6 +126,7 @@ class WorldQuickChatViewModelTest {
         await("失败态") { vm.ui.value.failed }
         coVerify(exactly = 1) { quickReply.sendAndAwait(CONV, "你好") }
         vm.retry()
+        // 此刻 failed=true，retry 首步 typing=真/failed=假 同一次 update 落 → 本条件只在 retry 协程末步后成立（非初始态）。
         await("重试成功") { !vm.ui.value.failed && !vm.ui.value.typing }
         coVerify(exactly = 1) { quickReply.retryReply(CONV) }
         coVerify(exactly = 1) { quickReply.sendAndAwait(any(), any()) } // 重试绝不重发用户消息
@@ -125,14 +138,16 @@ class WorldQuickChatViewModelTest {
         makeBusy()
         openAndWait()
         await("忙碌态") { vm.ui.value.busy }
-        val gate = CompletableDeferred<Unit>()
-        vm.busyGate = { gate.await() }
+        val entered = CompletableDeferred<Unit>()
+        val gate = CompletableDeferred<Unit>() // 本例永不开门：回合停在门内、测后零活动（开门则回合在测试结束后继续跑）
+        vm.busyGate = { entered.complete(Unit); gate.await() }
         vm.send("你好")
-        await("insert 已即时落") { verified { coVerify(exactly = 1) { quickReply.insertUserMessage(CONV, "你好") } } }
-        Thread.sleep(60)
+        // 等点 = 回合已停在门内（确定性信号·取代盲睡）：此刻门还关着，insert 必须已落。
+        await("回合已停在延迟门内") { entered.isCompleted }
+        coVerify(exactly = 1) { quickReply.insertUserMessage(CONV, "你好") } // 门前即落，不被门挡
+        assertFalse("门内不显 typing", vm.ui.value.typing)
         coVerify(exactly = 0) { quickReply.retryReply(any()) } // 延迟门未满 → 回合未起
         coVerify(exactly = 0) { quickReply.sendAndAwait(any(), any()) } // 忙碌路径绝不走 sendAndAwait
-        gate.complete(Unit)
     }
 
     @Test
@@ -142,11 +157,12 @@ class WorldQuickChatViewModelTest {
         coEvery { quickReply.retryReply(CONV) } returns true
         openAndWait()
         await("忙碌态") { vm.ui.value.busy }
+        val entered = CompletableDeferred<Unit>()
         val gate = CompletableDeferred<Unit>()
-        vm.busyGate = { gate.await() }
+        vm.busyGate = { entered.complete(Unit); gate.await() }
         vm.send("你好")
-        await("insert 已即时落") { verified { coVerify(exactly = 1) { quickReply.insertUserMessage(CONV, "你好") } } }
-        Thread.sleep(60)
+        await("回合已停在延迟门内") { entered.isCompleted } // 确定性信号·取代盲睡
+        coVerify(exactly = 1) { quickReply.insertUserMessage(CONV, "你好") }
         coVerify(exactly = 0) { quickReply.retryReply(any()) } // 门未满 → 回合未起
         gate.complete(Unit)
         // 门开后等回合真跑完（retryReply 已起 + typing 复位）——不能只等 !typing：回合起前 typing 本就是 false，
@@ -193,7 +209,8 @@ class WorldQuickChatViewModelTest {
         vm.openMeet("nat-1", "林墨", "老槐树下")
         await("开场呈现") { vm.ui.value.firstMeet?.opening == false }
         vm.confirmMeet()
-        Thread.sleep(80)
+        awaitVmIdle("确认协程已收尾") // 终态等待点·取代盲睡
+        coVerify(exactly = 1) { firstMeetService.confirmMeet(any(), any(), any()) } // 正向证据：确认真调到、异常真抛过
         assertFalse("met 不置位", vm.ui.value.firstMeet?.met == true)
         assertTrue("仍是 Meet 态", vm.ui.value.target is QuickChatTarget.Meet)
     }
@@ -271,10 +288,15 @@ class WorldQuickChatViewModelTest {
 
     @Test
     fun `E16_弹窗开着新回复_再markRead`() {
-        openAndWait() // markRead: open + 初始空 emission
+        openAndWait()
+        // 先等订阅吃完初始空 emission（markRead：open + 初始 emission = 2）再推新消息——否则 StateFlow 合流、订阅晚起时只见
+        // 新消息一次，旧写法 atLeast=2 便分不出「新回复有没有再 markRead」；且消息上屏先于其后的 markRead，断言会抢跑。
+        await("初始 emission 已 markRead") { verified { coVerify(atLeast = 2) { conversationRepo.markRead(CONV) } } }
         msgFlow.value = listOf(MessageEntity(messageUUID = "m1", conversationUuid = CONV, roleRaw = "assistant", content = "来啦", timestamp = System.currentTimeMillis()))
-        await("新消息呈现") { vm.ui.value.messages.any { it.text == "来啦" } }
-        coVerify(atLeast = 2) { conversationRepo.markRead(CONV) }
+        // 等点 = 新消息那次 emission 的末步（其后的 markRead）。
+        await("新消息呈现 + 再 markRead") {
+            vm.ui.value.messages.any { it.text == "来啦" } && verified { coVerify(atLeast = 3) { conversationRepo.markRead(CONV) } }
+        }
     }
 
     private companion object {

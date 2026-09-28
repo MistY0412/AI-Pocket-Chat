@@ -23,7 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.situ.aichat.R
 import com.situ.aichat.story.StoryChapterDraft
-import com.situ.aichat.story.StoryTextSanitizer
 import com.situ.aichat.ui.designsystem.AppButton
 import com.situ.aichat.ui.designsystem.AppButtonStyle
 import com.situ.aichat.ui.designsystem.AppDialog
@@ -31,7 +30,7 @@ import com.situ.aichat.ui.designsystem.AppSheet
 import com.situ.aichat.ui.designsystem.AppTheme
 
 /** 正文只读区封顶高度：超出内部滚动，保证底部「换回这一版」永远够得着（C1 教训：sheet 按钮不许被顶出屏幕）。 */
-private val PROSE_MAX_HEIGHT = 380.dp
+internal val PROSE_MAX_HEIGHT = 380.dp
 
 /**
  * 「上一版」只读回翻弹层（C3·图纸三 §4 画面②）。
@@ -51,8 +50,7 @@ internal fun StoryPreviousDraftSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var confirming by remember { mutableStateOf(false) }
-    val prose = remember(draft.content) { StoryTextSanitizer.sanitize(draft.content.orEmpty()) }
-    val title = draft.title?.takeIf { it.isNotBlank() }
+    val prose = rememberStoryPrevDraftProse(draft)
 
     AppSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -64,7 +62,7 @@ internal fun StoryPreviousDraftSheet(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = stringResource(R.string.story_prev_draft_title) + (title?.let { " · $it" } ?: ""),
+                text = storyPrevDraftTitle(draft),
                 style = AppTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )

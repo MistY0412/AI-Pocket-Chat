@@ -20,6 +20,7 @@ import com.situ.aichat.meeting.MeetingMissedReactionService
 import com.situ.aichat.meeting.MeetupNotificationService
 import com.situ.aichat.moments.MomentInteractionService
 import com.situ.aichat.moments.MomentRecoveryService
+import com.situ.aichat.moments.runMomentForegroundPass
 import com.situ.aichat.notification.CalendarNotificationScheduler
 import com.situ.aichat.notification.NotificationNavigator
 import com.situ.aichat.notification.StreakNotificationBridgeService
@@ -138,7 +139,7 @@ class AppViewModel @Inject constructor(
         .map { !it }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** 根部主题外观（脸 + 深浅模式 + 动态取色 + 玻璃档，11.4a）。初值=默认（跟随系统+默认暖陶+清透）→ 无首帧闪烁。 */
+    /** 根部主题外观（脸 + 深浅模式 + 动态取色 + 玻璃档，11.4a）。初值=默认（跟随系统+默认琉璃+通透）；splashReady 等偏好读完才放首帧 → 无首帧闪烁。 */
     val appearance: StateFlow<AppearanceState> =
         combine(
             settings.appearanceMode,
@@ -327,11 +328,10 @@ class AppViewModel @Inject constructor(
         )
         // P7.2.5 朋友圈韧性：回前台补处理待互动队列 + 恢复被国产 ROM 杀后台冲掉的延迟互动（场景 A/B/C）。
         // 1:1 iOS 回前台 runPendingMomentInteractions → runMomentRecovery。守卫避免多次 ON_RESUME 叠跑；
-        // 不随后台取消（在 viewModelScope 跑完，更稳）；恢复服务自带重入锁。
+        // 不随后台取消（在 viewModelScope 跑完，更稳）；恢复服务自带重入锁。定时循环也先处理队列（朋友圈发布页·乙 L-1）。
         if (momentForegroundPassJob?.isActive != true) {
             momentForegroundPassJob = viewModelScope.launch { perfTrace.timedPass(PerfPassNames.MOMENT_PASS) {
-                momentInteractionService.processPendingInteractions()
-                momentRecoveryService.recoverIfNeeded()
+                runMomentForegroundPass(momentInteractionService, momentRecoveryService)
             } }
         }
         // Phase 11 未来约定见面爽约：回前台扫「已确认、过宽限、未赴约」的约定 → 置 missed + 角色按人设自适应反应（旁白喂
@@ -403,13 +403,13 @@ class AppViewModel @Inject constructor(
         momentRecoveryLoopJob = null
     }
 
-    /** 前台每 4 分钟扫一遍丢失的 AI 互动（=iOS 4 分钟 Timer）。守卫式启动，避免重复创建循环。 */
+    /** 前台每 4 分钟扫一遍丢失的 AI 互动（=iOS 4 分钟 Timer）。守卫式启动，避免重复创建循环。定时循环也先处理队列（朋友圈发布页·乙 L-1）。 */
     private fun startMomentForegroundRecoveryLoop() {
         if (momentRecoveryLoopJob?.isActive == true) return
         momentRecoveryLoopJob = viewModelScope.launch {
             while (isActive) {
                 delay(MOMENT_RECOVERY_INTERVAL_MS)
-                momentRecoveryService.recoverIfNeeded()
+                runMomentForegroundPass(momentInteractionService, momentRecoveryService)
             }
         }
     }

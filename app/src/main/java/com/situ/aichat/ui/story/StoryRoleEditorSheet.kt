@@ -19,11 +19,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -41,7 +37,6 @@ import com.situ.aichat.ui.designsystem.AppSheet
 import com.situ.aichat.ui.designsystem.AppTextArea
 import com.situ.aichat.ui.designsystem.AppTextField
 import com.situ.aichat.ui.designsystem.AppTheme
-import kotlinx.coroutines.launch
 
 /**
  * 角色编辑弹层（图纸二 D1·2026-08-01 过审 mockup 画面②）——**设定页与创建屏共用**：
@@ -60,38 +55,9 @@ import kotlinx.coroutines.launch
  * （角色还没落库、上下文太薄，AI 起草与该栏一并留给书页·图纸 J5）。
  */
 @Composable
-internal fun StoryRoleEditorSheet(
-    initialName: String,
-    initialType: String,
-    initialDescription: String,
-    /** 「私下反差」初值；[showPersona] 为 false 时忽略。 */
-    initialPersona: String,
-    /** 是否显示反差栏（「我」这一行与创建屏都不显示·图纸 J5/§4.5）。 */
-    showPersona: Boolean,
-    /**
-     * AI 起草回调（拿弹层里**当前**的名字与人设去起草）；null = 不给起草钮
-     * （创建屏恒 null；书页在没有故事创作 API 配置时也传 null）。返回 null = 起草失败。
-     */
-    onDraftPersona: (suspend (name: String, description: String) -> String?)?,
-    isNew: Boolean,
-    nameEditable: Boolean,
-    /** 名字不可改时的解释文案（两种锁定原因不同：关联聊天角色 / 「我」这一行）；可改时传 null。 */
-    nameLockedHint: String?,
-    typeEditable: Boolean,
-    /** null = 不给移出/删除口（新建态、「我」这一行）。 */
-    onRemove: (() -> Unit)?,
-    /** 已落库的行（设定页）移出前先弹确认；创建屏还没落库，直接从表单移除。 */
-    removeNeedsConfirm: Boolean,
-    onSave: (name: String, type: String, description: String, persona: String) -> Unit,
-    onDismiss: () -> Unit,
-) {
+internal fun StoryRoleEditorSheet(config: StoryRoleEditorConfig, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var name by remember { mutableStateOf(initialName) }
-    var type by remember { mutableStateOf(initialType) }
-    var description by remember { mutableStateOf(initialDescription) }
-    var persona by remember { mutableStateOf(initialPersona) }
-    var drafting by remember { mutableStateOf(false) }
-    var confirmRemove by remember { mutableStateOf(false) }
+    val state = rememberStoryRoleEditorState(config)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -107,40 +73,40 @@ internal fun StoryRoleEditorSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                stringResource(if (isNew) R.string.story_role_editor_title_new else R.string.story_role_editor_title_edit),
+                stringResource(if (config.isNew) R.string.story_role_editor_title_new else R.string.story_role_editor_title_edit),
                 style = AppTheme.typography.titleMedium,
             )
 
             AppTextField(
-                value = name,
-                onValueChange = { name = it },
+                value = state.name,
+                onValueChange = { state.name = it },
                 label = stringResource(R.string.story_role_editor_name),
-                enabled = nameEditable,
-                supportingText = if (nameEditable) null else nameLockedHint,
+                enabled = config.nameEditable,
+                supportingText = if (config.nameEditable) null else config.nameLockedHint,
                 modifier = Modifier.fillMaxWidth(),
             )
 
             Text(stringResource(R.string.story_role_editor_type), style = AppTheme.typography.label, color = AppTheme.colors.text.primary)
             AppSegmentedControl(
-                options = listOf(StoryRoleType.PROTAGONIST, StoryRoleType.SUPPORTING, StoryRoleType.ANTAGONIST),
-                selected = type,
-                onSelect = { type = it },
-                enabled = typeEditable,
+                options = storyRoleTypes,
+                selected = state.type,
+                onSelect = { state.type = it },
+                enabled = config.typeEditable,
                 modifier = Modifier.fillMaxWidth(),
                 label = { value -> stringResource(roleTypeLabelRes(value)) },
             )
 
             Text(stringResource(R.string.story_role_editor_desc), style = AppTheme.typography.label, color = AppTheme.colors.text.primary)
             AppTextArea(
-                value = description,
-                onValueChange = { description = it },
+                value = state.description,
+                onValueChange = { state.description = it },
                 placeholder = stringResource(R.string.story_role_editor_desc_hint),
                 minHeight = 120.dp,
                 maxLines = 8,
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            if (showPersona) {
+            if (config.showPersona) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         stringResource(R.string.story_role_persona_label),
@@ -150,24 +116,15 @@ internal fun StoryRoleEditorSheet(
                     Spacer(Modifier.width(6.dp))
                     HubTagChip(stringResource(R.string.story_hub_tag_new), highlighted = true)
                     Spacer(Modifier.weight(1f))
-                    if (onDraftPersona != null) {
-                        DraftPersonaButton(drafting) {
-                            drafting = true
-                            scope.launch {
-                                val drafted = onDraftPersona(name.trim(), description)
-                                if (drafted != null) {
-                                    persona = drafted
-                                } else {
-                                    Toast.makeText(context, R.string.story_role_persona_failed, Toast.LENGTH_SHORT).show()
-                                }
-                                drafting = false
-                            }
+                    if (config.onDraftPersona != null) {
+                        DraftPersonaButton(state.drafting) {
+                            state.startDraft(config, scope) { Toast.makeText(context, R.string.story_role_persona_failed, Toast.LENGTH_SHORT).show() }
                         }
                     }
                 }
                 AppTextArea(
-                    value = persona,
-                    onValueChange = { persona = it },
+                    value = state.persona,
+                    onValueChange = { state.persona = it },
                     placeholder = stringResource(R.string.story_role_persona_placeholder),
                     minHeight = 100.dp,
                     maxLines = 6,
@@ -181,35 +138,35 @@ internal fun StoryRoleEditorSheet(
             }
 
             AppButton(
-                onClick = { onSave(name.trim(), type, description, persona); onDismiss() },
+                onClick = { state.save(config, onDismiss) },
                 style = AppButtonStyle.Primary,
-                // 空名字的角色没法被提示词引用，保存置灰（E11）
-                enabled = name.isNotBlank(),
+                // 空名字的角色没法被提示词引用，保存置灰（E11·见 canSave）
+                enabled = state.canSave,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(R.string.action_save)) }
 
-            if (onRemove != null) {
+            if (config.onRemove != null) {
                 AppButton(
-                    onClick = { if (removeNeedsConfirm) confirmRemove = true else { onRemove(); onDismiss() } },
+                    onClick = { state.requestRemove(config, onDismiss) },
                     style = AppButtonStyle.Text,
                     danger = true,
                 ) {
-                    Text(stringResource(if (removeNeedsConfirm) R.string.story_role_editor_remove else R.string.action_delete))
+                    Text(stringResource(if (config.removeNeedsConfirm) R.string.story_role_editor_remove else R.string.action_delete))
                 }
             }
         }
     }
 
-    if (confirmRemove && onRemove != null) {
+    if (state.confirmRemove && config.onRemove != null) {
         AppDialog(
-            onDismissRequest = { confirmRemove = false },
+            onDismissRequest = { state.confirmRemove = false },
             title = stringResource(R.string.story_role_editor_remove_title),
             body = stringResource(R.string.story_role_editor_remove_body),
             confirmText = stringResource(R.string.story_role_editor_remove),
-            onConfirm = { confirmRemove = false; onRemove(); onDismiss() },
+            onConfirm = { state.confirmRemoveAndClose(config, onDismiss) },
             confirmTone = AppDialogTone.Danger,
             dismissText = stringResource(R.string.action_cancel),
-            onDismiss = { confirmRemove = false },
+            onDismiss = { state.confirmRemove = false },
         )
     }
 }

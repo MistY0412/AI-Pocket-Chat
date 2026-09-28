@@ -113,7 +113,7 @@ internal fun WallpaperPicker(
 }
 
 // 线下主题色预设（6 位 hex·RRGGBB·与 OfflineTheme.parseHexColorOrNull 同格式；默认=空→teal）。
-private val OfflineThemePresets = listOf("14B8A6", "FF2D55", "AF52DE", "0A84FF", "FF9F0A", "34C759", "FF3B30", "5E5CE6")
+internal val OfflineThemePresets = listOf("14B8A6", "FF2D55", "AF52DE", "0A84FF", "FF9F0A", "34C759", "FF3B30", "5E5CE6")
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

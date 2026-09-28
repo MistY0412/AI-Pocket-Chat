@@ -50,6 +50,7 @@ import com.situ.aichat.ui.designsystem.AppTypography
 import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
 import com.situ.aichat.ui.liuli.designsystem.LiuliTheme
 import com.situ.aichat.ui.liuli.glass.liuliGlass
+import com.situ.aichat.ui.liuli.glass.liuliLens
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
 /** 小丸的 `onClickLabel`（图纸 §9 ① 唯一字面量·不是用户可见文案，只作读屏提示）。 */
@@ -69,7 +70,7 @@ private const val STRETCH_Y = 0.06f
 /**
  * 琉璃玻璃底栏（图纸 2026-09-06 卷三 §4.1 · 契约 §6 Q-H2 甲 / E 表）。
  *
- * 两态一枚玻璃片：**展开** = 66 高铺满的胶囊（四槽等分 · 当前槽下压一枚 72×46 的玻璃透镜丸·[liuliTabLens]）；**缩起** =
+ * 两态一枚玻璃片：**展开** = 66 高铺满的胶囊（四槽等分 · 当前槽下压一枚 72×46 的玻璃透镜丸·[liuliLens]）；**缩起** =
  * 44 高只剩当前 Tab 的小丸（图标 + 名字），点它就展开、**不导航**；两态间 `animateContentSize` 变形。
  * 缩 / 展的信号来自 [LiuliHomeChrome]（滚动方向累计·nested-scroll），本件只读它、并在切 Tab 时调 `expand()`。
  * 数据形状借暖陶 [AppBottomNavItem]（纯数据类·一个大脑喂两张脸），长相与动效全自画（M3 的
@@ -117,7 +118,7 @@ fun LiuliTabBar(
     }
 }
 
-/** 展开态：四槽等分 + 一枚随选中索引滑行的玻璃透镜丸（丸绘于槽之前 → 在图标 / 字之后）。 */
+/** 展开态：四槽等分 + 一枚随选中索引滑行的玻璃透镜丸（丸绘于槽之前 → 在图标 / 字之后）。卷四：Haze 时为真透镜（Lens 配方），否则画出来的透镜。 */
 @Composable
 private fun LiuliTabRow(
     items: List<AppBottomNavItem>,
@@ -160,7 +161,7 @@ private fun LiuliTabRow(
                     scaleX = 1f + STRETCH_X * stretch.value
                     scaleY = 1f - STRETCH_Y * stretch.value
                 }
-                .liuliTabLens(dark = dark)
+                .liuliLens(LiuliShapes.pill, dark = dark)
                 .testTag(LIULI_TAB_PILL_TAG),
         )
         Row(Modifier.fillMaxWidth().selectableGroup().padding(vertical = LiuliHomeGeometry.tabBarVPad)) {

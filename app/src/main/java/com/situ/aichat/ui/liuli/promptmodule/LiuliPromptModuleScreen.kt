@@ -83,6 +83,7 @@ private val TIP_GAP = 4.dp
 fun LiuliPromptModuleScreen(
     onBack: () -> Unit,
     onOpenImmersiveSettings: () -> Unit,
+    onOpenContextLog: () -> Unit, // 四期·图纸二 省钱卡「看日志」
     modifier: Modifier = Modifier,
     viewModel: PromptModuleSettingsViewModel = hiltViewModel(),
     listState: LazyListState = rememberLazyListState(),
@@ -92,6 +93,7 @@ fun LiuliPromptModuleScreen(
     // settings-misc-2：表情包模块行受「角色发送表情包」总开关 gating。
     val canSendStickers by viewModel.characterCanSendStickersEnabled.collectAsStateWithLifecycle()
     val narrativeDetailRaw by viewModel.offlineNarrativeDetailRaw.collectAsStateWithLifecycle() // §4-U5 叙事卡回显
+    val saver by viewModel.cacheSaver.collectAsStateWithLifecycle() // 四期·图纸二 省钱卡
 
     // 所有 remember 都排在提前 return 之上，编辑 ↔ 列表切换才不会跳槽（逐字照暖陶 :92）。
     var editing by remember { mutableStateOf<PromptModule?>(null) }
@@ -175,6 +177,7 @@ fun LiuliPromptModuleScreen(
                     Text(stringResource(R.string.pm_tip_3), style = AppTypography.secondary, color = colors.text.secondary)
                 }
             }
+            if (saver.visible) item(key = "cache-saver") { LiuliCacheSaverCard(saver, viewModel::setCacheSaverEnabled, onOpenContextLog) }
             item(key = "chips") {
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(CHIP_GAP)) {
                     Row(
@@ -228,6 +231,7 @@ fun LiuliPromptModuleScreen(
                 emptyText = prefixEmpty,
                 canSendStickers = canSendStickers,
                 sceneFilter = sceneFilter,
+                cacheSaverOn = saver.enabled,
                 onToggle = viewModel::toggle,
                 onEdit = { editing = it; editingIsNew = false },
                 onMove = viewModel::move,
@@ -238,6 +242,7 @@ fun LiuliPromptModuleScreen(
                 emptyText = suffixEmpty,
                 canSendStickers = canSendStickers,
                 sceneFilter = sceneFilter,
+                cacheSaverOn = saver.enabled,
                 onToggle = viewModel::toggle,
                 onEdit = { editing = it; editingIsNew = false },
                 onMove = viewModel::move,
@@ -285,6 +290,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.liuliModuleSection(
     emptyText: String,
     canSendStickers: Boolean,
     sceneFilter: PromptScene?,
+    cacheSaverOn: Boolean,
     onToggle: (String) -> Unit,
     onEdit: (PromptModule) -> Unit,
     onMove: (String, Boolean) -> Unit,
@@ -317,6 +323,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.liuliModuleSection(
                             onMoveUp = { onMove(module.id, true) },
                             onMoveDown = { onMove(module.id, false) },
                             divider = index > 0,
+                            saverHint = cacheSaverOn && module.isEnabled && module.systemModuleType == SystemModuleType.CHARACTER_MEMORY &&
+                                module.position == PromptModulePosition.PREFIX,
                         )
                     }
                 }

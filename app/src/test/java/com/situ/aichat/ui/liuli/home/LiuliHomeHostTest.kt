@@ -24,10 +24,9 @@ import com.situ.aichat.ui.components.AppHaptics
 import com.situ.aichat.ui.components.LocalAppHaptics
 import com.situ.aichat.ui.designsystem.AppBottomNavItem
 import com.situ.aichat.ui.designsystem.AppNavIcons
-import com.situ.aichat.ui.liuli.glass.BackdropState
-import com.situ.aichat.ui.liuli.glass.LiuliGatedBackdropHost
-import com.situ.aichat.ui.liuli.glass.LocalBackdrop
-import com.situ.aichat.ui.liuli.glass.rememberBackdropState
+import com.situ.aichat.ui.liuli.glass.LiuliGlassHost
+import com.situ.aichat.ui.liuli.glass.LiuliGlassHostState
+import com.situ.aichat.ui.liuli.glass.LocalLiuliGlassHost
 import com.situ.aichat.ui.theme.AIPocketChatTheme
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
@@ -42,13 +41,11 @@ import org.robolectric.annotation.Config
 /**
  * T2-3：主页宿主与它的门（图纸 2026-09-06 卷三 §7 T2-3 · A-2 / A-5 · E5）。
  *
- * 钉三件：① 暖陶下宿主 = 一个纯 `Box`——content 与 bottomBar 都渲染、overlay 里**没有** `LocalBackdrop`
- * （暖陶一层都不录、`AppBottomNav` 也不需要）；② 琉璃下 overlay 拿得到 `LocalBackdrop`（底栏那片玻璃靠它）；
- * ③ 门关上后**结构恒定**：content 与 overlay 都照常渲染（详情页底栏还要演退场动画），只是不再录层。
+ * 钉三件：① 暖陶下宿主 = 一个纯 `Box`——content 与 bottomBar 都渲染、overlay 里**没有** `LocalLiuliGlassHost`
+ * （暖陶一层都不取景、`AppBottomNav` 也不需要）；② 琉璃下 overlay 拿得到 `LocalLiuliGlassHost`（底栏那片玻璃靠它）；
+ * ③ 门关上后**结构恒定**：content 与 overlay 都照常渲染（详情页底栏还要演退场动画），只是 overlay 拿到 null 宿主。
  *
- * ③ 直接驱动 [LiuliGatedBackdropHost]：`tick` 是宿主的内部计数，[LiuliHomeHost] 不暴露 `state` 形参
- * （它自己 remember 一个）。`internal` 成员在测试源集里跨包可读（friend module）。
- * **「不录层」本身 Robolectric 够不着**（不跑 draw 相位 → tick 恒 0）→ 挂装机（图纸 §11 D-3）。
+ * ③ 直接驱动 [LiuliGlassHost]（琉璃 2.0 卷一图纸 §7 T2-3·E7）：门关上 = 不取景 + 给 overlay null 宿主 → 玻璃退着色。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "zh-rCN-w411dp-h891dp")
@@ -57,7 +54,7 @@ class LiuliHomeHostTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private fun host(skin: AppSkin, onBackdrop: (BackdropState?) -> Unit) {
+    private fun host(skin: AppSkin, onBackdrop: (LiuliGlassHostState?) -> Unit) {
         compose.setContent {
             AIPocketChatTheme(darkTheme = false, skin = skin) {
                 CompositionLocalProvider(LocalAppHaptics provides mockk<AppHaptics>(relaxed = true)) {
@@ -67,7 +64,7 @@ class LiuliHomeHostTest {
                         active = true,
                         modifier = Modifier.fillMaxSize(),
                         bottomBar = {
-                            onBackdrop(LocalBackdrop.current)
+                            onBackdrop(LocalLiuliGlassHost.current)
                             Text("底栏")
                         },
                     ) {
@@ -80,17 +77,17 @@ class LiuliHomeHostTest {
     }
 
     @Test fun 暖陶下是纯Box且overlay没有背景宿主() {
-        var seen: BackdropState? = null
+        var seen: LiuliGlassHostState? = null
         var called = false
         host(AppSkin.CLAY) { seen = it; called = true }
         compose.onNodeWithText("内容").assertIsDisplayed()
         compose.onNodeWithText("底栏").assertIsDisplayed()
         assertEquals("bottomBar 槽必须真的组合过", true, called)
-        assertNull("暖陶下不该有 LocalBackdrop（一层都不录）", seen)
+        assertNull("暖陶下不该有 LocalLiuliGlassHost（一层都不取景）", seen)
     }
 
     @Test fun 琉璃下overlay拿得到背景宿主() {
-        var seen: BackdropState? = null
+        var seen: LiuliGlassHostState? = null
         host(AppSkin.LIULI) { seen = it }
         compose.onNodeWithText("内容").assertIsDisplayed()
         compose.onNodeWithText("底栏").assertIsDisplayed()
@@ -143,29 +140,30 @@ class LiuliHomeHostTest {
         listOf("联系人", "动态", "我").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
     }
 
-    @Test fun 关门后不再录层而overlay照常渲染() {
+    @Test fun 关门后overlay拿到空宿主而两槽照常渲染() {
         val active = mutableStateOf(true)
-        lateinit var state: BackdropState
+        var seen: LiuliGlassHostState? = null
         compose.setContent {
             AIPocketChatTheme(darkTheme = false, skin = AppSkin.LIULI) {
-                state = rememberBackdropState()
-                LiuliGatedBackdropHost(
+                LiuliGlassHost(
                     modifier = Modifier.fillMaxSize(),
                     active = active.value,
-                    state = state,
                     content = { Text("内容") },
-                    overlay = { Text("底栏") },
+                    overlay = {
+                        seen = LocalLiuliGlassHost.current
+                        Text("底栏")
+                    },
                 )
             }
         }
         compose.waitForIdle()
+        assertNotNull("开门时 overlay 拿得到宿主", seen)
         compose.runOnIdle { active.value = false }
         compose.waitForIdle()
-        // Robolectric 不跑 draw 相位（`tick` 恒 0·captureToImage 要真 window 且会把这个「draw 里写 state」的
-        // 宿主拖成永不 idle）——「关门真的不录层」那半条挂装机（图纸 §11 D-3 / §7 装机 ⑤）。
-        // 这里钉住能钉的那半条：**门关上后结构恒定**，content 与 overlay 都照常渲染（详情页底栏还要演退场动画）。
+        // 「关门真的不取景」那半条 Robolectric 够不着（不跑真 draw 合成）→ 挂装机；这里钉能钉的：
+        // 关门后 overlay 拿到 null 宿主（玻璃退着色），且**结构恒定**——content 与 overlay 都照常渲染（详情页底栏还要演退场动画）。
+        assertNull("关门后 overlay 拿到 null 宿主", seen)
         compose.onNodeWithText("内容").assertIsDisplayed()
         compose.onNodeWithText("底栏").assertIsDisplayed()
-        assertEquals("关门只关录层，不关任何一个槽", 0, state.tick)
     }
 }

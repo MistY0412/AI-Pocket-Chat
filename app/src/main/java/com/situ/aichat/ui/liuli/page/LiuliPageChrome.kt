@@ -22,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -34,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import com.situ.aichat.ui.components.rememberReduceMotion
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
+import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
 import com.situ.aichat.ui.liuli.designsystem.LiuliTheme
 import com.situ.aichat.ui.liuli.glass.liuliGlass
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
@@ -50,6 +50,9 @@ import com.situ.aichat.ui.theme.LocalIsDarkTheme
 /** 收起顶栏的进出时长（卷三 §4.2·180ms fade + 6dp slide）。 */
 private const val COMPACT_BAR_MS = 180
 private val COMPACT_BAR_SLIDE = 6.dp
+
+/** 悬浮胶囊顶栏两侧内缩（琉璃 2.0 卷二 §4.8-1）：= gutter 20 − 4——40dp 返回圆钮在 x = 20 时落在胶囊内 4dp、上下各 2dp。 */
+private val COMPACT_PILL_INSET = 16.dp
 
 /**
  * 大标题带（列表的第 0 个 item / 卡片流的第一项）：顶 + 2 起、40 高、左 20，
@@ -82,13 +85,16 @@ fun LiuliLargeTitle(title: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** 列表小节标题（「置顶」/「对话」）：12/500 字距 .06em text.tertiary，上 14 下 6。 */
+/**
+ * 列表小节标题（「置顶」/「对话」）：12/500 字距 .06em `text.secondary`（卷三：压裸柔光底 ≥ 4.5），上 14 下 6；
+ * 左内距 = gutter + 卡内行距（= 36·与卡内行字起点及设置组标题同列·卷三 §4.7）。
+ */
 @Composable
 fun LiuliSectionHeader(text: String, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = LiuliPageGeometry.gutter, end = LiuliPageGeometry.gutter, top = 14.dp, bottom = 6.dp),
+            .padding(start = LiuliPageGeometry.gutter + LiuliPageGeometry.groupPadH, end = LiuliPageGeometry.gutter, top = 14.dp, bottom = 6.dp),
     ) {
         Text(
             text,
@@ -97,15 +103,17 @@ fun LiuliSectionHeader(text: String, modifier: Modifier = Modifier) {
                 fontWeight = FontWeight.W500,
                 letterSpacing = 0.06.em,
             ),
-            color = AppTheme.colors.text.tertiary,
+            color = AppTheme.colors.text.secondary,
             maxLines = 1,
         )
     }
 }
 
 /**
- * 收起后的玻璃顶栏：从窗口顶铺到「状态栏 + 44」（契约 §3.2 / §4.7 ⑱），小标题居中于**下 44**。
- * [subBar] 非空时同一片玻璃再往下延 56（8 + 40 玻璃 pill + 8·A-11），覆盖区总高 = 状态栏 + 44 + 56。
+ * 收起后的**悬浮玻璃胶囊顶栏**（琉璃 2.0 卷二 §4.8-1）：状态栏下方、两侧各内缩 [COMPACT_PILL_INSET] 的一片
+ * [LiuliShapes].compactPill 22 圆角玻璃，高 44、小标题居中。[subBar] 非空时同一片胶囊再往下延 56
+ * （8 + 40 玻璃 pill + 8·A-11），胶囊高 100；覆盖区总高仍 = 状态栏 + 44（+ 56）。状态栏那一截不再有玻璃挡着，
+ * 由页壳在 overlay 里画一条顶部渐进模糊带（琉璃 2.0 卷六·一·`LiuliTopScrollEdge`·`LiuliPage` / `LiuliHomeScaffold`）。
  *
  * **不挂任何 pointerInput**（卷三 A-17）：它是纯玻璃条，列表在它下面照常滚。
  * [leading] / [trailing] 是给「返回钮住进顶栏」那类页型留的槽；本卷四屏与主页四 Tab 都不传——它们的
@@ -118,6 +126,8 @@ fun BoxScope.LiuliCompactTopBar(
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
     subBar: (@Composable () -> Unit)? = null,
+    /** 书名后的小字（琉璃 2.0 卷六·三·下甲·阅读器「· 第 N 章」·加法零回归：null = 原渲染）。 */
+    titleSuffix: String? = null,
 ) {
     val dark = LocalIsDarkTheme.current
     val reduceMotion = rememberReduceMotion()
@@ -136,45 +146,79 @@ fun BoxScope.LiuliCompactTopBar(
             fadeOut(tween(COMPACT_BAR_MS)) + slideOutVertically(tween(COMPACT_BAR_MS)) { -slidePx }
         },
     ) {
-        Column(Modifier.fillMaxWidth().liuliGlass(RectangleShape, dark = dark)) {
+        Column(Modifier.fillMaxWidth()) {
             Box(Modifier.fillMaxWidth().windowInsetsTopHeight(WindowInsets.statusBars))
             Box(
-                Modifier.fillMaxWidth().height(LiuliPageGeometry.compactBar),
-                contentAlignment = Alignment.Center,
+                Modifier
+                    .padding(horizontal = COMPACT_PILL_INSET)
+                    .fillMaxWidth()
+                    .liuliGlass(LiuliShapes.compactPill, dark = dark),
             ) {
-                if (leading != null) {
-                    Box(
-                        Modifier.align(Alignment.CenterStart).padding(start = LiuliPageGeometry.gutter),
-                        content = { leading() },
-                    )
+                Column(Modifier.fillMaxWidth()) {
+                    Box(Modifier.fillMaxWidth().height(LiuliPageGeometry.compactBar), contentAlignment = Alignment.Center) {
+                        if (leading != null) {
+                            Box(
+                                Modifier.align(Alignment.CenterStart).padding(start = LiuliPageGeometry.gutter - COMPACT_PILL_INSET),
+                                content = { leading() },
+                            )
+                        }
+                        // 标题两侧让位（卷六·三·下甲·加法零回归）：只有传了 leading / trailing 才让（现有调用方都不传 → 走原 Text 分支逐字节同渲染）。
+                        val titleSide = if (leading != null || trailing != null) {
+                            LiuliPageGeometry.gutter - COMPACT_PILL_INSET + LiuliPageGeometry.backButton + LiuliPageGeometry.titleGap
+                        } else {
+                            0.dp
+                        }
+                        if (titleSuffix == null && titleSide == 0.dp) {
+                            Text(
+                                title,
+                                style = AppTypography.caption.copy(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.W600),
+                                color = LiuliTheme.onGlass.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        } else {
+                            Row(Modifier.padding(horizontal = titleSide), verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    title,
+                                    style = AppTypography.caption.copy(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.W600),
+                                    color = LiuliTheme.onGlass.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                                if (titleSuffix != null) {
+                                    Text(
+                                        titleSuffix,
+                                        style = AppTypography.caption.copy(fontSize = 12.sp, fontWeight = FontWeight.W500),
+                                        color = LiuliTheme.onGlass.secondary,
+                                        maxLines = 1,
+                                        modifier = Modifier.padding(start = 6.dp),
+                                    )
+                                }
+                            }
+                        }
+                        if (trailing != null) {
+                            Row(
+                                modifier = Modifier.align(Alignment.CenterEnd).padding(end = LiuliPageGeometry.gutter - COMPACT_PILL_INSET),
+                                horizontalArrangement = Arrangement.spacedBy(LiuliPageGeometry.actionButtonGap),
+                                verticalAlignment = Alignment.CenterVertically,
+                                content = trailing,
+                            )
+                        }
+                    }
+                    if (subBar != null) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(LiuliPageGeometry.subBar)
+                                .padding(
+                                    horizontal = LiuliPageGeometry.gutter - COMPACT_PILL_INSET,
+                                    vertical = (LiuliPageGeometry.subBar - LiuliPageGeometry.stripGlass) / 2,
+                                ),
+                            content = { subBar() },
+                        )
+                    }
                 }
-                Text(
-                    title,
-                    style = AppTypography.caption.copy(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.W600),
-                    color = LiuliTheme.onGlass.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (trailing != null) {
-                    Row(
-                        modifier = Modifier.align(Alignment.CenterEnd).padding(end = LiuliPageGeometry.gutter),
-                        horizontalArrangement = Arrangement.spacedBy(LiuliPageGeometry.actionButtonGap),
-                        verticalAlignment = Alignment.CenterVertically,
-                        content = trailing,
-                    )
-                }
-            }
-            if (subBar != null) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(LiuliPageGeometry.subBar)
-                        .padding(
-                            horizontal = LiuliPageGeometry.gutter,
-                            vertical = (LiuliPageGeometry.subBar - LiuliPageGeometry.stripGlass) / 2,
-                        ),
-                    content = { subBar() },
-                )
             }
         }
     }

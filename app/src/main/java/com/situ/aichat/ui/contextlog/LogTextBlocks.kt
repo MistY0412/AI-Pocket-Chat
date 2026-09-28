@@ -50,3 +50,9 @@ internal fun splitLogTextBlocks(text: String, maxChars: Int = LOG_TEXT_BLOCK_CHA
 
 /** 块大小上限（字符）。约一两屏文字：块内布局便宜，块外靠 LazyColumn 只渲染可见项。 */
 internal const val LOG_TEXT_BLOCK_CHARS = 4_000
+
+/**
+ * 落库截断标记前缀（[com.situ.aichat.diagnostics.LogContextFormat.clip] 的提示行）：命中来源 =
+ * 旧版软上限的历史条目，或现行 20 万字安全帽的极端条目——两者脚注一律如实标「已截断」。
+ */
+internal const val LEGACY_CLIP_MARKER = "[日志内容已截断"

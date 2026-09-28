@@ -24,8 +24,8 @@ import org.robolectric.annotation.Config
 /**
  * T2：外观页在「脸 × API 档」下的节可见性（图纸 2026-09-04-琉璃第二张脸-卷一 §7 T2-3 · E4/E5/E6/E9）。
  *
- * 唯二有意变化就靠这三例看门：琉璃下多一节「透明度」（API≥31）、少一节「底部导航栏」；暖陶下反之；
- * API 29–30 没有实时模糊能力 → 连「透明度」都不给选（图纸 §0 ② 8）。
+ * 唯二有意变化就靠这三例看门：琉璃下多一节「玻璃质感」（API≥33·琉璃 2.0 卷一图纸 §7 T2-7）、少一节「底部导航栏」；
+ * 暖陶下反之；安卓 13 以下只有毛玻璃 → 连「玻璃质感」都不给选。
  *
  * qualifiers 钉 zh-rCN（顺带验五键 zh/en 成对可解析）+ 真机尺寸（屏太小节点会被推出可视区·PITFALLS §1e）。
  * VM 用真 [AppearanceSettingsViewModel] + MockK 的 [SettingsPreferences]，显式传 `viewModel =` 形参绕开
@@ -38,7 +38,7 @@ class AppearanceSettingsScreenTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private fun vmWith(skin: AppSkin, tier: GlassTier = GlassTier.CLEAR): AppearanceSettingsViewModel {
+    private fun vmWith(skin: AppSkin, tier: GlassTier = GlassTier.SHEER): AppearanceSettingsViewModel {
         val prefs = mockk<SettingsPreferences>(relaxed = true)
         every { prefs.appSkin } returns flowOf(skin)
         every { prefs.glassTier } returns flowOf(tier)
@@ -50,7 +50,7 @@ class AppearanceSettingsScreenTest {
         return AppearanceSettingsViewModel(prefs)
     }
 
-    private fun show(skin: AppSkin, tier: GlassTier = GlassTier.CLEAR) {
+    private fun show(skin: AppSkin, tier: GlassTier = GlassTier.SHEER) {
         val vm = vmWith(skin, tier)
         compose.setContent {
             AIPocketChatTheme(darkTheme = false, skin = skin) {
@@ -64,32 +64,32 @@ class AppearanceSettingsScreenTest {
     }
 
     @Test
-    fun `琉璃 + API34：有透明度节、无底部导航栏节、默认清透选中`() {
+    fun `琉璃 + API34：有玻璃质感节、无底部导航栏节、默认通透选中`() {
         show(AppSkin.LIULI)
-        compose.onNodeWithText("透明度").assertExists()
-        compose.onNodeWithText("清透").assertIsSelected()
+        compose.onNodeWithText("玻璃质感").assertExists()
+        compose.onNodeWithText("通透").assertIsSelected()
         compose.onNodeWithText("底部导航栏").assertDoesNotExist()
         // 正向锚：两张脸的卡都在，琉璃那张被选中（证明这一屏真渲染出来了，不是空树假绿）。
         compose.onNodeWithText("琉璃").assertIsSelected()
     }
 
     @Test
-    fun `暖陶 + API34：有底部导航栏节、无透明度节`() {
+    fun `暖陶 + API34：有底部导航栏节、无玻璃质感节`() {
         show(AppSkin.CLAY)
         compose.onNodeWithText("底部导航栏").assertExists()
         compose.onNodeWithText("暖陶").assertIsSelected()
-        compose.onNodeWithText("透明度").assertDoesNotExist()
-        compose.onNodeWithText("清透").assertDoesNotExist()
+        compose.onNodeWithText("玻璃质感").assertDoesNotExist()
+        compose.onNodeWithText("通透").assertDoesNotExist()
     }
 
     @Test
     @Config(sdk = [30], qualifiers = "zh-rCN-w411dp-h891dp")
-    fun `琉璃 + API30：无实时模糊能力则连透明度节都不给`() {
+    fun `琉璃 + API30：安卓 13 以下只有毛玻璃则连玻璃质感节都不给`() {
         show(AppSkin.LIULI)
         // 正向锚：屏确实渲染了琉璃态（否则下面的全否定断言没有判别力）。
         compose.onNodeWithText("琉璃").assertIsSelected()
-        compose.onNodeWithText("透明度").assertDoesNotExist()
-        compose.onNodeWithText("清透").assertDoesNotExist()
+        compose.onNodeWithText("玻璃质感").assertDoesNotExist()
+        compose.onNodeWithText("通透").assertDoesNotExist()
         // 底栏节的隐藏只看脸、不看 API：琉璃下仍然没有。
         compose.onNodeWithText("底部导航栏").assertDoesNotExist()
     }

@@ -48,4 +48,10 @@ data class MomentPostEntity(
     val triggerTypeRaw: String = "auto_draft",
     /** When [triggerTypeRaw] == "gift_received": the related GiftRecord uuid (P9). */
     val relatedGiftId: String? = null,
+    /**
+     * 「提醒谁看」的角色 uuid 列表（JSON·解码用 `MomentPostEntity.mentionedCharacterUuids`）。"" = 没提醒任何人。
+     * 只有用户帖会有；写者唯一 = 发布页 [com.situ.aichat.ui.moments.ComposeMomentViewModel.publish]。
+     * 朋友圈发布页重构·甲（docs/handoff/2026-09-27-朋友圈发布页-甲-底子.md §3.1）。
+     */
+    val mentionedCharacterUuidsJson: String = "",
 )

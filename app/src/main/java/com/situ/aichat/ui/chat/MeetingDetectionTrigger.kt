@@ -11,6 +11,7 @@ import com.situ.aichat.data.repository.ConversationRepository
 import com.situ.aichat.data.repository.MessageRepository
 import com.situ.aichat.diagnostics.ContextLogService
 import com.situ.aichat.diagnostics.LogSource
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.meeting.MeetingAppointmentStore
 import com.situ.aichat.meeting.MeetingDetectionService
 import com.situ.aichat.meeting.MeetingDisplayFormatter
@@ -20,6 +21,7 @@ import com.situ.aichat.prompt.memory.MemoryService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlin.coroutines.EmptyCoroutineContext
 import java.time.ZoneId
 
 /**
@@ -75,11 +77,11 @@ internal class MeetingDetectionTrigger(
         }
     }
 
-    fun checkAndTrigger(character: CharacterEntity, config: ApiConfigValues, userName: String) {
+    fun checkAndTrigger(character: CharacterEntity, config: ApiConfigValues, userName: String, trace: LogTrace? = null) {
         if (isScanning) return
 
         isScanning = true
-        scope.launch {
+        scope.launch(trace ?: EmptyCoroutineContext) {
             try {
                 val conversation = conversationRepo.get(conversationUuid) ?: return@launch
                 if (conversation.isInOfflineMode) return@launch

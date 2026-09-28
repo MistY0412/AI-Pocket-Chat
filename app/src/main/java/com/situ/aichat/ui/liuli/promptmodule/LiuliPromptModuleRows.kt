@@ -75,6 +75,7 @@ internal fun LiuliPromptModuleRow(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     divider: Boolean,
+    saverHint: Boolean = false,
 ) {
     val colors = AppTheme.colors
     LiuliRowBase(
@@ -133,6 +134,8 @@ internal fun LiuliPromptModuleRow(
                     color = colors.text.secondary,
                 )
             }
+            // 四期·图纸二 §4.3：省钱模式开着时，前置区的角色记忆行说明「相关的旧聊天」已挪位并改写成叙述句。
+            if (saverHint) Text(stringResource(R.string.pm_saver_module_hint), style = AppTypography.caption, color = colors.status.onSuccess, modifier = Modifier.padding(top = 3.dp))
         }
         Spacer(Modifier.width(LiuliPageGeometry.tileGap))
         MoveButton(Icons.Filled.ArrowUpward, stringResource(R.string.pm_move_up), enabled = !isFirst, onClick = onMoveUp)

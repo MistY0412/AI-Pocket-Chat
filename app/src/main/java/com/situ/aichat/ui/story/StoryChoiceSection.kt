@@ -3,8 +3,6 @@ package com.situ.aichat.ui.story
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -51,11 +49,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.situ.aichat.R
 import com.situ.aichat.data.local.entity.StoryChapterEntity
-import com.situ.aichat.story.StoryChoiceClassifier
 import com.situ.aichat.story.StoryChoiceCountdown
 import com.situ.aichat.story.StoryNarrativePerson
 import com.situ.aichat.ui.designsystem.AppTheme
-import kotlinx.coroutines.delay
 
 /**
  * 章末选择区（ST7d·契约 §6.4 + J2）。选项卡全 token 化（照 mockup 屏六 .choice/.choice.sel）：A/B/C 键徽
@@ -77,23 +73,15 @@ fun StoryChoiceSection(
     val textColor = StoryReaderLayout.textColor(isDark)
     val secondaryColor = StoryReaderLayout.secondaryTextColor(isDark)
     val isLocked = chapter.userChoice != null
-    val options = remember(chapter.choiceOptions) { StoryChoiceClassifier.decodeChoiceOptions(chapter.choiceOptions) }
+    val options = rememberStoryChoiceOptions(chapter)
 
-    // 选中选项的弹一下（1→1.04→1，= iOS spring bounce）。
-    val popScale = remember { Animatable(1f) }
-    LaunchedEffect(selectedChoiceText) {
-        if (selectedChoiceText != null && !isLocked) {
-            popScale.animateTo(1.04f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium))
-            delay(220)
-            popScale.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMedium))
-        }
-    }
+    val popScale = rememberStoryChoicePopScale(selectedChoiceText, isLocked)
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(11.dp)) {
         StoryChoiceHeader(isDark)
 
         Text(
-            text = chapter.choicePrompt ?: storyDefaultChoicePrompt(narrativePerson, userRoleName),
+            text = storyChoicePromptText(chapter, narrativePerson, userRoleName),
             color = textColor,
             fontSize = 17.sp,
             fontWeight = FontWeight.SemiBold,
@@ -103,10 +91,10 @@ fun StoryChoiceSection(
         options.forEachIndexed { index, option ->
             val selected = selectedChoiceText == option
             ChoiceOptionCard(
-                letter = ('A' + index).toString(),
+                letter = storyChoiceLetter(index),
                 option = option,
                 selected = selected,
-                dimmed = selectedChoiceText != null && !selected,
+                dimmed = storyChoiceDimmed(selectedChoiceText, option),
                 locked = isLocked,
                 isDark = isDark,
                 scale = if (selected) popScale.value else 1f,
@@ -116,9 +104,9 @@ fun StoryChoiceSection(
 
         FreeInputCard(locked = isLocked, isDark = isDark, onClick = { if (!isLocked) onOpenCustomInput() })
 
-        if (isLocked && !chapter.userChoice.isNullOrEmpty()) {
+        storyChoiceFeedbackText(chapter, narrativePerson, userRoleName)?.let {
             Text(
-                text = storyChoiceFeedbackPrefix(narrativePerson, userRoleName) + chapter.userChoice,
+                text = it,
                 color = secondaryColor,
                 fontSize = 13.sp,
             )
@@ -295,7 +283,7 @@ internal fun StoryUndoBar(
  * → 安卓同样整行压停。
  */
 @Composable
-private fun StoryChoiceHeader(isDark: Boolean) {
+internal fun StoryChoiceHeader(isDark: Boolean) {
     val ornament = StoryReaderLayout.ornamentColor(isDark)
     val textColor = StoryReaderLayout.secondaryTextColor(isDark)
     Row(

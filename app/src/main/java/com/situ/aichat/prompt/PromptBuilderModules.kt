@@ -13,8 +13,11 @@ import com.situ.aichat.data.model.CharacterEconomicChatState
 import com.situ.aichat.data.model.MomentChatContext
 import com.situ.aichat.data.model.StructuredMemory
 import com.situ.aichat.pet.OtherPetInfo
+import com.situ.aichat.prompt.ourdays.buildOurDaysContent
+import com.situ.aichat.prompt.saver.CacheSaverLayout
 import com.situ.aichat.tts.provider.MiniMaxVoiceTagsCapability
 import java.time.Instant
+import java.time.ZoneId
 
 /**
  * 系统提示词装配（自 [PromptBuilder] 抽出 · 文件瘦身）：按 scene 过滤启用模块、按 sortOrder 排序、
@@ -39,6 +42,13 @@ data class SuffixModuleEntry(
 ) {
     val systemModuleType: SystemModuleType? get() = module?.systemModuleType
 }
+
+/** 系统提示词装配结果（四期·图纸二）：[savedBlock] = 省钱模式挪走的内容（关着 / 无可挪 = ""）。 */
+data class SystemPromptAssembly(
+    val systemPrompt: String,
+    val suffixEntries: List<SuffixModuleEntry>,
+    val savedBlock: String,
+)
 
 fun buildSystemPromptWithSuffixes(
     character: CharacterEntity,
@@ -93,7 +103,31 @@ fun buildSystemPromptWithSuffixes(
     worldInfoAfter: String = "",
     /** 卷三 D2：透传进 [PromptBuilder.BuildContext.recentCharacterLines]（空 = 无自述·旧行为）。 */
     recentCharacterLines: List<String> = emptyList(),
-): Pair<String, List<SuffixModuleEntry>> {
+    /** 四期·图纸一 §3.5：透传进 [PromptBuilder.BuildContext.timeSense]（null = 现在卡不接新行·旧行为）。 */
+    timeSense: com.situ.aichat.prompt.timesense.ChatTimeSense? = null,
+): SystemPromptAssembly {
+    val modules = PromptModuleService.effectiveModules(
+        characterUuid = character.uuid,
+        globalJson = appSettings.promptModulesJSON,
+        characterJson = appSettings.characterPromptModulesJSON,
+    )
+    // 方案 V2：按 scene 过滤（enabledScenes==null → 全场景）
+    val enabledModules = modules
+        .filter { it.isEnabled }
+        .filter { (it.enabledScenes ?: PromptScene.entries.toSet()).contains(scene) }
+        .sortedBy { it.sortOrder }
+
+    val prefixModules = enabledModules.filter { it.position == PromptModulePosition.PREFIX }
+    val suffixModules = enabledModules.filter { it.position == PromptModulePosition.SUFFIX }
+
+    // 省钱模式（四期·图纸二 §3.2 ③）：只挪「本来在前置区」的三类——召回片段 / 我们的日子 / 世界书前后锚；
+    // 挪走的块按关着时的出现顺序拼，由 PromptBuilder.buildMessages 插到最新用户消息前。关着 = 逐字节旧行为。
+    val saver = appSettings.cacheSaverEnabled
+    val movesMemory = saver && retrievedMemorySnippets.isNotEmpty() &&
+        prefixModules.any { it.systemModuleType == SystemModuleType.CHARACTER_MEMORY }
+    val movesOurDays = saver && ourDays.isNotEmpty() && prefixModules.any { it.systemModuleType == SystemModuleType.OUR_DAYS }
+    val movesWorldInfo = saver
+
     val macros = PromptBuilder.promptMacros(character, userProfile, strings)
     val ctx = PromptBuilder.BuildContext(
         character = character,
@@ -105,12 +139,12 @@ fun buildSystemPromptWithSuffixes(
         userProfile = userProfile,
         appSettings = appSettings,
         structuredMemory = structuredMemory,
-        retrievedMemorySnippets = retrievedMemorySnippets,
+        retrievedMemorySnippets = if (movesMemory) emptyList() else retrievedMemorySnippets,
         offlineMeetingMemoryText = offlineMeetingMemoryText,
         worldContext = worldContext,
         openLoops = openLoops,
         promises = promises,
-        ourDays = ourDays,
+        ourDays = if (movesOurDays) emptyList() else ourDays,
         ourDaysTurnText = ourDaysTurnText,
         windowEarliestMillis = windowEarliestMillis,
         assistantDeliveryMode = assistantDeliveryMode,
@@ -135,46 +169,49 @@ fun buildSystemPromptWithSuffixes(
         now = now,
         strings = strings,
         recentCharacterLines = recentCharacterLines,
+        timeSense = timeSense,
     )
-
-    val modules = PromptModuleService.effectiveModules(
-        characterUuid = character.uuid,
-        globalJson = appSettings.promptModulesJSON,
-        characterJson = appSettings.characterPromptModulesJSON,
-    )
-    // 方案 V2：按 scene 过滤（enabledScenes==null → 全场景）
-    val enabledModules = modules
-        .filter { it.isEnabled }
-        .filter { (it.enabledScenes ?: PromptScene.entries.toSet()).contains(scene) }
-        .sortedBy { it.sortOrder }
-
-    val prefixModules = enabledModules.filter { it.position == PromptModulePosition.PREFIX }
-    val suffixModules = enabledModules.filter { it.position == PromptModulePosition.SUFFIX }
 
     val prefixParts = mutableListOf<String>()
+    val moved = mutableListOf<String>()
+    // 世界书锚点的去处：省钱模式 → 挪位块；否则照旧进系统提示词。
+    val worldInfoSink = if (movesWorldInfo) moved else prefixParts
     var worldInfoAnchored = false
     for (module in prefixModules) {
         val content = PromptBuilder.buildModuleContent(module, ctx)
         if (content.isNotEmpty()) {
             val isIdentityAnchor = !worldInfoAnchored &&
                 module.systemModuleType == SystemModuleType.CHARACTER_IDENTITY
-            if (isIdentityAnchor && worldInfoBefore.isNotBlank()) prefixParts.add(worldInfoBefore)
+            if (isIdentityAnchor && worldInfoBefore.isNotBlank()) worldInfoSink.add(worldInfoBefore)
             prefixParts.add(content)
             segmentSink?.add(PromptBuilder.moduleSegment(module, content, ContextSegment.POSITION_PREFIX))
-            if (isIdentityAnchor && worldInfoAfter.isNotBlank()) prefixParts.add(worldInfoAfter)
+            if (isIdentityAnchor && worldInfoAfter.isNotBlank()) worldInfoSink.add(worldInfoAfter)
             if (isIdentityAnchor) worldInfoAnchored = true
         }
+        // 模块内容可能因只剩召回而为空（上面跳过），挪位段照样加。
+        if (movesMemory && module.systemModuleType == SystemModuleType.CHARACTER_MEMORY) {
+            val today = ctx.now.atZone(ZoneId.systemDefault()).toLocalDate()
+            moved += memorySnippetSection(
+                retrievedMemorySnippets.map { CacheSaverLayout.narrate(it, ctx.resolvedCharacterName, today) },
+                strings,
+            ).joinToString("\n")
+        }
+        if (movesOurDays && module.systemModuleType == SystemModuleType.OUR_DAYS) {
+            val ourDaysBlock = buildOurDaysContent(ctx.copy(ourDays = ourDays))
+            if (ourDaysBlock.isNotEmpty()) moved += ourDaysBlock
+        }
     }
-    // 身份模块缺席/空内容的兜底：前桶置顶、后桶收尾（§2.2 映射的降级语义）。
+    // 身份模块缺席/空内容的兜底：前桶置顶、后桶收尾（§2.2 映射的降级语义；省钱模式下「置顶 / 收尾」指挪位块内）。
     if (!worldInfoAnchored) {
-        if (worldInfoBefore.isNotBlank()) prefixParts.add(0, worldInfoBefore)
-        if (worldInfoAfter.isNotBlank()) prefixParts.add(worldInfoAfter)
+        if (worldInfoBefore.isNotBlank()) worldInfoSink.add(0, worldInfoBefore)
+        if (worldInfoAfter.isNotBlank()) worldInfoSink.add(worldInfoAfter)
     }
 
-    // 安全兜底：所有模块都禁用 → 最小提示词
-    if (prefixParts.isEmpty() && suffixModules.isEmpty()) {
+    // 安全兜底：所有模块都禁用 → 最小提示词。省钱模式把前置区内容全挪走时（moved 非空）不算「全禁用」——
+    // 系统提示词为空就不发（PromptBuilder 只发非空 system），挪位块照插（复核 R1 🟡-1·图纸 §3.2 ③-5 订正）。
+    if (prefixParts.isEmpty() && moved.isEmpty() && suffixModules.isEmpty()) {
         val fallback = "You are “${character.name}”. Reply in this character’s identity and tone, in the current app language."
-        return Pair(fallback, emptyList())
+        return SystemPromptAssembly(fallback, emptyList(), "")
     }
 
     val systemPrompt = prefixParts.joinToString("\n\n")
@@ -199,5 +236,5 @@ fun buildSystemPromptWithSuffixes(
         suffixEntries.add(insertAt, SuffixModuleEntry(PromptBuilder.buildMiniMaxVoiceTagsHint(ctx.strings), module = null))
     }
 
-    return Pair(systemPrompt, suffixEntries)
+    return SystemPromptAssembly(systemPrompt, suffixEntries, moved.joinToString("\n\n"))
 }

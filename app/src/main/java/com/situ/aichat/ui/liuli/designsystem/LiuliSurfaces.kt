@@ -36,18 +36,13 @@ fun Modifier.liuliCardSurface(shape: Shape = LiuliShapes.medium): Modifier = com
 }
 
 /**
- * 琉璃按压反馈（灵感板 12 · 契约 §4.1）：缩 0.96 + 可选提亮（叠白 昼 6% / 夜 8%）。
- *
- * 提亮叠在**内容之上**——它是玻璃整片的亮度反馈，不是底垫；只在 180ms 量级的按压态出现，白 6% 叠深字
- * 只会让字略浅（`#111318` + 白 6% ≈ `#1F2126`，对玻璃合成底仍 >7:1），不破对比红线。
- * [rememberReduceMotion] 时不缩不亮（触觉与 ripple 由调用方保留）。
+ * 琉璃按压反馈（灵感板 12 · 契约 §4.1）：缩 0.96。提亮另走 [liuliPressBrighten]，挂在调用方裁好形状之后。
+ * [rememberReduceMotion] 时不缩（触觉与 ripple 由调用方保留）。
  */
 internal fun Modifier.liuliPressable(
     interactionSource: MutableInteractionSource,
     enabled: Boolean,
-    brighten: Boolean,
 ): Modifier = composed {
-    val dark = LocalIsDarkTheme.current
     val reduceMotion = rememberReduceMotion()
     val pressed by interactionSource.collectIsPressedAsState()
     val active = pressed && enabled && !reduceMotion
@@ -56,16 +51,26 @@ internal fun Modifier.liuliPressable(
         animationSpec = AppMotion.calmSpring(),
         label = "liuliPress",
     )
-    this
-        .graphicsLayer { scaleX = scale; scaleY = scale }
-        .then(
-            if (brighten) {
-                Modifier.drawWithContent {
-                    drawContent()
-                    if (active) drawRect(Color.White, alpha = if (dark) 0.08f else 0.06f)
-                }
-            } else {
-                Modifier
-            },
-        )
+    this.graphicsLayer { scaleX = scale; scaleY = scale }
+}
+
+/**
+ * 按压提亮（契约 §4.1·叠白 昼 6% / 夜 8%）：玻璃整片的亮度反馈，叠在**内容之上**；只在 180ms 量级的按压态出现，白 6% 叠深字
+ * 只会让字略浅（`#111318` + 白 6% ≈ `#1F2126`，对玻璃合成底仍 >7:1），不破对比红线。[rememberReduceMotion] 时不亮。
+ *
+ * **必须挂在形状裁切之后**（`liuliGlass` / `clip` / `liuliAccentFill` 之后）：卷四复核 R1 抓到提亮原本画满整个触达框，
+ * 圆钮 / 胶囊按下时形状外亮出一块方角（深色下明显）。
+ */
+internal fun Modifier.liuliPressBrighten(
+    interactionSource: MutableInteractionSource,
+    enabled: Boolean,
+): Modifier = composed {
+    val dark = LocalIsDarkTheme.current
+    val reduceMotion = rememberReduceMotion()
+    val pressed by interactionSource.collectIsPressedAsState()
+    val active = pressed && enabled && !reduceMotion
+    this.drawWithContent {
+        drawContent()
+        if (active) drawRect(Color.White, alpha = if (dark) 0.08f else 0.06f)
+    }
 }

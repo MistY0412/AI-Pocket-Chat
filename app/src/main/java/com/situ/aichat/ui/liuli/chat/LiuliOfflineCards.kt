@@ -139,7 +139,7 @@ internal fun LiuliOfflineEndCard(
  * 离场分隔线（A-4）：两侧 0.5 发丝 + 中间一枚玻璃 pill 写「线下见面结束 · {时长}」，有 sessionId 时
  * 右缀「· 回顾」并整条可点。落成时序与暖陶同一枚 [rememberOfflineDividerReveal]。
  *
- * pill 走 `liuliGlass` = 内容层**自动退纯染色**（拿不到 `LocalBackdrop`），与卷二A 日期胶囊同判例。
+ * pill 走 `liuliGlass` = 内容层**自动退着色兜底**（拿不到 `LocalLiuliGlassHost`），与卷二A 日期胶囊同判例。
  */
 @Composable
 internal fun LiuliOfflineEndDivider(

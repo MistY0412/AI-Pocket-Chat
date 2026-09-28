@@ -26,6 +26,7 @@ import com.situ.aichat.offline.OfflineNarrativePreset
 import com.situ.aichat.pet.OtherPetInfo
 import com.situ.aichat.prompt.memory.InSceneRecapCoordinator
 import com.situ.aichat.prompt.memory.MemoryService
+import com.situ.aichat.prompt.saver.CacheSaverLayout
 import com.situ.aichat.tooling.ChatToolContext
 import com.situ.aichat.tooling.PendingCalendarFailure
 import com.situ.aichat.tooling.chatToolRegistry
@@ -168,6 +169,8 @@ object PromptBuilder {
         val strings: PromptStrings,
         /** 卷三 D2：最近 3 轮 · 3h 内的角色在线发言（`AttentionJudge.recentCharacterLines`），【此刻】睡眠/分心裁决取材。 */
         val recentCharacterLines: List<String> = emptyList(),
+        /** 四期·图纸一 §3.5：在线文字聊天的时间感事实（非在线 / 延迟生成 = null → 现在卡不接新行）。 */
+        val timeSense: com.situ.aichat.prompt.timesense.ChatTimeSense? = null,
     )
 
     internal const val ROLE_USER = "user"
@@ -349,6 +352,7 @@ object PromptBuilder {
             now = now,
         )
         val timeSnapshot = ConversationTimeSnapshot.from(filteredMessages)
+        val timeSense = if (effectiveScene == PromptScene.ONLINE_CHAT && !delayedGeneration) com.situ.aichat.prompt.timesense.ChatTimeSense.from(sortedMessages, now, ZoneId.systemDefault()) else null // 四期·图纸一 §3.5
         val ourDaysTurnText = com.situ.aichat.prompt.ourdays.OurDaysTurnText.from(filteredMessages) // 卷二 W-4：只有这里知道真实窗口
         val windowEarliestMillis = filteredMessages.firstOrNull()?.timestamp
 
@@ -369,7 +373,7 @@ object PromptBuilder {
 
         // 1. 系统提示词（前置区模块）+ 收集后置区模块条目（发射顺序在第 4/5 步决定）
         val recentCharacterLines = com.situ.aichat.prompt.growth.AttentionJudge.recentCharacterLines(filteredMessages, now.toEpochMilli()) // 卷三 D2
-        val (systemPrompt, suffixEntries) = buildSystemPromptWithSuffixes(
+        val (systemPrompt, suffixEntries, savedBlock) = buildSystemPromptWithSuffixes(
             character = character,
             milestones = milestones,
             todaySchedule = todaySchedule,
@@ -407,6 +411,7 @@ object PromptBuilder {
             worldInfoBefore = activeWorldInfo?.before?.takeIf { it.isNotBlank() }?.let(::resolveWorld) ?: "",
             worldInfoAfter = activeWorldInfo?.after?.takeIf { it.isNotBlank() }?.let(::resolveWorld) ?: "",
             recentCharacterLines = recentCharacterLines,
+            timeSense = timeSense,
         )
         if (systemPrompt.isNotEmpty()) {
             chatMessages.add(ChatMessageDto(role = ROLE_SYSTEM, content = systemPrompt))
@@ -480,6 +485,7 @@ object PromptBuilder {
                 inserted++
             }
         }
+        if (savedBlock.isNotEmpty()) CacheSaverLayout.insertBlock(chatMessages, historyStart, savedBlock, segmentSink) // 省钱模式（四期·图纸二 §3.2）
 
         // 4. 后置区模块（聊天历史之后，利用近因偏差）。
         // 布局审计刀1+刀2（2026-07-11 过审）：**非线下**时后置区装订为三张卡——
@@ -653,6 +659,7 @@ object PromptBuilder {
             .joinToString(separator = "") { it.content.orEmpty() }
         val prefix = sink.filter { it.position == ContextSegment.POSITION_PREFIX }
         val suffix = sink.filter { it.position == ContextSegment.POSITION_SUFFIX }
+        val saved = sink.filter { it.position == ContextSegment.POSITION_HISTORY } // 省钱模式挪位段（四期·图纸二）
         sink.clear()
         sink.addAll(prefix)
         if (historyText.isNotEmpty()) {
@@ -666,6 +673,7 @@ object PromptBuilder {
                 ),
             )
         }
+        sink.addAll(saved)
         sink.addAll(suffix)
     }
 
@@ -826,6 +834,7 @@ object PromptBuilder {
             charCount = content.length,
             estimatedTokens = TokenEstimator.estimate(content),
             position = position,
+            fingerprint = ContextSegment.fingerprintOf(content),
         )
 
     internal fun buildModuleContent(module: PromptModule, ctx: BuildContext): String {

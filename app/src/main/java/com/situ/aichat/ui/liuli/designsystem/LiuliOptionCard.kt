@@ -27,20 +27,21 @@ import androidx.compose.ui.unit.sp
 import com.situ.aichat.ui.components.LocalAppHaptics
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
 /** 卡最小高（触达 ≥ 48 由此保）· 内距 · swatch 直径。 */
 private val CARD_MIN_HEIGHT = 64.dp
 private val CARD_PAD = 12.dp
 private val SWATCH = 28.dp
-/** 选中描边 1.5 `accent.primary`；未选 0.5 发丝。 */
+/** 选中描边 1.5 `accent.primary`；未选 1dp 白边 [LiuliMaterials.cardRim]（琉璃 2.0 卷二 §4.5-5）。 */
 private val BORDER_ON = 1.5.dp
-private val BORDER_OFF = 0.5.dp
+private val BORDER_OFF = 1.dp
 private val TITLE_SIZE = 15.sp
 private val SUB_SIZE = 13.sp
 
 /**
  * 外观页的选项卡（图纸 2026-09-06 卷四 A-6）：双色 swatch 圆 + 标签 / 副标；
- * 选中 = 1.5dp `accent.primary` 描边 + `accent.container` 底，未选 = `surface.raised` + 0.5 发丝。
+ * 选中 = 1.5dp `accent.primary` 描边 + `accent.container` 底，未选 = [LiuliMaterials.chipFill] + 1dp 白边（卷二 §4.5-5）。
  *
  * 触达 ≥ 48 由 [CARD_MIN_HEIGHT] 保（卡本身就比 48 高，无需外溢框）；`selectable(role = RadioButton)`，
  * 互斥由调用方的 `selectableGroup()` 管；切换 `haptics.selection()`。
@@ -57,6 +58,7 @@ fun LiuliOptionCard(
     enabled: Boolean = true,
 ) {
     val colors = AppTheme.colors
+    val dark = LocalIsDarkTheme.current
     val haptics = LocalAppHaptics.current
     val shape = LiuliShapes.small
     Column(
@@ -64,10 +66,10 @@ fun LiuliOptionCard(
             .fillMaxWidth()
             .heightIn(min = CARD_MIN_HEIGHT)
             .clip(shape)
-            .background(if (selected) colors.accent.container else colors.surface.raised)
+            .background(if (selected) colors.accent.container else LiuliMaterials.chipFill(dark))
             .border(
                 width = if (selected) BORDER_ON else BORDER_OFF,
-                color = if (selected) colors.accent.primary else colors.surface.stroke,
+                color = if (selected) colors.accent.primary else LiuliMaterials.cardRim(dark),
                 shape = shape,
             )
             .selectable(

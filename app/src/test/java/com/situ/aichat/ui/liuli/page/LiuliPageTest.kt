@@ -184,7 +184,11 @@ class LiuliPageTest {
     }
 }
 
-/** 卷五复核 R1：返回钮可禁用（导入进行中）+ 导航行纸面带只在未收起的非 hero 页在场。 */
+/**
+ * 卷五复核 R1：返回钮可禁用（导入进行中）+ 页壳顶带。琉璃 2.0 卷六·一 C 甲起（图纸 §7 T2-P1 预先裁决）：顶带 = 渐进模糊带，
+ * 未收起的非 hero 页 = 状态栏 + 导航行 44 + 标题带顶距 2 = 46；收起态（含 hero 页）= 状态栏 + 胶囊 44 + 尾巴 12 = 56；
+ * hero 未收起不画。Robolectric 下状态栏恒 0，故量出来的就是状态栏以下那一段——状态栏那半留装机（T4-2）。
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "zh-rCN-w411dp-h891dp")
 class LiuliPageBackAndBandTest {
@@ -212,18 +216,29 @@ class LiuliPageBackAndBandTest {
         assertEquals(0, taps)
     }
 
-    @Test fun 未收起时导航行纸面带在场收起后撤走() {
+    private fun bandHeightDp(): Float {
+        compose.onAllNodesWithTag(LIULI_NAV_BAND_TAG).assertCountEquals(1)
+        val band = compose.onNodeWithTag(LIULI_NAV_BAND_TAG).getUnclippedBoundsInRoot()
+        return (band.bottom - band.top).value
+    }
+
+    @Test fun 未收起时顶带伸到大标题带顶() {
         page(collapsed = false)
-        compose.onNodeWithTag(LIULI_NAV_BAND_TAG).assertExists()
+        assertEquals(46f, bandHeightDp(), 0.01f)
     }
 
-    @Test fun 收起后纸面带撤走() {
+    @Test fun 收起后顶带伸到胶囊下12() {
         page(collapsed = true)
-        compose.onAllNodesWithTag(LIULI_NAV_BAND_TAG).assertCountEquals(0)
+        assertEquals(56f, bandHeightDp(), 0.01f)
     }
 
-    @Test fun hero页从不画纸面带() {
+    @Test fun hero页未收起不画顶带() {
         page(collapsed = false, hero = true)
         compose.onAllNodesWithTag(LIULI_NAV_BAND_TAG).assertCountEquals(0)
+    }
+
+    @Test fun hero页收起后顶带同普通页() {
+        page(collapsed = true, hero = true)
+        assertEquals(56f, bandHeightDp(), 0.01f)
     }
 }

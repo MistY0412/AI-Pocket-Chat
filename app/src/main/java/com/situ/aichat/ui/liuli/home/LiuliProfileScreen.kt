@@ -26,13 +26,12 @@ import com.situ.aichat.R
 import com.situ.aichat.data.local.entity.UserProfileEntity
 import com.situ.aichat.ui.components.contentMaxWidth
 import com.situ.aichat.ui.designsystem.AppProfileIcons
-import com.situ.aichat.ui.designsystem.AppTheme
+import com.situ.aichat.ui.liuli.designsystem.LiuliPalette
+import com.situ.aichat.ui.liuli.designsystem.LiuliTileTone
 import com.situ.aichat.ui.liuli.page.LiuliLargeTitle
 import com.situ.aichat.ui.liuli.page.rememberScrollCollapsed
 import com.situ.aichat.ui.profile.ProfileDashboardViewModel
-
-/** 钱包图标块底：`economy.goldContainer` 这个 token 不存在 → 走 `economy.gold@14%`（A-12 明写的兜底）。 */
-private const val WALLET_TILE_ALPHA = 0.14f
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
 /**
  * 琉璃「我」页（图纸 2026-09-06 卷三 §4.6 · 契约 §6 D 甲）。
@@ -99,7 +98,6 @@ internal fun LiuliProfileContent(
     onOpenSettings: () -> Unit,
     scrollState: ScrollState = rememberScrollState(),
 ) {
-    val colors = AppTheme.colors
     LiuliHomeScaffold(
         title = stringResource(R.string.tab_profile),
         collapsed = rememberScrollCollapsed(scrollState),
@@ -137,8 +135,7 @@ internal fun LiuliProfileContent(
                         LiuliStatTile(
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             icon = AppProfileIcons.Moments,
-                            tileTint = colors.accent.container,
-                            tileInk = colors.accent.onContainer,
+                            tone = LiuliTileTone.Rose,
                             title = stringResource(R.string.moment_user_moments_title),
                             value = momentsCount,
                             unit = stringResource(R.string.profile_box_moments_unit),
@@ -149,13 +146,12 @@ internal fun LiuliProfileContent(
                         LiuliStatTile(
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             icon = AppProfileIcons.Wallet,
-                            tileTint = colors.economy.gold.copy(alpha = WALLET_TILE_ALPHA),
-                            tileInk = colors.economy.gold,
+                            tone = LiuliTileTone.Gold,
                             title = stringResource(R.string.wallet_title),
                             value = coinBalance,
                             unit = stringResource(R.string.profile_box_wallet_unit),
                             hint = stringResource(R.string.profile_box_wallet_hint),
-                            valueColor = colors.economy.gold,
+                            valueColor = LiuliPalette.goldOnCard(LocalIsDarkTheme.current),
                             onClick = onOpenUserWallet,
                         )
                     }

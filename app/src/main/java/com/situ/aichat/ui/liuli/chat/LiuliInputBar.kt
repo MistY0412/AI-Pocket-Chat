@@ -49,7 +49,7 @@ import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
 /**
  * 琉璃输入区（图纸 2026-09-05 卷二A §4.5 · 契约 §5.2）：**三片分体**——「+」圆钮 44 / 输入胶囊 44 /
- * 右圆钮 44，片间 6dp、离屏左右 10dp、底 12dp（+ 导航栏 inset 由调用方给）。整块住在 `BackdropHost.overlay`
+ * 右圆钮 44，片间 6dp、离屏左右 10dp、底 12dp（+ 导航栏 inset 由调用方给）。整块住在 `LiuliGlassHost.overlay`
  * 里、按面板区高度向上偏移，故玻璃能模糊身后的气泡，托盘又永远贴着键盘 / 面板顶（PLUS_PANEL 硬指标）。
  *
  * **不持 `ChatViewModel`**：所有动作经回调进来（[onSend] 返回「发送是否被受理」）——既是分层纪律，

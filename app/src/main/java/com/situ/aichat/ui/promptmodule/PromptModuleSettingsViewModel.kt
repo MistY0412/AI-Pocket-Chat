@@ -3,7 +3,12 @@ package com.situ.aichat.ui.promptmodule
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.situ.aichat.data.local.dao.LogDao
+import com.situ.aichat.data.model.ApiFunction
+import com.situ.aichat.data.remote.llm.ProviderFamily
+import com.situ.aichat.data.repository.ApiConfigRepository
 import com.situ.aichat.data.repository.SettingsRepository
+import com.situ.aichat.diagnostics.LogSource
 import com.situ.aichat.prompt.PromptModule
 import com.situ.aichat.prompt.PromptModulePosition
 import com.situ.aichat.prompt.PromptModulePreset
@@ -13,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -29,6 +35,8 @@ import javax.inject.Inject
 class PromptModuleSettingsViewModel @Inject constructor(
     private val settingsRepo: SettingsRepository,
     savedStateHandle: SavedStateHandle,
+    private val logDao: LogDao,
+    private val apiConfigRepository: ApiConfigRepository,
 ) : ViewModel() {
 
     /** null = 全局配置；非空 = 该角色专属配置。 */
@@ -76,6 +84,27 @@ class PromptModuleSettingsViewModel @Inject constructor(
             _presets.value = PromptModuleService.loadPresets(presetsJson)
         }
     }
+
+    // MARK: - 省钱模式卡（时间感知四期·图纸二 §3.5）
+
+    /** 当前聊天配置确定不会自动缓存（Claude 系）→ 卡上灰字；每次进页现查一次，查不到配置 = false。 */
+    private val providerWontCache = MutableStateFlow(false)
+    init {
+        viewModelScope.launch {
+            providerWontCache.value = apiConfigRepository.resolveConfigValues(ApiFunction.CHAT)
+                ?.let { !ProviderFamily.cachesPromptAutomatically(it) } ?: false
+        }
+    }
+
+    /** 省钱卡状态：开关 + 最近 [RECENT_CHAT_WINDOW] 次成功对话的命中行 + 灰字；角色专属页 visible = false。 */
+    val cacheSaver: StateFlow<CacheSaverCardState> = combine(
+        settingsRepo.appSettings.map { it.cacheSaverEnabled },
+        logDao.recentSuccessBySource(LogSource.CHAT, RECENT_CHAT_WINDOW),
+        providerWontCache,
+    ) { enabled, rows, wont -> CacheSaverCardState(visible = !isCharacterScope, enabled = enabled, providerWontCache = wont, recent = recentCacheLineOf(rows)) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CacheSaverCardState(visible = !isCharacterScope))
+
+    fun setCacheSaverEnabled(enabled: Boolean) = viewModelScope.launch { settingsRepo.setCacheSaverEnabled(enabled) }
 
     // MARK: - 模块操作（每次写盘）
 

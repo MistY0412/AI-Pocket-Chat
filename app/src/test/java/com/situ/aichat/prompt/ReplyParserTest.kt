@@ -296,10 +296,56 @@ class ReplyParserTest {
 
     @Test
     fun nonDividerBracket_notStripped() {
-        // 句中的【…】、别的【标签】、或【时间·…】后还有正文 → 不是整行分割线，不误伤。
+        // 句中的【…】、别的【标签】不误伤；四期·图纸一 §3.4：句首黏连的【时间 · …】只剥标记、保留后文。
         val a = ReplyParser.stripInternalAssistantTags("【正经事】我们聊聊吧")
         assertTrue("普通【标签】不应被剥：$a", a.contains("【正经事】我们聊聊吧"))
         val b = ReplyParser.stripInternalAssistantTags("【时间 · 今天】后面还有话")
-        assertTrue("非整行的【时间·…】不应被剥：$b", b.contains("后面还有话"))
+        assertEquals("句首黏连的【时间 · …】剥成后文", "后面还有话", b)
+        val c = ReplyParser.stripInternalAssistantTags("我说【时间 · 今天】你看")
+        assertEquals("句中的不在行首，不剥", "我说【时间 · 今天】你看", c)
+    }
+
+    @Test
+    fun dividerEcho_glueAtSentenceHead_onlyMarkerStripped() {
+        // E13：模型把停顿标记黏在句首 → 两路都只剥标记、保留后文；整行标记剥成空行（同旧）。
+        assertEquals("嗯嗯我在", ReplyParser.stripInternalAssistantTags("【时间 · 今天 22:06 · 距离上条消息过去了约 12 分钟】嗯嗯我在"))
+        assertEquals("好的", ReplyParser.decontaminateAssistantContent("【时间 · 今天 22:06】好的"))
+        assertEquals("前\n\n后", ReplyParser.stripInternalAssistantTags("前\n【时间 · 昨天 14:56】\n后"))
+        assertEquals("你好\n在吗", ReplyParser.stripInternalAssistantTags("你好\n  【时间 · 今天 09:31】在吗"))
+        // 复核 R1：行首连着两个标记一并剥（旧写法只剥第一个，第二个漏进气泡）。
+        assertEquals("嗯", ReplyParser.stripInternalAssistantTags("【时间 · 今天 22:06】【时间 · 今天 22:07】嗯"))
+        assertEquals("嗯", ReplyParser.decontaminateAssistantContent("【时间 · 今天 22:06】 【时间 · 今天 22:07】嗯"))
+    }
+
+    // MARK: - 【系统说明】框回声剥除（时间感知四期·图纸一 §3.4·E12·非白名单服务商发送前改写的回声）
+
+    @Test
+    fun systemNoteEcho_blockStrippedViaStripInternalTags() {
+        val out = ReplyParser.stripInternalAssistantTags("好呀\n【系统说明】\n【时间 · 今天 22:06】\n【/系统说明】\n我在")
+        assertEquals("好呀\n\n我在", out)
+    }
+
+    @Test
+    fun systemNoteEcho_orphanTagStripped_bodyKept() {
+        assertEquals("嗯嗯", ReplyParser.stripInternalAssistantTags("【/系统说明】嗯嗯"))
+        assertEquals("嗯嗯你好", ReplyParser.stripInternalAssistantTags("嗯嗯【系统说明】你好"))
+        assertEquals("嗯嗯", ReplyParser.sanitizeAssistantResponse("【系统说明】C1【/系统说明】嗯嗯"))
+    }
+
+    @Test
+    fun systemNoteEcho_strippedViaDecontaminate() {
+        assertEquals("今天好累", ReplyParser.decontaminateAssistantContent("【系统说明】C1\nC2【/系统说明】\n今天好累"))
+        assertEquals("今天好累", ReplyParser.decontaminateAssistantContent("今天好累【/系统说明】"))
+    }
+
+    @Test
+    fun systemNote_singleSourceLock_withProviderMessageAdapter() {
+        // 生成侧 ↔ 消费侧字面互指（REDLINES §1）：任一侧改字面而另一侧没跟 → 本例变红。
+        assertEquals("【系统说明】", com.situ.aichat.data.remote.llm.ProviderMessageAdapter.NOTE_OPEN)
+        assertEquals("【/系统说明】", com.situ.aichat.data.remote.llm.ProviderMessageAdapter.NOTE_CLOSE)
+        val frame = com.situ.aichat.data.remote.llm.ProviderMessageAdapter.NOTE_OPEN + "X" +
+            com.situ.aichat.data.remote.llm.ProviderMessageAdapter.NOTE_CLOSE
+        assertEquals("正文", ReplyParser.stripInternalAssistantTags(frame + "正文"))
+        assertEquals("正文", ReplyParser.decontaminateAssistantContent(frame + "正文"))
     }
 }

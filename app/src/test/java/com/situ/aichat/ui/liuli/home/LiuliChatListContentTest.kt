@@ -1,10 +1,14 @@
 package com.situ.aichat.ui.liuli.home
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -14,6 +18,7 @@ import com.situ.aichat.data.model.AppSkin
 import com.situ.aichat.ui.chat.ChatListViewModel
 import com.situ.aichat.ui.components.AppHaptics
 import com.situ.aichat.ui.components.LocalAppHaptics
+import com.situ.aichat.ui.liuli.page.LIULI_ROW_DIVIDER_TAG
 import com.situ.aichat.ui.theme.AIPocketChatTheme
 import com.situ.aichat.util.DateFormatters
 import io.mockk.mockk
@@ -153,6 +158,30 @@ class LiuliChatListContentTest {
         compose.waitForIdle()
         assertEquals("a", quickReplied)
         assertEquals("长按绝不顺带进会话", null, opened)
+    }
+
+    // ── 卷三 §4.8：分段卡（E16）──────────────────────────────────────────────
+
+    /** 2x 密度：1x 下 0.5dp 发丝会被取整成 1px（= 1dp），量不出 0.5（PITFALLS §1e「要 2x 请用限定符」）。 */
+    @Config(qualifiers = "zh-rCN-w411dp-h891dp-xhdpi")
+    @Test fun 卡内分隔自卡内八十二起且只画在第二行起() {
+        show(listOf(row("a", "小满", "嗯"), row("b", "阿泠", "在")))
+        compose.onAllNodesWithTag(LIULI_ROW_DIVIDER_TAG).assertCountEquals(1)
+        val d = compose.onNodeWithTag(LIULI_ROW_DIVIDER_TAG).getUnclippedBoundsInRoot()
+        assertEquals("起点 = 卡左（屏 gutter 20）+ 卡内 82", 20f + 82f, d.left.value, 0.5f)
+        assertEquals("发丝 0.5 高", 0.5f, (d.bottom - d.top).value, 0.01f)
+    }
+
+    @Test fun 单行成单段卡时没有卡内分隔() {
+        show(listOf(row("a", "小满", "嗯")))
+        compose.onAllNodesWithTag(LIULI_ROW_DIVIDER_TAG).assertCountEquals(0)
+    }
+
+    @Test fun 置顶卡与其余卡之间隔十六() {
+        show(listOf(row("a", "阿泠", "在", pinned = true), row("b", "小满", "嗯")))
+        val pinned = compose.onNodeWithText("阿泠").getUnclippedBoundsInRoot()
+        val normal = compose.onNodeWithText("小满").getUnclippedBoundsInRoot()
+        assertEquals("置顶卡底 → 其余卡顶 = 16", 16f, (normal.top - pinned.bottom).value, 0.5f)
     }
 
     @Test fun 右上加号也走新建对话() {

@@ -40,4 +40,7 @@ object ProactiveOccasionText {
         "random" -> "突然想到什么，想分享"
         else -> ProactiveMessageComposer.FALLBACK_OCCASION
     }
+
+    /** 特别日子由头（四期·图纸一 §3.8 锁定）：`今天是七夕` / `今天是小明的生日，也是七夕`。 */
+    internal fun occasionForSpecialDay(names: List<String>): String = "今天是" + names.joinToString("，也是")
 }

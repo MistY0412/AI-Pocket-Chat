@@ -56,7 +56,6 @@ import com.situ.aichat.data.local.entity.StoryChapterEntity
 import com.situ.aichat.story.StoryGenerationTaskManager
 import com.situ.aichat.story.storyCleanTitle
 import com.situ.aichat.story.storyNumberToChinese
-import com.situ.aichat.story.unlockRemainingMinutes
 import com.situ.aichat.ui.components.rememberReduceMotion
 import com.situ.aichat.ui.designsystem.AppButton
 import com.situ.aichat.ui.designsystem.AppButtonStyle
@@ -229,7 +228,7 @@ internal fun BottomCapsule(
 
 /** 进度胶囊文案：仍有剩余分钟 → 「62% · 还剩 3 分钟」；读到末尾 → 只「100%」。 */
 @Composable
-private fun storyReaderProgressLabel(percent: Int, remainingMinutes: Int): String =
+internal fun storyReaderProgressLabel(percent: Int, remainingMinutes: Int): String =
     if (remainingMinutes > 0) stringResource(R.string.story_reader_progress_time, percent, remainingMinutes)
     else stringResource(R.string.story_reader_progress_pct, percent)
 
@@ -287,15 +286,7 @@ internal fun LockedOverlay(chapter: StoryChapterEntity, now: Long) {
             Text(stringResource(R.string.story_reader_chapter_n, chapter.chapterNumber), style = AppTheme.typography.titleMedium)
             Text(storyCleanTitle(chapter.title), style = AppTheme.typography.listName, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
-            chapter.unlockAt?.let { unlockAt ->
-                val mins = unlockRemainingMinutes(unlockAt, now)
-                val remaining = if (mins >= 60) {
-                    stringResource(R.string.story_remaining_hm, mins / 60, mins % 60)
-                } else {
-                    stringResource(R.string.story_remaining_m, mins)
-                }
-                Text(stringResource(R.string.story_unlock_in, remaining), color = AppTheme.colors.accent.text)
-            }
+            chapter.unlockAt?.let { unlockAt -> Text(storyUnlockRemainingText(unlockAt, now), color = AppTheme.colors.accent.text) }
             Spacer(Modifier.height(8.dp))
             Text(
                 stringResource(R.string.story_reader_locked_hint),

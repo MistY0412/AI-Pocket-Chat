@@ -88,7 +88,9 @@ class PromptBuilderAcquaintanceLineTest {
 
     /**
      * 图纸 §13（用户拍板 2026-09-03）：真管线里相识行与间隔行**共用同一个称呼**——
-     * 有昵称两行都叫昵称、整块不再出现「对方」；这条走 3 小时前的角色消息才有间隔行（<10 分钟不出）。
+     * 有昵称两行都叫昵称、整块不再出现「对方」。
+     * 四期·图纸一 §3.5 重算：在线文字聊天的旧方向化间隔行被「这条消息距离上条」行取代，而本例最后一条计数消息
+     * 是角色的 → 该行不出；fixedNow（2025-06-15）恰是父亲节 → 块内第 2 行是日子行，相识行顺延到第 3 行。
      */
     @Test
     fun 有昵称_相识行与间隔行同一个称呼() {
@@ -101,12 +103,15 @@ class PromptBuilderAcquaintanceLineTest {
             appSettings = AppSettings(), strings = strings(), now = fixedNow,
         ).map { it.content.orEmpty() }.last()
         val block = last.substringAfter("<time_context>\n").substringBefore("\n</time_context>").split("\n")
-        assertEquals("你和小明是 2025-03-14 第一次聊天认识的，到今天相识 93 天，最近连续 12 天每天都聊。", block[1])
-        assertEquals("小明隔了约 3 小时才回你", block[2])
+        assertEquals(
+            listOf("今天：父亲节", "你和小明是 2025-03-14 第一次聊天认识的，到今天相识 93 天，最近连续 12 天每天都聊。"),
+            block.drop(1),
+        )
+        assertFalse("旧方向化间隔行已被取代", block.any { it.contains("隔了") })
         assertFalse("同一块里不再出现第二种叫法", block.joinToString("\n").contains("对方"))
     }
 
-    /** 昵称为空时两行都退回「对方」（旧文案逐字回归钉）。 */
+    /** 昵称为空时退回「对方」（旧文案逐字回归钉）；四期：在线旧间隔行被取代（本例最后一条是角色的 → 新间隔行也不出）。 */
     @Test
     fun 无昵称_间隔行仍是对方() {
         val threeHoursAgo = listOf(
@@ -117,7 +122,8 @@ class PromptBuilderAcquaintanceLineTest {
             appSettings = AppSettings(), strings = strings(), now = fixedNow,
         ).map { it.content.orEmpty() }.last()
         assertTrue(last.contains("你和对方是 2025-03-14 第一次聊天认识的"))
-        assertTrue(last.contains("对方隔了约 3 小时才回你"))
+        assertFalse(last.contains("对方隔了"))
+        assertFalse(last.contains("这条消息距离上条"))
     }
 
     @Test
@@ -169,10 +175,12 @@ class PromptBuilderAcquaintanceLineTest {
         val block = card.substringAfter("<time_context>\n").substringBefore("\n</time_context>").split("\n")
         assertTrue("样张须是完整的现在卡（含时间锚块与尾注）", card.contains("<time_context>") && card.contains("↑ 以上是此刻的真实时间，以它为准。"))
         assertTrue("块内第 1 行 = 现在行", block[0].startsWith("现在：2025-06-15 周日"))
+        // 四期·图纸一 §3.5：2025-06-15 是 6 月第 3 个周日 = 父亲节 → 日子行排在相识行之前。
+        assertEquals("块内第 2 行 = 日子行", "今天：父亲节", block[1])
         assertEquals(
-            "块内第 2 行 = 相识行",
+            "块内第 3 行 = 相识行",
             "你和小明是 2025-03-14 第一次聊天认识的，到今天相识 93 天，最近连续 12 天每天都聊。",
-            block[1],
+            block[2],
         )
     }
 }

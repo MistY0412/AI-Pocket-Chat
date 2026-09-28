@@ -71,7 +71,7 @@ class StorySettingsViewModelTogglesTest {
         every { apiConfigs.observeAll() } returns flowOf(emptyList())
         every { apiConfigs.observeActive() } returns flowOf(null)
         captured = SENTINEL
-        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg(); Unit }
+        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg() }
         return StorySettingsViewModel(
             SavedStateHandle(mapOf("storyId" to "s1")),
             repo,

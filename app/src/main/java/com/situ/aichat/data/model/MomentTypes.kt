@@ -55,3 +55,7 @@ enum class MomentNotificationType(val raw: String) {
  */
 val MomentPostEntity.imagePaths: List<String>
     get() = StringListJson.decode(imagePathsJson)
+
+/** 「提醒谁看」的角色 uuid（发布时的点选顺序；可能含已删角色——显示 / 互动时由 MomentMentionRules 过滤）。 */
+val MomentPostEntity.mentionedCharacterUuids: List<String>
+    get() = StringListJson.decode(mentionedCharacterUuidsJson)

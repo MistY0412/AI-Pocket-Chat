@@ -41,14 +41,15 @@ import com.situ.aichat.R
 import com.situ.aichat.util.ImageScaler
 import com.situ.aichat.util.QrCodec
 import com.situ.aichat.ui.designsystem.AppTypography
+import com.situ.aichat.ui.liuli.designsystem.LiuliAmbientBackground
 import com.situ.aichat.ui.liuli.designsystem.LiuliButton
 import com.situ.aichat.ui.liuli.designsystem.LiuliButtonStyle
 import com.situ.aichat.ui.liuli.designsystem.LiuliCircleButton
 import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
 import com.situ.aichat.ui.liuli.designsystem.LiuliSnackbarHost
 import com.situ.aichat.ui.liuli.designsystem.LiuliTheme
-import com.situ.aichat.ui.liuli.glass.BackdropHost
-import com.situ.aichat.ui.liuli.glass.LiuliGlassStyle
+import com.situ.aichat.ui.liuli.glass.LiuliGlassHost
+import com.situ.aichat.ui.liuli.glass.LiuliGlassRole
 import com.situ.aichat.ui.liuli.glass.liuliGlass
 import com.situ.aichat.ui.liuli.page.LiuliPageGeometry
 import com.situ.aichat.ui.designsystem.AppTopBarIcons
@@ -58,9 +59,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.statusBarsPadding
-import com.situ.aichat.ui.designsystem.AppTheme
 
 /** 相册解码前的最长边（逐字照暖陶 `QrScanScreen.kt:217` 的 1600）。 */
 private const val GALLERY_MAX_EDGE = 1600
@@ -124,14 +123,17 @@ fun LiuliQrScanScreen(
         }
     }
 
-    BackdropHost(
+    LiuliGlassHost(
         modifier = modifier.fillMaxSize(),
+        // 宿主常关（图纸 §0.2-5）：相机预览上方 Haze 取不到画面、录层还可能干扰预览 → 圆钮与底条都退成着色。
+        active = false,
         content = {
             if (hasCamera) {
                 LiuliCameraPreview(onDecoded = deliver)
             } else {
-                // 内容层自画纸面（BackdropHost 铁律·否则底下玻璃条切到透明底）。
-                Box(Modifier.matchParentSize().background(AppTheme.colors.surface.base), contentAlignment = Alignment.Center) {
+                // 内容层自画柔光底（宿主铁律·否则底下玻璃条切到透明底）。
+                Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+                    LiuliAmbientBackground(Modifier.matchParentSize())
                     Text(
                         stringResource(R.string.api_scan_permission_needed),
                         style = AppTypography.listPreview,
@@ -167,7 +169,7 @@ fun LiuliQrScanScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .liuliGlass(LiuliShapes.sheet, dark = dark, style = LiuliGlassStyle.Panel)
+                    .liuliGlass(LiuliShapes.sheet, dark = dark, role = LiuliGlassRole.Panel, blurEnabled = false)
                     .navigationBarsPadding()
                     .padding(BAR_PAD),
                 horizontalAlignment = Alignment.CenterHorizontally,

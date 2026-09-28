@@ -30,6 +30,9 @@ object MomentPendingInteractionStore {
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** 读—改—写互斥（乙 L-3）：[add] 与 [replaceKeepingNewcomers] 同锁，进程内原子。 */
+    private val lock = Any()
+
     /** One queued interaction (iOS `PendingInteraction`, Codable). */
     @Serializable
     data class PendingInteraction(
@@ -38,6 +41,10 @@ object MomentPendingInteractionStore {
         val postAuthorUuid: String?,
         val characterUuid: String,
         val queuedAtMillis: Long,
+        /** 被提醒项累计失败次数（乙 L-2）；非提醒项恒 0。满上限 = 已放弃：留队占位不再试，24h 过期出队（复核 R1）。 */
+        val failedAttempts: Int = 0,
+        /** 被提醒项上一次尝试的时刻（乙 L-2）；0 = 从没试过。 */
+        val lastAttemptAtMillis: Long = 0L,
     )
 
     private fun prefs(context: Context) =
@@ -55,18 +62,31 @@ object MomentPendingInteractionStore {
         characterUuid: String,
         nowMillis: Long = System.currentTimeMillis(),
     ) {
-        val queue = load(context)
-        if (queue.any { it.postUuid == postUuid && it.characterUuid == characterUuid }) return
-        save(
-            context,
-            queue + PendingInteraction(
-                postUuid = postUuid,
-                postTimestampMillis = postTimestampMillis,
-                postAuthorUuid = postAuthorUuid,
-                characterUuid = characterUuid,
-                queuedAtMillis = nowMillis,
-            ),
-        )
+        synchronized(lock) {
+            val queue = load(context)
+            if (queue.any { it.postUuid == postUuid && it.characterUuid == characterUuid }) return
+            save(
+                context,
+                queue + PendingInteraction(
+                    postUuid = postUuid,
+                    postTimestampMillis = postTimestampMillis,
+                    postAuthorUuid = postAuthorUuid,
+                    characterUuid = characterUuid,
+                    queuedAtMillis = nowMillis,
+                ),
+            )
+        }
+    }
+
+    /**
+     * drain 回写（乙 L-3）：以 [kept] 为准，并保留 [snapshot] 之后别处新入队的条目（按 (帖, 角色) 判新），在同一把锁里读—合并—写。
+     */
+    fun replaceKeepingNewcomers(context: Context, snapshot: List<PendingInteraction>, kept: List<PendingInteraction>) {
+        synchronized(lock) {
+            val seen = snapshot.mapTo(HashSet()) { it.postUuid to it.characterUuid }
+            val newcomers = load(context).filter { (it.postUuid to it.characterUuid) !in seen }
+            save(context, kept + newcomers)
+        }
     }
 
     /** Load the queue (empty on missing / corrupt, like iOS's `?? []`). */

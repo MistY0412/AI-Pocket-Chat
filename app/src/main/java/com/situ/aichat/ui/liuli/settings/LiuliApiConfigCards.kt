@@ -56,7 +56,8 @@ import com.situ.aichat.ui.liuli.designsystem.LiuliMenuEntry
 import com.situ.aichat.ui.liuli.designsystem.LiuliPopupMenu
 import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
 import com.situ.aichat.ui.liuli.designsystem.LiuliSpinner
-import com.situ.aichat.ui.liuli.designsystem.liuliCardSurface
+import com.situ.aichat.ui.liuli.designsystem.liuliCardMaterial
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import com.situ.aichat.ui.liuli.page.LiuliPageGeometry
 import com.situ.aichat.util.QrCodec
 
@@ -81,7 +82,7 @@ private val MENU_OFFSET = DpOffset((-8).dp, 36.dp)
 private const val ASSIGNMENT_ALPHA = 0.6f
 
 /**
- * API 配置卡（琉璃·图纸 2026-09-06 卷五 §4.1 屏 7）。壳 = [liuliCardSurface]（独立卡·不是分组），
+ * API 配置卡（琉璃·图纸 2026-09-06 卷五 §4.1 屏 7）。壳 = [liuliCardMaterial]（独立卡·不是分组·琉璃 2.0 卷二换半透明卡），
  * 卡内行 / 徽章 / 菜单 / 按钮的**条件与文案逐字继承**暖陶 `ConfigCard`。
  *
  * 💰 **只读**：余额只显示不动钱（`supportsBalance` 仅 DeepSeek / OpenRouter·判红阈值 10 逐字照抄）。
@@ -110,7 +111,7 @@ internal fun LiuliApiConfigCard(
     Column(
         modifier
             .fillMaxWidth()
-            .liuliCardSurface()
+            .liuliCardMaterial(LiuliShapes.medium, LocalIsDarkTheme.current)
             .padding(CARD_PAD),
         verticalArrangement = Arrangement.spacedBy(CARD_GAP),
     ) {

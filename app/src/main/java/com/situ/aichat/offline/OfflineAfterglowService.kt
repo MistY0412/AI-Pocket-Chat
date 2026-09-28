@@ -17,11 +17,13 @@ import com.situ.aichat.data.repository.OfflineMeetingMemoryRepository
 import com.situ.aichat.data.repository.SettingsRepository
 import com.situ.aichat.diagnostics.ContextLogService
 import com.situ.aichat.diagnostics.LogSource
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.proactive.ProactiveReplyDeliverer
 import com.situ.aichat.prompt.HistoryTimeDivider
 import com.situ.aichat.prompt.TimeAnchorFormatter
 import com.situ.aichat.prompt.memory.MemoryService
 import com.situ.aichat.prompt.scheduleTimeOfDayLabel
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
@@ -123,13 +125,14 @@ class OfflineAfterglowService @Inject constructor(
         val messages = promptAssembler.assemble(convo, character, settings, nowInstant) +
             ChatMessageDto(role = "system", content = systemInstruction)
 
+        val afterglowTrace = LogTrace.newTurn(convo.uuid, character.uuid, anchorMessageUuid = null) // 四期·图纸三：两次尝试同一轮
         repeat(2) { attempt ->
-            val raw = contextLog.completion(
+            val raw = withContext(afterglowTrace) { contextLog.completion(
                 source = LogSource.OFFLINE_AFTERGLOW,
                 characterName = character.name,
                 config = config,
                 messages = messages,
-            )
+            ) }
             val text = MemoryService.strippingThinkingTags(raw).trim()
             if (text.isNotEmpty() && text.length <= MAX_LEN && !text.contains('[') && !text.contains('【')) return text
             Log.i(TAG, "余温消息校验不合格（第 ${attempt + 1} 次·len=${text.length}）conv=${convo.uuid}")

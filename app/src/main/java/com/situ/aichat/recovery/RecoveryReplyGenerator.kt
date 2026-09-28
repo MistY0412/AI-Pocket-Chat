@@ -16,6 +16,7 @@ import com.situ.aichat.data.model.MoodHistoryEntry
 import com.situ.aichat.data.model.StructuredMemory
 import com.situ.aichat.diagnostics.ContextLogService
 import com.situ.aichat.diagnostics.LogSource
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.data.repository.ApiConfigRepository
 import com.situ.aichat.data.repository.CharacterRepository
 import com.situ.aichat.data.repository.ConversationRepository
@@ -43,6 +44,7 @@ import com.situ.aichat.sticker.StickerTagParser
 import com.situ.aichat.worldbook.WorldBookPromptService
 import com.situ.aichat.worldbook.toWorldInfoSettings
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
@@ -203,12 +205,12 @@ class RecoveryReplyGenerator @Inject constructor(
             quotedRefs = quotedRefs,
         )
 
-        val rawReply = contextLog.completion(
+        val rawReply = withContext(LogTrace.newTurn(conversationUuid, character.uuid, anchorMessageUuid = null)) { contextLog.completion( // 四期·图纸三：补回复自成一轮
             source = LogSource.RECOVERY_REPLY,
             characterName = character.name,
             config = config,
             messages = messages,
-        )
+        ) }
         // 与正常回复同序：剥暗号 → parseMood → sanitize → 表情包归一（语音标签一律不保留，后台恢复纯文字）。
         // 卷一 A2c：**见面中**须保留线下叙事标签（[叙述]/[对话]/[场景：…]）——本管线也服务「见面期间的
         // 列表快捷回复 / 通知直接回复」，剥掉标签会让这条回复在沉浸剧场里缺席渲染结构（与主路径

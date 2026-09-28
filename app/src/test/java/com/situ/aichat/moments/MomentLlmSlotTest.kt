@@ -1,5 +1,10 @@
 package com.situ.aichat.moments
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -51,5 +56,34 @@ class MomentLlmSlotTest {
         assertTrue(slot.tryAcquire())
         assertTrue(slot.tryAcquire())
         assertFalse(slot.tryAcquire())
+    }
+
+    // ── 朋友圈发布页重构·甲 T1-3（§3.3.4·E8）：等槽 = 先试一次，拿不到每 2 秒再试，共 31 次（约 60 秒）──
+
+    @OptIn(ExperimentalCoroutinesApi::class) // testScheduler.currentTime 读虚拟时钟
+    @Test
+    fun `acquireWaiting gives up after 31 tries spanning exactly 60 seconds`() = runTest {
+        val slot = MomentLlmSlot()
+        slot.tryAcquire()
+        slot.tryAcquire()
+        val start = testScheduler.currentTime
+        assertFalse(slot.acquireWaiting(31, 2_000))
+        assertEquals("31 次尝试之间 30 个间隔 × 2 秒", 60_000L, testScheduler.currentTime - start)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class) // testScheduler.currentTime 读虚拟时钟
+    @Test
+    fun `acquireWaiting succeeds once a slot frees up mid-wait`() = runTest {
+        val slot = MomentLlmSlot()
+        slot.tryAcquire()
+        slot.tryAcquire()
+        val start = testScheduler.currentTime
+        launch {
+            delay(10_000)
+            slot.release()
+        }
+        assertTrue(slot.acquireWaiting(31, 2_000))
+        assertTrue("释放后下一次轮询（≤ 2 秒）即拿到", testScheduler.currentTime - start <= 12_000L)
+        assertFalse("拿到后两个槽又都占满", slot.tryAcquire())
     }
 }

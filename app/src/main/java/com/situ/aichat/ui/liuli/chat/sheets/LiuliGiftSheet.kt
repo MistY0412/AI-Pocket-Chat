@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,7 +37,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.situ.aichat.gift.GiftCatalog
 import com.situ.aichat.data.model.GiftCategory
@@ -153,7 +156,11 @@ internal fun LiuliGiftSheet(
                     }
                 }
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = CHIP_ROW_BLEED),
+                        modifier = Modifier.fillMaxWidth().bleedHorizontal(CHIP_ROW_BLEED),
+                    ) {
                         item {
                             LiuliChip(selected = category == null, onClick = { category = null }, label = "全部")
                         }
@@ -273,4 +280,15 @@ private fun LiuliDiyEntryCell(enabled: Boolean, onClick: () -> Unit) {
             Text("2–20 金币", style = AppTypography.amount, color = onGlass.primary)
         }
     }
+}
+
+/** 标签行向左右各「出血」20dp（= 外层网格左右内距）：首尾标签的形状外柔影不被横向滚动容器裁掉，标签起点位置不变（卷三 §4.5-6）。 */
+private val CHIP_ROW_BLEED = 20.dp
+
+private fun Modifier.bleedHorizontal(bleed: Dp): Modifier = layout { measurable, constraints ->
+    val extra = (bleed * 2).roundToPx()
+    val placeable = measurable.measure(
+        constraints.copy(minWidth = constraints.minWidth + extra, maxWidth = constraints.maxWidth + extra),
+    )
+    layout(constraints.maxWidth, placeable.height) { placeable.place(-bleed.roundToPx(), 0) }
 }

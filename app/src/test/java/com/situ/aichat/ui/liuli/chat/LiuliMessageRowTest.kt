@@ -1,6 +1,13 @@
 package com.situ.aichat.ui.liuli.chat
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.doubleClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -10,13 +17,12 @@ import androidx.compose.ui.test.printToString
 import androidx.compose.ui.unit.dp
 import com.situ.aichat.data.local.entity.MessageEntity
 import com.situ.aichat.data.model.MessageKind
-import com.situ.aichat.ui.chat.MessageRowActions
 import com.situ.aichat.ui.components.AppHaptics
 import com.situ.aichat.ui.components.LocalAppHaptics
 import com.situ.aichat.util.DateFormatters
 import io.mockk.mockk
-import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,34 +47,6 @@ class LiuliMessageRowTest {
 
     private val haptics = mockk<AppHaptics>(relaxed = true)
 
-    private val noopActions = MessageRowActions(
-        onVoiceToggle = {},
-        onOpenImage = {},
-        onSaveImage = {},
-        onQuote = {},
-        onDelete = {},
-        onOpenMenu = { _, _, _ -> },
-        onFlightBubblePositioned = { _, _ -> },
-        onRegenerate = {},
-        loadDiyImage = { null },
-        onOpenDiyDetail = {},
-        observeRedPacket = { flowOf(null) },
-        onRedPacketClick = {},
-        onAcceptInvite = {},
-        onDeclineInvite = {},
-        onEndMeeting = {},
-        onContinueMeeting = {},
-        onReviewOffline = {},
-        observeAppointment = { flowOf(null) },
-        onAppointmentAccept = {},
-        onAppointmentDecline = {},
-        onAppointmentReschedule = {},
-        onAppointmentChangeApply = {},
-        onAppointmentChangeKeep = {},
-        onVoiceCascadePlayed = {},
-        onOpenVoiceSetup = {},
-    )
-
     private fun msg(
         content: String,
         kind: MessageKind = MessageKind.PLAIN_TEXT,
@@ -89,7 +67,9 @@ class LiuliMessageRowTest {
         offlineSessionId = offlineSessionId,
     )
 
-    private fun setRow(message: MessageEntity) {
+    private var reaction = LiuliReactionState()
+
+    private fun setRow(message: MessageEntity, deliveryRead: Boolean? = null) {
         compose.setContent {
             CompositionLocalProvider(LocalAppHaptics provides haptics) {
                 LiuliMessageRow(
@@ -102,12 +82,11 @@ class LiuliMessageRowTest {
                     customStickers = emptyList(),
                     isVoicePlaying = false,
                     voiceProgress = { 0f },
-                    actions = noopActions,
+                    actions = liuliNoopRowActions,
                     canRegenerate = false,
-                    deliveryRead = null,
-                    tail = true,
+                    deliveryRead = deliveryRead,
                     flightTracking = false,
-                    reaction = LiuliReactionState(),
+                    reaction = reaction,
                     reduceMotion = true,
                     fold = LiuliFoldState(),
                 )
@@ -233,9 +212,91 @@ class LiuliMessageRowTest {
         compose.onNodeWithText("云野想和你约个时间").assertIsDisplayed()
     }
 
-    @Test fun stickerOnly_goesToLiuliStickerStack() {
-        setRow(msg("[sticker:happy]"))
-        // 纯贴纸行的独有特征 = 旁戳（贴纸本体在 Robolectric 里解不出真图）。
+    @Test fun stickerOnly_goesToStickerStack() {
+        setRow(msg("[sticker:开心_1]"))
+        // 卷三：纯贴纸走暖陶 StickerStack——独有特征 = 合并朗读句把裸标签换成「[表情包]」（内置 id 才占位上屏）。
+        compose.onNodeWithContentDescription("说：[表情包]", substring = true).assertIsDisplayed()
+    }
+
+    // ── 卷三 T2-1：泡下时间戳（照暖陶 MessageRow）─────────────────────────────
+
+    /** 断言：时间戳在泡下 ≥ 4dp（−0.5 容差）、用户行右缘对齐 / AI 行左缘对齐（±0.5）。 */
+    private fun assertStampUnder(bubbleNode: SemanticsNodeInteraction, isUser: Boolean, label: String) {
+        val density = compose.onRoot().fetchSemanticsNode().layoutInfo.density.density
+        val bubble = bubbleNode.fetchSemanticsNode().boundsInRoot
+        val stamp = compose.stampBoundsBelow(bubble)
+        assertTrue("$label：时间戳顶 ${stamp.top} 应 ≥ 泡底 ${bubble.bottom} + 4dp", stamp.top >= bubble.bottom + 4f * density - 0.5f)
+        if (isUser) {
+            assertEquals("$label：用户行时间戳右缘 = 泡右缘", bubble.right, stamp.right, 0.5f)
+        } else {
+            assertEquals("$label：AI 行时间戳左缘 = 泡左缘", bubble.left, stamp.left, 0.5f)
+        }
+    }
+
+    @Test fun userText_stampUnderBubble_rightAligned() {
+        setRow(msg("在吗", role = "user"), deliveryRead = false)
+        assertStampUnder(compose.onNodeWithText("在吗"), isUser = true, label = "用户文字")
+    }
+
+    @Test fun aiText_stampUnderBubble_leftAligned() {
+        setRow(msg("今天的风刚好"))
+        assertStampUnder(compose.onNodeWithText("今天的风刚好"), isUser = false, label = "AI 文字")
+    }
+
+    @Test fun voice_stampUnderBubble() {
+        setRow(msg("嗯", role = "user").copy(isVoiceMessage = true, audioDuration = 5.0))
+        assertStampUnder(compose.onNodeWithText("5\""), isUser = true, label = "语音")
+    }
+
+    @Test fun image_stampUnderBubble() {
+        setRow(msg("[图片]", role = "user").copy(imageRelativePath = "chat_images/nope.jpg"))
+        // 读屏句走图片语义渲染（`[图片]` 哨兵不外露）：「你在…说：发送了一张图片」。
+        assertStampUnder(compose.onNodeWithContentDescription("发送了一张图片", substring = true), isUser = true, label = "图片")
+    }
+
+    @Test fun sticker_stampUnderBubble() {
+        setRow(msg("[sticker:开心_1]"))
+        assertStampUnder(compose.onNodeWithContentDescription("说：[表情包]", substring = true), isUser = false, label = "贴纸")
+    }
+
+    @Test fun card_stampUnderCard_withReadableHourMinute() {
+        setRow(
+            msg(
+                """{"type":"gift_card","giftItemId":"g1","giftRecordId":"r1","cost":120,"giftName":"桂花糕","isHandmade":false}""",
+                kind = MessageKind.GIFT_CARD,
+                role = "user",
+            ),
+        )
+        // 卡片没有合并读屏句 → 时间戳文字可读（照暖陶·卷三新增）。
         compose.onNodeWithText(DateFormatters.hourMinute(1_756_000_000_000L)).assertIsDisplayed()
+        assertStampUnder(compose.onNodeWithContentDescription("送出礼物 桂花糕，心意 120 金币"), isUser = true, label = "礼物卡")
+    }
+
+    @Test fun unrevealedAi_announcesTyping_andHasNoRowActions() {
+        setRow(msg("").copy(isContentRevealed = false))
+        compose.onNodeWithContentDescription("正在输入").assertExists()
+        compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions), useUnmergedTree = true)
+            .assertCountEquals(0)
+    }
+
+    @Test fun unrevealedAi_doubleTap_doesNotReact() {
+        setRow(msg("").copy(isContentRevealed = false))
+        compose.onNodeWithContentDescription("正在输入").performTouchInput { doubleClick() }
+        compose.waitForIdle()
+        assertEquals("未显形泡双击不挂回应（E4）", null, reaction.burst)
+    }
+
+    @Test fun revealedAiText_doubleTap_playsReactionOnce() {
+        setRow(msg("今天的风刚好"))
+        compose.onNodeWithText("今天的风刚好").performTouchInput { doubleClick() }
+        compose.waitForIdle()
+        assertEquals("m1", reaction.burst?.messageUuid)
+        assertEquals("双击一次 = 回应一次", 1, reaction.burst?.token)
+    }
+
+    @Test fun mixedSticker_aiTextOverTwelveLines_folds() {
+        val thirteen = (1..13).joinToString("\n") { "第${it}行" }
+        setRow(msg("$thirteen[sticker:开心_1]"))
+        compose.onNodeWithText("展开全文").assertExists()
     }
 }

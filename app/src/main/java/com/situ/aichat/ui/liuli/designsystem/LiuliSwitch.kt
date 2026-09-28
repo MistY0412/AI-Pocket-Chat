@@ -19,15 +19,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.situ.aichat.ui.components.AppMotion
 import com.situ.aichat.ui.components.LocalAppHaptics
 import com.situ.aichat.ui.components.rememberReduceMotion
-import com.situ.aichat.ui.designsystem.AppTheme
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
 /** 药丸几何（§3.2）：轨 44×26 · 拇指 20 · 边距 3 · 触达 48 居中外溢不占版。 */
 private val TRACK_WIDTH = 44.dp
@@ -36,9 +34,10 @@ private val THUMB = 20.dp
 private val THUMB_INSET = 3.dp
 private val TOUCH = 48.dp
 
-/** 开态顶沿迎光（白 35%·与 `LiuliButtonStyle.Prominent` 同一句话）与关态轨色（玻璃上主文字 15%）。 */
+/** 开态顶沿迎光（白 35%）；关态轨色见 [LiuliMaterials.offTrack]（琉璃 2.0 卷二 §4.5-2）。 */
 private const val SPECULAR_ALPHA = 0.35f
-private const val TRACK_OFF_ALPHA = 0.15f
+/** 拇指影（卷二 §4.5-2：1 → 2dp）。 */
+private val THUMB_SHADOW = 2.dp
 
 /** 禁用态透明度（与 [LiuliButton] 同值·结构恒定不提前 return）。 */
 private const val DISABLED_ALPHA = 0.38f
@@ -46,8 +45,8 @@ private const val DISABLED_ALPHA = 0.38f
 /**
  * 琉璃开关（图纸 2026-09-05 卷二C §4.11 · 落值 §3.2 · A-15）。
  *
- * 自绘，**禁 M3 `Switch`**（§9 ⑤）：开态 = `accent` gradientStart→End 135° 对角渐变 + 顶沿 1px 白 35%
- * 迎光；关态 = 玻璃上主文字色 15% 平轨。拇指恒 20dp 纯白正圆 + 1dp 影（两态同大小——「关态拇指小一圈」
+ * 自绘，**禁 M3 `Switch`**（§9 ⑤）：开态 = 主色三段 135° 渐变 [LiuliMaterials.accentBrush] + 顶沿 1px 白 35%
+ * 迎光；关态 = [LiuliMaterials.offTrack] 平轨。拇指恒 20dp 纯白正圆 + 2dp 影（两态同大小——「关态拇指小一圈」
  * 是 M3 的语汇，不是琉璃的）。
  *
  * 动效：拇指位移走位移轴 [AppMotion].calmSpring，[rememberReduceMotion] 时 `snap()` 直落。
@@ -63,7 +62,7 @@ fun LiuliSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val colors = AppTheme.colors
+    val dark = LocalIsDarkTheme.current
     val haptics = LocalAppHaptics.current
     val reduceMotion = rememberReduceMotion()
     val interaction = remember { MutableInteractionSource() }
@@ -72,9 +71,7 @@ fun LiuliSwitch(
         animationSpec = if (reduceMotion) snap() else AppMotion.calmSpring(),
         label = "liuliSwitchThumb",
     )
-    val trackOff = LiuliTheme.onGlass.primary.copy(alpha = TRACK_OFF_ALPHA)
-    val gradientStart = colors.accent.gradientStart
-    val gradientEnd = colors.accent.gradientEnd
+    val trackOff = LiuliMaterials.offTrack(dark)
 
     Box(
         modifier = modifier
@@ -107,13 +104,8 @@ fun LiuliSwitch(
                 .drawBehind {
                     val corner = CornerRadius(size.height / 2f, size.height / 2f)
                     if (checked) {
-                        // 135° 对角：起点左上、终点右下（与 Prominent 钮同一句话）。
-                        val brush = Brush.linearGradient(
-                            colors = listOf(gradientStart, gradientEnd),
-                            start = Offset.Zero,
-                            end = Offset(size.width, size.height),
-                        )
-                        drawRoundRect(brush = brush, cornerRadius = corner)
+                        // 135° 三段渐变：起点左上、终点右下（与 Prominent 钮同一条）。
+                        drawRoundRect(brush = LiuliMaterials.accentBrush, cornerRadius = corner)
                         drawRoundRect(
                             color = Color.White.copy(alpha = SPECULAR_ALPHA),
                             size = size.copy(height = 1f),
@@ -128,7 +120,7 @@ fun LiuliSwitch(
             Box(
                 Modifier
                     .padding(start = thumbOffset)
-                    .shadow(1.dp, CircleShape)
+                    .shadow(THUMB_SHADOW, CircleShape)
                     .size(THUMB)
                     .background(Color.White, CircleShape),
             )

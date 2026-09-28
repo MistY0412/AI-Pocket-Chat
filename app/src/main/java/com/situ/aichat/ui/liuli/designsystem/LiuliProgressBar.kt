@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
 import com.situ.aichat.ui.liuli.page.LiuliPageGeometry
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
 /** 不定态转圈直径与说明字号（图纸 2026-09-06 卷五 A-4 ③）。 */
 private val SPINNER = 16.dp
@@ -32,7 +33,8 @@ private val LABEL_GAP = 10.dp
  *
  * **禁 M3 `LinearProgressIndicator` / `CircularProgressIndicator`**（§9 ⑤）：
  * - [progress] 非空 = 定量 → 轨 [LiuliPageGeometry.progressTrack] 高（与 `LiuliSlider` 的轨同源落值）
- *   圆角 [LiuliPageGeometry.progressCorner]，底 `surface.sunken`、填充 `accent.primary`；挂
+ *   圆角 [LiuliPageGeometry.progressCorner]，底 [LiuliMaterials.offTrack]、填充主色横向渐变
+ *   [LiuliMaterials.accentHorizontalBrush]（琉璃 2.0 卷二 §4.6-2）；挂
  *   [progressSemantics] 报真值（0f..1f）。
  * - [progress] 为空 = 不定 → [LiuliSpinner] 16 + [label]（13 `text.secondary`）。定量态**不渲染** [label]
  *   ——它是「说不出还剩多少时才需要的一句话」，有百分比就不再多这一行（A-4 ③ 逐字）。
@@ -62,8 +64,8 @@ fun LiuliProgressBar(
         return
     }
     val clamped = progress.coerceIn(0f, 1f)
-    val track = colors.surface.sunken
-    val fill = colors.accent.primary
+    val track = LiuliMaterials.offTrack(LocalIsDarkTheme.current)
+    val fill = LiuliMaterials.accentHorizontalBrush
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -74,7 +76,7 @@ fun LiuliProgressBar(
                 val radius = CornerRadius(LiuliPageGeometry.progressCorner.toPx(), LiuliPageGeometry.progressCorner.toPx())
                 drawRoundRect(color = track, size = size, cornerRadius = radius)
                 if (clamped > 0f) {
-                    drawRoundRect(color = fill, size = Size(size.width * clamped, size.height), cornerRadius = radius)
+                    drawRoundRect(brush = fill, size = Size(size.width * clamped, size.height), cornerRadius = radius)
                 }
             },
     )

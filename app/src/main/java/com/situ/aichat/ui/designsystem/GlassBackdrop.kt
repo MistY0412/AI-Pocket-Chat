@@ -4,10 +4,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -18,6 +21,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.IntOffset
@@ -29,10 +33,41 @@ import kotlin.math.roundToInt
 enum class GlassDivider { Top, Bottom, None }
 
 /**
+ * 壁纸玻璃的**参照框**：模糊壁纸按它的尺寸铺、切片偏移按它的坐标算（2026-09-24 工具链轮三复核 R1 🔴-1）。
+ *
+ * 为什么不直接用窗口根坐标：导航 2.10 起左滑返回会把整页 `scaleOut` 到 0.7。按根坐标算，偏移被整页缩放一起缩了，
+ * 切片却在本栏自己（未缩放）的坐标里画 → 取到别处的壁纸（颜色错位）。参照框与玻璃同在被缩放的页面里，
+ * [LayoutCoordinates.localPositionOf] 求的相对位置不受整页缩放影响；平时框 = 整窗 → 画面逐像素不变。
+ * 框外（没包 [GlassFrame]）的玻璃照旧按窗口根坐标算。
+ */
+@Stable
+class GlassFrameState internal constructor() {
+    internal var coords: LayoutCoordinates? = null
+}
+
+val LocalGlassFrame = staticCompositionLocalOf<GlassFrameState?> { null }
+
+/** 包住「壁纸 + 其上全部 [GlassBackdrop]」的那一层（聊天屏根 Box 的直接替身·行为同 Box）。 */
+@Composable
+fun GlassFrame(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+    val frame = remember { GlassFrameState() }
+    Box(modifier.onGloballyPositioned { frame.coords = it }) {
+        val scope = this
+        CompositionLocalProvider(LocalGlassFrame provides frame) { scope.content() }
+    }
+}
+
+/** 本栏在参照系里的偏移与参照系尺寸（纯函数·T2 锁「整页缩放下偏移不变」）。 */
+internal fun glassSliceOf(self: LayoutCoordinates, frame: LayoutCoordinates?): Pair<Offset, IntSize> {
+    val ref = frame?.takeIf { it.isAttached } ?: self.findRootCoordinates()
+    return ref.localPositionOf(self, Offset.Zero) to ref.size
+}
+
+/**
  * 聊天壁纸毛玻璃悬浮控件（契约 FABLE5_CHAT_WALLPAPER_PROPOSAL.md §4「五要素配方」）。在自有静态壁纸上做出 iOS
  * Material 级高级质感，全自研（守铁律#1，不引第三方）。五要素：
- *  ① 真实背景模糊——画的是**壁纸像素**：拿预糊好的小图 [blurred] 按全屏 [rootSize] 拉伸、再按本栏在屏内的偏移
- *     [offset] 负向平移、clip 到本栏边界 → 模糊切片与四周清晰壁纸像素级对齐，且无每帧模糊成本。
+ *  ① 真实背景模糊——画的是**壁纸像素**：拿预糊好的小图 [blurred] 按参照框（[GlassFrame]·缺省=全屏）尺寸拉伸、再按本栏在
+ *     框内的偏移负向平移、clip 到本栏边界 → 模糊切片与四周清晰壁纸像素级对齐，且无每帧模糊成本。
  *  ② 暖色 vibrancy 染色——非冷白霜，浅向暖瓷 / 深向暖咖（[dark]）。
  *  ③ 轻微饱和提升——模糊背景过 [SATURATION] 的 ColorMatrix，透而有神不发灰。
  *  ④ 迎光描边——内容相邻缘 1px 高光（[divider]）。
@@ -50,6 +85,7 @@ fun GlassBackdrop(
     divider: GlassDivider = GlassDivider.None,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val frame = LocalGlassFrame.current
     var offset by remember { mutableStateOf(Offset.Zero) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
 
@@ -67,9 +103,9 @@ fun GlassBackdrop(
     Box(
         modifier
             .onGloballyPositioned { coords ->
-                val root = coords.findRootCoordinates()
-                rootSize = root.size
-                offset = root.localPositionOf(coords, Offset.Zero)
+                val (off, refSize) = glassSliceOf(coords, frame?.coords)
+                rootSize = refSize
+                offset = off
             }
             .drawBehind {
                 clipRect {

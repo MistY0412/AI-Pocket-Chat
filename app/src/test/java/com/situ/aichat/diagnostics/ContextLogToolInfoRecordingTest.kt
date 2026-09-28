@@ -1,6 +1,7 @@
 package com.situ.aichat.diagnostics
 
 import com.situ.aichat.data.local.dao.LogDao
+import com.situ.aichat.data.local.dao.LogStatsDao
 import com.situ.aichat.data.model.AppSettings
 import com.situ.aichat.data.remote.llm.ChatMessageDto
 import com.situ.aichat.data.remote.llm.LlmClient
@@ -29,7 +30,7 @@ class ContextLogToolInfoRecordingTest {
     private fun serviceWith(detailEnabled: Boolean, logDao: LogDao): ContextLogService {
         val settingsRepository = mockk<SettingsRepository>()
         every { settingsRepository.appSettings } returns flowOf(AppSettings(logDetailEnabled = detailEnabled))
-        return ContextLogService(mockk<LlmClient>(), logDao, settingsRepository, json)
+        return ContextLogService(mockk<LlmClient>(), logDao, settingsRepository, json, mockk<LogStatsDao>(relaxed = true))
     }
 
     private fun toolInfo() = LogToolInfo.toolTurn(

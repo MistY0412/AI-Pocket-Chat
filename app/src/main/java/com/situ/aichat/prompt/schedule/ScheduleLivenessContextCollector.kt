@@ -7,6 +7,8 @@ import com.situ.aichat.data.local.dao.OfflineMeetingMemoryDao
 import com.situ.aichat.data.local.dao.OpenLoopDao
 import com.situ.aichat.data.local.dao.PromiseDao
 import com.situ.aichat.data.local.dao.ScheduleDao
+import com.situ.aichat.data.local.entity.OpenLoopEntity
+import com.situ.aichat.data.local.entity.OpenLoopType
 import com.situ.aichat.data.model.EconomicStatusTier
 import com.situ.aichat.data.model.MeetingStatus
 import com.situ.aichat.data.model.MeetingTimeGranularity
@@ -63,15 +65,25 @@ class ScheduleLivenessContextCollector @Inject constructor(
                 )
             }
 
-        // 惦记：剔除被进行中约定桥接的行（openLoopUuid·图纸 §0.②-6），防同一件事双列。
+        // 惦记：剔除被进行中约定桥接的行（openLoopUuid·图纸 §0.②-6），防同一件事双列；她自己的打算另起一段（四期）。
         val bridgedLoopUuids = openPromises.mapNotNull { it.openLoopUuid }.toSet()
         val openLoops = runCatching {
             openLoopDao.openByCharacter(characterUuid)
+                .filterNot { it.typeRaw == OpenLoopType.PLAN_CHAR }
                 .filterNot { it.uuid in bridgedLoopUuids }
                 .sortedWith(compareBy({ it.dueAt ?: Long.MAX_VALUE }, { -it.createdAt }))
                 .take(OPEN_LOOP_LIMIT)
                 .map { it.content }
         }.onFailure { Log.w(TAG, "素材收集失败[惦记] char=$characterUuid: ${it.message}") }.getOrDefault(emptyList())
+
+        // 她自己说过、落在目标日的打算（四期·图纸一 §3.7）：09:00 = 只有日期的默认落点，不标时刻。
+        val ownPlans = runCatching {
+            openLoopDao.openByCharacter(characterUuid)
+                .filter { it.typeRaw == OpenLoopType.PLAN_CHAR && it.dueAt != null && it.dueAt >= dayStart && it.dueAt < dayEnd }
+                .sortedBy { it.dueAt }
+                .take(OWN_PLAN_LIMIT)
+                .map { planLine(it, zone) }
+        }.onFailure { Log.w(TAG, "素材收集失败[打算] char=$characterUuid: ${it.message}") }.getOrDefault(emptyList())
 
         val afterglow = runCatching { recentAfterglow(characterUuid, dayStart, zone) }
             .onFailure { Log.w(TAG, "素材收集失败[见面余温] char=$characterUuid: ${it.message}") }
@@ -88,7 +100,14 @@ class ScheduleLivenessContextCollector @Inject constructor(
             openLoops = openLoops,
             recentMeetingAfterglow = afterglow,
             recentDaysDigest = digest,
+            ownPlans = ownPlans,
         )
+    }
+
+    /** 打算行：本地时刻恰为 09:00 → 只写事；否则「HH:mm 事」。 */
+    private fun planLine(loop: OpenLoopEntity, zone: ZoneId): String {
+        val due = Instant.ofEpochMilli(loop.dueAt!!).atZone(zone)
+        return if (due.hour == 9 && due.minute == 0) loop.content else "${TIME_FORMAT.format(due)} ${loop.content}"
     }
 
     /** 经济档（今日与 backfill 都注入·拍板⑤）：无钱包/月薪≤0 → null = 块缺席。只读、只出档位标签。 */
@@ -162,6 +181,7 @@ class ScheduleLivenessContextCollector @Inject constructor(
         const val TAG = "ScheduleLiveness"
         const val MEETING_KIND = "meeting"
         const val OPEN_LOOP_LIMIT = 3
+        const val OWN_PLAN_LIMIT = 3
         const val UPCOMING_PROMISE_LIMIT = 3
         const val DIGEST_EVENT_LIMIT = 3
         val DIGEST_DAY_OFFSETS = 2..5

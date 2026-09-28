@@ -42,7 +42,7 @@ class PromiseLedgerServiceTest {
         val loopRepo = mockk<OpenLoopRepository>(relaxed = true)
         val scheduler = mockk<BackgroundScheduler>(relaxed = true)
         coEvery { promiseRepo.openByCharacter(any()) } returns emptyList()
-        coEvery { loopRepo.openLoopsForCharacter(any()) } returns emptyList()
+        coEvery { loopRepo.openLoopsForChat(any()) } returns emptyList()
         return Triple(promiseRepo, loopRepo, scheduler)
     }
 
@@ -119,7 +119,7 @@ class PromiseLedgerServiceTest {
             uuid = "loopX", conversationUuid = "conv1", characterUuid = "c1", content = "下周 一起 爬山",
             typeRaw = OpenLoopType.PROMISE_CHAR, dueAt = future, statusRaw = OpenLoopStatus.OPEN, createdAt = now,
         )
-        coEvery { t.second.openLoopsForCharacter("c1") } returns listOf(existing)
+        coEvery { t.second.openLoopsForChat("c1") } returns listOf(existing)
         val p = service(t).register("c1", "conv1", "下周一起爬山", future, PromiseSource.CHAT, "", now) // 去空白等值 existing
         assertEquals("loopX", p!!.openLoopUuid) // 只关联
         coVerify(exactly = 0) { t.second.upsert(any()) } // 不新建 loop
@@ -426,7 +426,7 @@ class PromiseLedgerServiceTest {
             uuid = "loopX", conversationUuid = "conv1", characterUuid = "c1", content = "下周 一起 爬山",
             typeRaw = OpenLoopType.PROMISE_CHAR, statusRaw = OpenLoopStatus.OPEN, createdAt = now,
         )
-        coEvery { t.second.openLoopsForCharacter("c1") } returns listOf(existing)
+        coEvery { t.second.openLoopsForChat("c1") } returns listOf(existing)
         val p = service(t).register("c1", "conv1", "下周一起爬山", null, PromiseSource.CHAT, "", now) // 无日期
         assertEquals("无日期也链接等值 open loop（四期新行为）", "loopX", p!!.openLoopUuid)
         coVerify(exactly = 0) { t.second.upsert(any()) } // 不新建 loop
@@ -434,7 +434,7 @@ class PromiseLedgerServiceTest {
     }
 
     @Test fun register_noDue_noEquivalentLoop_openLoopNull_unchanged_e9() = runBlocking {
-        val t = fixture() // openLoopsForCharacter 默认 emptyList
+        val t = fixture() // openLoopsForChat 默认 emptyList
         val p = service(t).register("c1", "conv1", "随口说的一件事", null, PromiseSource.CHAT, "", now)
         assertNull("无等值 loop → openLoopUuid null（与旧行为逐字一致）", p!!.openLoopUuid)
         coVerify(exactly = 0) { t.second.upsert(any()) }

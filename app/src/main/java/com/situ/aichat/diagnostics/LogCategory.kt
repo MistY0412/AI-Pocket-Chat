@@ -14,7 +14,7 @@ package com.situ.aichat.diagnostics
 enum class LogCategory(val sources: List<String>) {
     ALL(emptyList()),
 
-    CHAT(listOf(LogSource.CHAT, LogSource.BUSY_REPLY, LogSource.RECOVERY_REPLY, LogSource.OFFLINE_AFTERGLOW)),
+    CHAT(listOf(LogSource.CHAT, LogSource.BUSY_REPLY, LogSource.RECOVERY_REPLY, LogSource.OFFLINE_AFTERGLOW, LogSource.IMAGE_UNDERSTANDING)),
 
     VOICE_CALL(listOf(LogSource.VOICE_CALL)),
 

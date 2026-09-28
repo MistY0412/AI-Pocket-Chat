@@ -15,7 +15,7 @@ import java.util.TimeZone
 
 /**
  * 时间锚（刀2 现在卡·间隔五档规格,2026-07-11 过审）测试。断言从过审表独立反推：
- * - 间隔行自带方向：「{userLabel}隔了约 X 才回你」（§13：有昵称叫昵称、空退「对方」）；<10 分钟静默；≥1 年档句内用「一年多」；
+ * - 间隔行自带方向：「{userLabel}隔了约 X 回你」（四期去「才」；§13：有昵称叫昵称、空退「对方」）；<10 分钟静默；≥1 年档句内用「一年多」；
  * - 五档：<2h 无附言 / 同日或跨日但 <6h=半日(几个小时) / 同日 ≥6h=半日(大半天) / 跨 1 日且 ≥6h=跨夜 /
  *   2–7 天=数日 / >7 天=久别；命中任一档追加「长期持续」保命附言；
  * - 深夜边界（23:00→01:30 跨日 2.5h）落半日档，不预设「睡过一觉」；
@@ -71,15 +71,15 @@ class TimeAnchorFormatterTest {
     @Test
     fun sinceLast_directionalWording_noCrossMarker() {
         val s = TimeAnchorFormatter.formatSinceLastAssistant(at(2026, 6, 13, 15, 0), at(2026, 6, 13, 12, 0))
-        assertEquals("对方隔了约 3 小时才回你", s)
+        assertEquals("对方隔了约 3 小时回你", s)
         // 旧「（跨夜）/（跨日）」后缀已废——跨夜语义由五档措辞承担。
         val overnight = TimeAnchorFormatter.formatSinceLastAssistant(at(2026, 6, 13, 8, 0), at(2026, 6, 12, 23, 0))
-        assertEquals("对方隔了约 9 小时才回你", overnight)
+        assertEquals("对方隔了约 9 小时回你", overnight)
     }
 
     @Test
     fun sinceLast_delayedGeneration_neutralWording() {
-        // 延迟生成路(进程恢复):间隔是系统欠的 → 中性措辞,绝不说「对方隔了…才回你」(T5 复核🟡④)。
+        // 延迟生成路(进程恢复):间隔是系统欠的 → 中性措辞,绝不说「对方隔了…回你」(T5 复核🟡④)。
         val s = TimeAnchorFormatter.formatSinceLastAssistant(at(2026, 6, 13, 20, 0), at(2026, 6, 13, 12, 0), directional = false)
         assertEquals("距离你上条回复：约 8 小时", s)
         val anchor = TimeAnchorFormatter.buildTimeAnchor(at(2026, 6, 13, 20, 0), at(2026, 6, 13, 12, 0), directionalGapLine = false)
@@ -90,7 +90,7 @@ class TimeAnchorFormatterTest {
     @Test
     fun sinceLast_overOneYear_sentenceCompatible() {
         val s = TimeAnchorFormatter.formatSinceLastAssistant(at(2027, 8, 1, 12, 0), at(2026, 6, 1, 12, 0))
-        assertEquals("对方隔了一年多才回你", s)
+        assertEquals("对方隔了一年多回你", s)
     }
 
     // MARK: - 五档边界
@@ -419,11 +419,11 @@ class TimeAnchorFormatterTest {
         val out = anchorWith(now, at(2026, 9, 2, 13, 15), at(2026, 6, 1, 10, 0), streak = 3, directional = false)
         assertEquals("你和小明是 2026-06-01 第一次聊天认识的，到今天相识 93 天。", blockLine(out, 1))
         assertTrue("延迟生成路的间隔行仍是中性措辞", out.contains("距离你上条回复：约 8 小时"))
-        // 中性变体一个人都不提：块内没有任何一行是方向化间隔行（「…隔了…才回你」），既不是「对方隔了」也不是「小明隔了」。
+        // 中性变体一个人都不提：块内没有任何一行是方向化间隔行（「…隔了…回你」·四期去「才」），既不是「对方隔了」也不是「小明隔了」。
         // ⚠️ 不能写成 `!out.contains("隔了")`：五档措辞里的 [TIER_FEW_DAYS] 本身就以「隔了好几天。」开头，
         // 那样的断言只是碰巧对 8 小时这个输入成立，换成 2–7 天的间隔就会误红（自查发现，2026-09-03）。
         val block = out.substringAfter("<time_context>\n").substringBefore("\n</time_context>").split("\n")
-        assertEquals("块内不得出现方向化间隔行", 0, block.count { it.endsWith("才回你") })
+        assertEquals("块内不得出现方向化间隔行", 0, block.count { it.endsWith("回你") })
     }
 
     /**
@@ -437,7 +437,7 @@ class TimeAnchorFormatterTest {
         assertTrue("命中数日档措辞", out.contains(TimeAnchorFormatter.TIER_FEW_DAYS))
         assertTrue("含「隔了」但那是五档措辞，不是间隔行", out.contains("隔了"))
         val block = out.substringAfter("<time_context>\n").substringBefore("\n</time_context>").split("\n")
-        assertEquals("块内不得出现方向化间隔行", 0, block.count { it.endsWith("才回你") })
+        assertEquals("块内不得出现方向化间隔行", 0, block.count { it.endsWith("回你") })
         assertTrue("中性间隔行照常在", block.any { it.startsWith("距离你上条回复：") })
     }
 
@@ -448,14 +448,14 @@ class TimeAnchorFormatterTest {
         val s = TimeAnchorFormatter.formatSinceLastAssistant(
             at(2026, 6, 13, 15, 0), at(2026, 6, 13, 12, 0), userLabel = "小明",
         )
-        assertEquals("小明隔了约 3 小时才回你", s)
+        assertEquals("小明隔了约 3 小时回你", s)
     }
 
     @Test
     fun 间隔行_昵称为空时逐字回退旧文案() {
         // 回归钉：不传称呼（= 昵称为空退 USER_LABEL_FALLBACK）时与 §13 之前逐字相同。
         val s = TimeAnchorFormatter.formatSinceLastAssistant(at(2026, 6, 13, 15, 0), at(2026, 6, 13, 12, 0))
-        assertEquals("对方隔了约 3 小时才回你", s)
+        assertEquals("对方隔了约 3 小时回你", s)
     }
 
     @Test
@@ -463,7 +463,7 @@ class TimeAnchorFormatterTest {
         val now = at(2026, 9, 2, 21, 15)
         val out = anchorWith(now, now.minus(Duration.ofHours(3)), at(2026, 6, 1, 10, 0), streak = 3)
         assertEquals("你和小明是 2026-06-01 第一次聊天认识的，到今天相识 93 天。", blockLine(out, 1))
-        assertEquals("小明隔了约 3 小时才回你", blockLine(out, 2))
+        assertEquals("小明隔了约 3 小时回你", blockLine(out, 2))
         // 同一段里绝不出现第二种叫法（这正是 §13 要治的）。只看块内：五档措辞今天都不含「对方」，
         // 但那是它们自己的事，块外的措辞变化不该让这条为无关原因误红。
         val block = out.substringAfter("<time_context>\n").substringBefore("\n</time_context>")
@@ -478,7 +478,7 @@ class TimeAnchorFormatterTest {
             label = TimeAnchorFormatter.USER_LABEL_FALLBACK,
         )
         assertEquals("你和对方是 2026-06-01 第一次聊天认识的，到今天相识 93 天。", blockLine(out, 1))
-        assertEquals("对方隔了约 3 小时才回你", blockLine(out, 2))
+        assertEquals("对方隔了约 3 小时回你", blockLine(out, 2))
     }
 
     @Test

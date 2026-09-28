@@ -3,9 +3,11 @@ package com.situ.aichat.data.remote.llm
 import android.util.Log
 import com.situ.aichat.data.model.ApiProviderType
 import com.situ.aichat.data.model.redirectDeprecatedModel
+import com.situ.aichat.data.remote.LazyOkHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
@@ -36,9 +38,11 @@ import kotlin.math.pow
  * 429/5xx/network errors (respecting Retry-After); the SSE receive phase does not retry.
  */
 class LlmClient(
-    private val baseClient: OkHttpClient,
+    private val http: LazyOkHttpClient,
     private val json: Json,
 ) {
+    /** 测试 / 已有现成客户端用；App 内由 NetworkModule 注入懒持有（启动主线程读盘清零 ①）。 */
+    constructor(baseClient: OkHttpClient, json: Json) : this(LazyOkHttpClient(baseClient), json)
 
     /** Stream visible content + thinking deltas as they arrive. */
     fun streamChat(
@@ -58,9 +62,11 @@ class LlmClient(
          *  （数据行、`:` 开头的 keep-alive 注释行、空分隔行）回调一次；IO 线程调用，
          *  实现须线程安全、不得阻塞、不得抛异常。 */
         onSseLine: (() -> Unit)? = null,
+        /** 会话标识（四期·图纸一 §3.2b·可选尾参默认 null 零波及）：非 null 时 OpenRouter / xAI 多带一个会话请求头，模型读到的内容一字不变。 */
+        sessionKey: String? = null,
     ): Flow<StreamToken> = flow {
-        val bodyJson = buildRequestJson(messages, config, stream = true, temperature, maxTokens, responseFormat, tools)
-        val client = baseClient.newBuilder()
+        val bodyJson = buildRequestJson(messages, config, stream = true, temperature, maxTokens, responseFormat, tools, capture = currentCoroutineContext()[LlmRequestCapture])
+        val client = http.get().newBuilder()
             .callTimeout(0, TimeUnit.SECONDS) // no overall cap; streams can be long
             .readTimeout(idleTimeoutSec, TimeUnit.SECONDS) // per-read idle guard
             .build()
@@ -70,21 +76,21 @@ class LlmClient(
         // clamp SAFE_RETRY_MAX_TOKENS）> 去温度（方言不认 temperature）> 不重试。各类重试各恰一次
         // （catch 只包首调，重试自身的异常自然上抛，故互不链式）；其余 400（模型名错等）原样抛。
         val response = try {
-            connectWithRetry(client, config, bodyJson)
+            connectWithRetry(client, config, bodyJson, sessionKey)
         } catch (e: LlmError.Http) {
             val sentTemperature = resolveEffectiveTemperature(temperature, config.providerType == ApiProviderType.MINIMAX, config.isThinkingModel)
             when (firstCall400RetryPlan(e, maxTokens, sentTemperature)) {
                 FirstCall400RetryPlan.SWAP_PARAM_NAME -> {
                     Log.w(TAG, "流式首调 max_tokens 参数名被拒（推理系方言），换 max_completion_tokens 同值重试一次")
-                    connectWithRetry(client, config, buildRequestJson(messages, config, stream = true, temperature, maxTokens, responseFormat, tools, useMaxCompletionTokens = true))
+                    connectWithRetry(client, config, buildRequestJson(messages, config, stream = true, temperature, maxTokens, responseFormat, tools, useMaxCompletionTokens = true), sessionKey)
                 }
                 FirstCall400RetryPlan.CLAMP -> {
                     Log.w(TAG, "流式首调 maxTokens=$maxTokens 被 400 拒（超服务商硬顶），clamp $SAFE_RETRY_MAX_TOKENS 重试一次")
-                    connectWithRetry(client, config, buildRequestJson(messages, config, stream = true, temperature, SAFE_RETRY_MAX_TOKENS, responseFormat, tools))
+                    connectWithRetry(client, config, buildRequestJson(messages, config, stream = true, temperature, SAFE_RETRY_MAX_TOKENS, responseFormat, tools), sessionKey)
                 }
                 FirstCall400RetryPlan.DROP_TEMPERATURE -> {
                     Log.w(TAG, "流式首调 temperature 被 400 拒（方言不认），去温度重试一次")
-                    connectWithRetry(client, config, buildRequestJson(messages, config, stream = true, temperature, maxTokens, responseFormat, tools, dropTemperature = true))
+                    connectWithRetry(client, config, buildRequestJson(messages, config, stream = true, temperature, maxTokens, responseFormat, tools, dropTemperature = true), sessionKey)
                 }
                 FirstCall400RetryPlan.NONE -> throw e
             }
@@ -122,8 +128,9 @@ class LlmClient(
                                 result.chunk.choices.firstOrNull()?.finishReason?.takeIf { it.isNotEmpty() }?.let { onFinishReason?.invoke(it) }
                                 val delta = result.chunk.choices.firstOrNull()?.delta ?: continue
                                 // 优先 reasoning_content（DeepSeek）回退 reasoning（OpenRouter）——已是思考字段，直发。
+                                // 旗标记来源：只有 reasoning_content 那路要在工具回喂里原样回传（见 StreamToken.Reasoning）。
                                 (delta.reasoningContent ?: delta.reasoning)?.takeIf { it.isNotEmpty() }
-                                    ?.let { emit(StreamToken.Reasoning(it)) }
+                                    ?.let { emit(StreamToken.Reasoning(it, fromReasoningContent = delta.reasoningContent != null)) }
                                 // content 可能内联 <think> 标签（开源模型）→ 经解析器切分。
                                 delta.content?.takeIf { it.isNotEmpty() }?.let { content ->
                                     thinkParser.parse(content).forEach { emit(it) }
@@ -178,6 +185,8 @@ class LlmClient(
         onUsage: ((UsageDto) -> Unit)? = null,
         /** finish_reason 回调（记忆护栏 G2·可选尾参默认 null 零波及）："length" = 输出被掐断，调用方据此拒收半份结果。 */
         onFinishReason: ((String?) -> Unit)? = null,
+        /** 会话标识（同 [streamChat]）：每次 attempt 都带，重试不丢头。 */
+        sessionKey: String? = null,
     ): String = withContext(Dispatchers.IO) {
         // 首调 400 自愈（与 streamChat 同款分类 [maxTokensRetryPlan]）：clamp 后升额基数随之收窄为生效值——
         // 否则下方升额重试乘回超顶原值，必然再 400 白烧一轮；换名命中则 useNewName 贯穿本次调用的后续 attempt
@@ -186,24 +195,24 @@ class LlmClient(
         var useNewName = false
         var dropTemp = false
         val first = try {
-            completionAttempt(messages, config, temperature, maxTokens, responseFormat, onUsage)
+            completionAttempt(messages, config, temperature, maxTokens, responseFormat, onUsage, sessionKey = sessionKey)
         } catch (e: LlmError.Http) {
             val sentTemperature = resolveEffectiveTemperature(temperature, config.providerType == ApiProviderType.MINIMAX, config.isThinkingModel)
             when (firstCall400RetryPlan(e, maxTokens, sentTemperature)) {
                 FirstCall400RetryPlan.SWAP_PARAM_NAME -> {
                     Log.w(TAG, "非流式首调 max_tokens 参数名被拒（推理系方言），换 max_completion_tokens 同值重试一次")
                     useNewName = true
-                    completionAttempt(messages, config, temperature, maxTokens, responseFormat, onUsage, useMaxCompletionTokens = true)
+                    completionAttempt(messages, config, temperature, maxTokens, responseFormat, onUsage, useMaxCompletionTokens = true, sessionKey = sessionKey)
                 }
                 FirstCall400RetryPlan.CLAMP -> {
                     Log.w(TAG, "非流式首调 maxTokens=$maxTokens 被 400 拒（超服务商硬顶），clamp $SAFE_RETRY_MAX_TOKENS 重试一次")
                     effectiveMaxTokens = SAFE_RETRY_MAX_TOKENS
-                    completionAttempt(messages, config, temperature, SAFE_RETRY_MAX_TOKENS, responseFormat, onUsage)
+                    completionAttempt(messages, config, temperature, SAFE_RETRY_MAX_TOKENS, responseFormat, onUsage, sessionKey = sessionKey)
                 }
                 FirstCall400RetryPlan.DROP_TEMPERATURE -> {
                     Log.w(TAG, "非流式首调 temperature 被 400 拒（方言不认），去温度重试一次")
                     dropTemp = true
-                    completionAttempt(messages, config, temperature, maxTokens, responseFormat, onUsage, dropTemperature = true)
+                    completionAttempt(messages, config, temperature, maxTokens, responseFormat, onUsage, dropTemperature = true, sessionKey = sessionKey)
                 }
                 FirstCall400RetryPlan.NONE -> throw e
             }
@@ -215,7 +224,7 @@ class LlmClient(
             try {
                 completionAttempt(
                     messages, config, temperature, escalationBase * LENGTH_ESCALATION_FACTOR, responseFormat, onUsage,
-                    useMaxCompletionTokens = useNewName, dropTemperature = dropTemp,
+                    useMaxCompletionTokens = useNewName, dropTemperature = dropTemp, sessionKey = sessionKey,
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -245,12 +254,14 @@ class LlmClient(
         onUsage: ((UsageDto) -> Unit)?,
         useMaxCompletionTokens: Boolean = false,
         dropTemperature: Boolean = false,
+        sessionKey: String? = null,
     ): CompletionOutcome {
         val bodyJson = buildRequestJson(
             messages, config, stream = false, temperature, maxTokens, responseFormat,
             useMaxCompletionTokens = useMaxCompletionTokens, dropTemperature = dropTemperature,
+            capture = currentCoroutineContext()[LlmRequestCapture],
         )
-        val client = baseClient.newBuilder()
+        val client = http.get().newBuilder()
             .callTimeout(120, TimeUnit.SECONDS)
             .build()
         val url = buildUrl(config.baseUrl)
@@ -265,7 +276,7 @@ class LlmClient(
                 retryAfterMs = null
             }
             try {
-                val request = buildPostRequest(url, config, bodyJson)
+                val request = buildPostRequest(url, config, bodyJson, sessionKey)
                 client.newCall(request).execute().use { resp ->
                     when {
                         resp.code == 200 -> {
@@ -305,6 +316,7 @@ class LlmClient(
         client: OkHttpClient,
         config: ApiConfigValues,
         bodyJson: String,
+        sessionKey: String?,
     ): Response {
         val url = buildUrl(config.baseUrl)
         var lastError: Exception = LlmError.InvalidResponse
@@ -317,7 +329,7 @@ class LlmClient(
                 retryAfterMs = null
             }
             try {
-                val request = buildPostRequest(url, config, bodyJson)
+                val request = buildPostRequest(url, config, bodyJson, sessionKey)
                 val response = client.newCall(request).execute()
                 when {
                     response.code == 200 -> return response
@@ -343,13 +355,15 @@ class LlmClient(
 
     // MARK: - Request building
 
-    private fun buildPostRequest(url: String, config: ApiConfigValues, bodyJson: String): Request {
+    private fun buildPostRequest(url: String, config: ApiConfigValues, bodyJson: String, sessionKey: String?): Request {
         val builder = Request.Builder()
             .url(url)
             .post(bodyJson.toRequestBody(JSON_MEDIA))
         for ((key, value) in LlmHttp.authHeaders(config)) {
             builder.addHeader(key, value)
         }
+        // 会话头只凭显式 sessionKey 追加（四期·图纸一 §3.2b）；authHeaders 被探测 / 模型目录复用，故不放那里。
+        for ((k, v) in ProviderFamily.sessionHeaders(config, sessionKey)) builder.addHeader(k, v)
         return builder.build()
     }
 
@@ -365,6 +379,8 @@ class LlmClient(
         useMaxCompletionTokens: Boolean = false,
         /** true = 本发彻底不带 temperature（图纸件②：服务商方言不认该参数的 400 自愈重试用）。 */
         dropTemperature: Boolean = false,
+        /** 上下文日志「实际发出去的样子」捕获（四期·图纸三 §3.2）：只在两个首发点传，只读不改请求。 */
+        capture: LlmRequestCapture? = null,
     ): String {
         val payload = ReasoningPayloadMapper.payload(config)
         val effectiveResponseFormat = if (config.providerType.supportsResponseFormat) responseFormat else null
@@ -372,10 +388,12 @@ class LlmClient(
         // MiniMax: map temperature 0..2 -> (0, 1.0]; strip reasoning_content (DeepSeek-only field).
         val isMiniMax = config.providerType == ApiProviderType.MINIMAX
         val effectiveTemperature = if (dropTemperature) null else resolveEffectiveTemperature(temperature, isMiniMax, config.isThinkingModel)
+        // 非白名单服务商发送前改写（四期·图纸一 §3.2·唯一调用点·纯函数幂等）；在 MiniMax 剥离之前。
+        val sendMessages = ProviderMessageAdapter.forSend(messages, config)
         val effectiveMessages = if (isMiniMax) {
-            messages.map { if (it.reasoningContent != null) it.copy(reasoningContent = null) else it }
+            sendMessages.map { if (it.reasoningContent != null) it.copy(reasoningContent = null) else it }
         } else {
-            messages
+            sendMessages
         }
 
         val streamOptions = if (stream && config.providerType.supportsStreamUsage) {
@@ -399,6 +417,12 @@ class LlmClient(
             thinking = payload.thinking,
             responseFormat = effectiveResponseFormat,
             streamOptions = streamOptions,
+        )
+        capture?.offer(
+            request,
+            config.providerType.raw,
+            if (ProviderFamily.keepsSystemInPlace(config)) null
+            else ProviderMessageAdapter.adapt(messages).let { SendAdaptationCounts(it.leadingMerged, it.midMerged, it.tailMerged) },
         )
         return json.encodeToString(ChatRequestDto.serializer(), request)
     }

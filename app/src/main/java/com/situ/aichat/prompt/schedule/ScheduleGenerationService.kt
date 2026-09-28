@@ -267,14 +267,15 @@ class ScheduleGenerationService @Inject constructor(
             sections.add("")
             sections.add("【最近和${request.userName}聊到的事】")
             sections.add(trimmed)
-            // 禁令收窄（图纸 C6·§4-F·拍板④）：排约定单源 = 账本（【今天的约定】），聊天降级为背景素材。
-            sections.add("⚠️ 这段聊天只用来了解TA最近的生活状态和心情，可作为 innerThought 的素材。不要从聊天里自行提取约定排进日程——今天要赴的约定一律以【今天的约定】为准。禁止在 activity 里写「和${request.userName}发消息/聊天/分享」之类的互动动作，禁止虚构任何对话引用。")
+            // 禁令再收窄（四期·图纸一 §3.7）：只禁从聊天自造与用户的约定；TA 自己的打算放行（治「她说过的打算进不了日程」）。
+            sections.add("⚠️ 这段聊天只用来了解TA最近的生活状态和心情，可作为 innerThought 的素材。不要从聊天里自造和${request.userName}的约定排进日程——今天要赴的约定一律以【今天的约定】为准；TA自己说过要做的事（进货、看牙这类）可以照常排进日程。禁止在 activity 里写「和${request.userName}发消息/聊天/分享」之类的互动动作，禁止虚构任何对话引用。")
         }
 
         // 约定硬锚点 + 惦记 + 余温（图纸 C6·§4-H/H2/H3）：liveness 为 null（backfill）恒缺席。
         request.liveness?.let { liveness ->
             for (block in listOf(
                 ScheduleLivenessPromptSections.todayPromisesSection(liveness, request.userName),
+                ScheduleLivenessPromptSections.ownPlansSection(liveness.ownPlans),
                 ScheduleLivenessPromptSections.upcomingPromisesSection(liveness),
                 ScheduleLivenessPromptSections.openLoopsSection(liveness.openLoops, request.userName),
                 ScheduleLivenessPromptSections.afterglowSection(liveness.recentMeetingAfterglow),

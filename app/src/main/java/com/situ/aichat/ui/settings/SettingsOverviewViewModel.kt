@@ -36,7 +36,7 @@ class SettingsOverviewViewModel @Inject constructor(
     val embedderLoadState: StateFlow<TextEmbedder.LoadState> = embedder.loadState
 
     val appSkin: StateFlow<AppSkin> = settingsPreferences.appSkin
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSkin.CLAY)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSkin.DEFAULT)
 
     val appearanceMode: StateFlow<AppearanceMode> = settingsPreferences.appearanceMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppearanceMode.SYSTEM)

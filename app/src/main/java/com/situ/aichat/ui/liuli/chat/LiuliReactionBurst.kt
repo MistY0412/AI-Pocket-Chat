@@ -59,8 +59,9 @@ internal class LiuliReactionState {
 internal data class LiuliReactionBurstTarget(val messageUuid: String, val emoji: String, val token: Int)
 
 /**
- * 双击 / 菜单表情回应的徽章 + 四颗小心（图纸 §4.6 · 对版稿 D 节）：徽章画在**气泡外**的右下角
- * （所以不被泡的 `clip` 裁掉），弹出 → 驻留 1400ms → 缩回；四颗小心自徽章处错峰上飘。
+ * 双击 / 菜单表情回应的徽章 + 四颗小心（图纸 §4.6 · 对版稿 D 节）：徽章贴在**气泡外侧**的空白处（卷三 §4.3：
+ * AI 泡在右侧、用户泡在左侧·离泡 4dp·底与泡底对齐——不压泡、不压泡下时间戳；泡最宽 74%，外侧恒有 ≥ 26% 屏宽），
+ * 弹出 → 驻留 1400ms → 缩回；四颗小心自徽章处错峰上飘。
  *
  * 调用方给的 [modifier] 应是 `Modifier.matchParentSize()`——本件寄生在气泡那一格上，既拿到泡的边界
  * 用来定位，又完全不参与父 Box 的定尺（否则短泡会被撑宽）。对读屏隐形（纯装饰，回应不进任何记录）。
@@ -68,6 +69,8 @@ internal data class LiuliReactionBurstTarget(val messageUuid: String, val emoji:
 @Composable
 internal fun LiuliReactionBurst(
     burst: LiuliReactionBurstTarget?,
+    /** 卷三 §4.3：用户泡徽章在泡左外侧、AI 泡在右外侧。 */
+    isUser: Boolean,
     messageUuid: String,
     reduceMotion: Boolean,
     modifier: Modifier = Modifier,
@@ -90,11 +93,14 @@ internal fun LiuliReactionBurst(
     if (!visible) return
 
     Box(modifier = modifier.zIndex(1f).clearAndSetSemantics {}) {
-        // BottomEnd 对齐 = 徽章右下角贴泡右下角；再外扩 6 / 10 ⇒ 盒左上角 = (泡右 − 20, 泡底 − 16)。
+        // AI 泡：BottomEnd 对齐后右移「徽章宽 + 4」⇒ 徽章左缘 = 泡右 + 4；用户泡：BottomStart 后左移同量 ⇒
+        // 徽章右缘 = 泡左 − 4。纵向不偏移（徽章底 = 泡底）。
+        val anchor = if (isUser) Alignment.BottomStart else Alignment.BottomEnd
+        val badgeX = if (isUser) -(LiuliChatGeometry.reactionBadge + BADGE_GAP) else LiuliChatGeometry.reactionBadge + BADGE_GAP
         Box(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset(x = BADGE_OVERHANG_X, y = BADGE_OVERHANG_Y)
+                .align(anchor)
+                .offset(x = badgeX)
                 .graphicsLayer { scaleX = scale.value; scaleY = scale.value }
                 .then(if (dark) Modifier else Modifier.shadow(BADGE_SHADOW, CircleShape, clip = false))
                 .size(LiuliChatGeometry.reactionBadge)
@@ -106,13 +112,13 @@ internal fun LiuliReactionBurst(
             Text(active.emoji, style = AppTypography.body.copy(fontSize = BADGE_EMOJI_SIZE))
         }
         // 减弱动画：只留徽章，不放小心（飘散是纯装饰的空间动画）。
-        if (!reduceMotion) LiuliFloatingHearts(token = active.token, emoji = active.emoji)
+        if (!reduceMotion) LiuliFloatingHearts(token = active.token, emoji = active.emoji, anchor = anchor, badgeX = badgeX)
     }
 }
 
 /** 四颗小心自徽章处错峰上飘（图纸 §3.2 回应徽章一节·x / y / 错峰三组落值逐个照表）。 */
 @Composable
-private fun BoxScope.LiuliFloatingHearts(token: Int, emoji: String) {
+private fun BoxScope.LiuliFloatingHearts(token: Int, emoji: String, anchor: Alignment, badgeX: Dp) {
     repeat(HEART_COUNT) { i ->
         val rise = remember(token, i) { Animatable(0f) }
         LaunchedEffect(token, i) {
@@ -124,8 +130,8 @@ private fun BoxScope.LiuliFloatingHearts(token: Int, emoji: String) {
             emoji,
             style = AppTypography.body.copy(fontSize = HEART_EMOJI_SIZE),
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset(x = BADGE_OVERHANG_X, y = BADGE_OVERHANG_Y)
+                .align(anchor)
+                .offset(x = badgeX)
                 .graphicsLayer {
                     translationX = dx.toPx()
                     translationY = -dy.toPx() * rise.value
@@ -142,14 +148,8 @@ internal fun liuliHeartOffsets(index: Int): Pair<Dp, Dp> {
 }
 
 // 落值（图纸 §3.2 回应徽章一节 / §4.10 表·孤值即打回）。
-/**
- * 徽章相对泡右下角的外扩量（复核 R1 🔴-2 改定·用户可反悔）：对版稿 `right:-6` 换算成盒子会让 26dp 徽章有 20dp
- * 伸进泡内，正压在泡内右下的时间戳上（实拍遮住末位约 7dp·零重叠 ⑯ 不过）。改为横向外扩 20 ⇒ 盒左缘 = 泡右 − 6，
- * 比泡的右内边距（[LiuliBubblePadEnd] 11）浅，时间戳右缘永远在徽章左缘之左；纵向 10 不变（戳在泡内，纵向不相干）。
- * `LiuliReactionBurstTest` 钉 `reactionBadge − BADGE_OVERHANG_X ≤ LiuliBubblePadEnd`。
- */
-internal val BADGE_OVERHANG_X = 20.dp
-private val BADGE_OVERHANG_Y = 10.dp
+/** 徽章离泡外侧的间距（卷三 §4.3）。 */
+private val BADGE_GAP = 4.dp
 private const val BADGE_HOLD_MS = 1400L
 private const val BADGE_EXIT_MS = 180
 private val BADGE_SHADOW = 2.dp

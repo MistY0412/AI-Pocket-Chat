@@ -59,11 +59,13 @@ fun StoryCard(
     onContinueReading: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 卡面材质（琉璃 2.0 卷六·三「材质外给」：默认 = 暖陶承托，琉璃传半透明卡）。 */
+    surface: Modifier = Modifier.appCardSurface(),
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .appCardSurface()
+            .then(surface)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {

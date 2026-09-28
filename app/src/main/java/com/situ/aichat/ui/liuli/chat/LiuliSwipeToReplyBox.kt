@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.situ.aichat.ui.components.LocalAppHaptics
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.liuli.designsystem.LiuliTheme
-import com.situ.aichat.ui.liuli.glass.LiuliGlassStyle
+import com.situ.aichat.ui.liuli.glass.LiuliGlassRole
 import com.situ.aichat.ui.liuli.glass.liuliGlass
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import kotlinx.coroutines.launch
@@ -84,7 +84,7 @@ internal fun LiuliSwipeToReplyBox(
                         scaleY = arrowScale
                         alpha = progress
                     }
-                    .liuliGlass(CircleShape, dark = dark, style = LiuliGlassStyle.Button),
+                    .liuliGlass(CircleShape, dark = dark, role = LiuliGlassRole.Button),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(

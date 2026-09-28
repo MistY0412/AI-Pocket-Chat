@@ -22,7 +22,7 @@ class MomentCommentPromptBuilderTest {
         othersHeader = "OTHERSHDR", othersReact = "OTHERSREACT", saidToYou = "SAID:%1\$s|%2\$s",
         replyInstruction = "REPLYINSTR", writeInstruction = "WRITEINSTR", reqPersonality = "REQPERS",
         reqConcise = "REQCONCISE", reqFriends = "REQFRIENDS", reqNoAi = "REQNOAI", outputOnly = "OUTPUT",
-        userMessage = "USERMSG", friendFallback = "Friend",
+        userMessage = "USERMSG", friendFallback = "Friend", mentionedYou = "MENTIONED:%1\$s",
         schedCurrent = "SCHED:%1\$s", schedAt = " (at %1\$s)", schedFeeling = ", feeling: %1\$s",
         schedSuffix = "SCHEDSUFFIX",
     )
@@ -105,6 +105,44 @@ class MomentCommentPromptBuilderTest {
         )
         // No location / mood → only current + suffix.
         assertEquals("SCHED:散步SCHEDSUFFIX", MomentCommentPromptBuilder.scheduleLine(cs(), "散步", "", null))
+    }
+
+    // ── 朋友圈发布页重构·甲 T1-2（§3.4·E16 / K-3）──
+
+    private fun minimal(mentioned: Boolean? = null) = if (mentioned == null) {
+        MomentCommentPromptBuilder.build(
+            strings = cs(), character = char(),
+            postAuthorName = "用户", postTimeDescription = "3分钟前", postContent = "今天好开心",
+            isPostByCharacter = false, nowContext = "NOWCTX", scheduleContext = null,
+            photoCount = 0, visionEnabled = false, existingComments = emptyList(), replyTarget = null,
+        )
+    } else {
+        MomentCommentPromptBuilder.build(
+            strings = cs(), character = char(),
+            postAuthorName = "用户", postTimeDescription = "3分钟前", postContent = "今天好开心",
+            isPostByCharacter = false, nowContext = "NOWCTX", scheduleContext = null,
+            photoCount = 0, visionEnabled = false, existingComments = emptyList(), replyTarget = null,
+            mentionedByPoster = mentioned,
+        )
+    }
+
+    @Test fun `mentioned by poster adds the tagged line right under the quoted post`() {
+        val lines = minimal(mentioned = true).lines()
+        val quote = lines.indexOf("[3分钟前] 「今天好开心」")
+        assertTrue(quote >= 0)
+        assertEquals("MENTIONED:用户", lines[quote + 1])
+        assertEquals(1, lines.count { it.startsWith("MENTIONED") })
+    }
+
+    @Test fun `not mentioned keeps the prompt byte-identical to before`() {
+        // 改前「minimal user post」同输入的完整输出（按改前装配顺序逐行独立写出）。
+        val before = listOf(
+            "INTRO:小樱|活泼", "", "FRIEND:用户", "[3分钟前] 「今天好开心」", "", "EMOTION", "", "NOWCTX", "",
+            "WRITEINSTR", "", "REQHDR", "REQPERS", "REQCONCISE", "REQFRIENDS", "REQNOAI", "", "OUTPUT",
+        ).joinToString("\n")
+        assertEquals(before, minimal())
+        assertEquals(before, minimal(mentioned = false))
+        assertFalse(minimal().contains("MENTIONED"))
     }
 
     private fun assertSubsequence(markers: List<String>, text: String) {

@@ -22,7 +22,7 @@ import com.situ.aichat.R
 import com.situ.aichat.ui.designsystem.AppFeatureIcons
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
-import com.situ.aichat.ui.designsystem.EmotionTileAlpha
+import com.situ.aichat.ui.liuli.designsystem.LiuliTileTone
 import com.situ.aichat.ui.moments.MomentsHubState
 import com.situ.aichat.ui.pet.PetAnimationView
 import com.situ.aichat.ui.pet.petStatusColor
@@ -60,8 +60,8 @@ fun LiuliPetHubStrip(state: MomentsHubState, onClick: () -> Unit, modifier: Modi
             title = title,
             subText = subText,
             leading = {
-                // 底色 = 暖陶同族淡档 `shy@EmotionTileAlpha`（A-12「宠物 emotion.shy 族沿暖陶 PetStripTile」·R1 🟡-4 补回）。
-                LiuliIconTile(AppFeatureIcons.Pet, colors.emotion.shy.copy(alpha = EmotionTileAlpha), colors.emotion.shyInk)
+                // 桃色六色渐变图标块（卷三 §4.10·取代暖陶同族淡档 `shy@EmotionTileAlpha`）。
+                LiuliIconTile(AppFeatureIcons.Pet, LiuliTileTone.Peach)
             },
         )
         if (state.petSprites.isNotEmpty()) {

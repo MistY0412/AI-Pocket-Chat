@@ -3,6 +3,7 @@ package com.situ.aichat.openloop
 import com.situ.aichat.data.local.entity.CharacterEntity
 import com.situ.aichat.data.local.entity.OpenLoopEntity
 import com.situ.aichat.data.local.entity.OpenLoopStatus
+import com.situ.aichat.data.local.entity.OpenLoopType
 import com.situ.aichat.data.model.ApiFunction
 import com.situ.aichat.data.remote.llm.ApiConfigValues
 import com.situ.aichat.data.remote.llm.ChatMessageDto
@@ -48,6 +49,7 @@ class OpenLoopDueMessenger @Inject constructor(
         val settings = settingsRepo.getAppSettings()
         if (!settings.notificationsEnabled) return // 守卫①：走既有通知总开关（拍板）
         val loop = openLoopRepository.byUuid(loopUuid) ?: return
+        if (loop.typeRaw == OpenLoopType.PLAN_CHAR) return // 她自己的打算不发「就是今天」（四期·图纸一 §3.6）
         if (loop.statusRaw != OpenLoopStatus.OPEN) return // 守卫②：已 resolved/expired → 静默（E4）
         val due = loop.dueAt ?: return // 无 dueAt 不该有 worker；防御
         val now = System.currentTimeMillis()

@@ -93,8 +93,8 @@ class SettingsPreferences @Inject constructor(
     // MARK: - 界面「脸」（琉璃第二张脸·2026-09-04·见 FABLE5_THEME_LIULI_PROPOSAL.md §7.1）
 
     /**
-     * 界面「脸」（默认暖陶 [AppSkin.CLAY]）。与深浅模式正交；用户在外观设置切换。设备本地（=iOS UserDefaults 语义）。
-     * DataStore key 沿用历史串 `"theme_palette"`（不迁移·老值 `"qinghua"` 由 [AppSkin.fromRaw] 回退暖陶）。
+     * 界面「脸」（默认琉璃 [AppSkin.DEFAULT]·用户 2026-09-28 拍板）。与深浅模式正交；用户在外观设置切换。设备本地（=iOS UserDefaults 语义）。
+     * DataStore key 沿用历史串 `"theme_palette"`（不迁移·老值 `"qinghua"` 由 [AppSkin.fromRaw] 回退默认脸）。
      */
     val appSkin: Flow<AppSkin> =
         dataStore.data.map { AppSkin.fromRaw(it[KEY_THEME_PALETTE]) }
@@ -103,7 +103,7 @@ class SettingsPreferences @Inject constructor(
         dataStore.edit { it[KEY_THEME_PALETTE] = skin.raw }
     }
 
-    /** 琉璃玻璃「透明度」档（默认清透 [GlassTier.CLEAR]）。只影响琉璃的玻璃片；暖陶下无消费者。 */
+    /** 琉璃玻璃质感档（默认通透 [GlassTier.SHEER]；旧 clear / tinted 读出即落到默认）。只影响琉璃的玻璃片；暖陶下无消费者。 */
     val glassTier: Flow<GlassTier> =
         dataStore.data.map { GlassTier.fromRaw(it[KEY_GLASS_TIER]) }
 
@@ -122,6 +122,14 @@ class SettingsPreferences @Inject constructor(
         dataStore.edit { it[KEY_BOTTOM_NAV_OPACITY] = opacity }
     }
 
+    /** 上下文日志首页上次停留的分段（四期·图纸四·设备本地·不进备份）；取值 = `LogHomeTab.raw`，空串 = 从没选过。 */
+    val contextLogHomeTab: Flow<String> =
+        dataStore.data.map { it[KEY_CONTEXT_LOG_HOME_TAB] ?: "" }
+
+    suspend fun setContextLogHomeTab(raw: String) {
+        dataStore.edit { it[KEY_CONTEXT_LOG_HOME_TAB] = raw }
+    }
+
     companion object {
         /** Mirrors iOS `UserAgreementView.currentVersion`. Bump to re-prompt all users. */
         const val CURRENT_AGREEMENT_VERSION = "1.1"
@@ -134,5 +142,6 @@ class SettingsPreferences @Inject constructor(
         private val KEY_THEME_PALETTE = stringPreferencesKey("theme_palette")
         private val KEY_GLASS_TIER = stringPreferencesKey("glass_tier")
         private val KEY_BOTTOM_NAV_OPACITY = floatPreferencesKey("bottom_nav_opacity")
+        private val KEY_CONTEXT_LOG_HOME_TAB = stringPreferencesKey("context_log_home_tab")
     }
 }

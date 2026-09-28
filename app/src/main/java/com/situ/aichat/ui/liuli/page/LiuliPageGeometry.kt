@@ -48,16 +48,16 @@ object LiuliPageGeometry {
     fun contentTopInset(statusBarTop: Dp): Dp = statusBarTop + navRow
 
     // ── 内嵌圆角分组与行族（§4.1 · 对版稿 A 甲） ─────────────────────────────────
-    val groupCorner: Dp = 16.dp
+    val groupCorner: Dp = 20.dp
     val groupPadH: Dp = 16.dp
     /** 单行行高下限 / 两行行高下限。 */
     val rowMin: Dp = 52.dp
     val rowTwoLine: Dp = 64.dp
     /** 两行行的上下内距（对版稿 `.row.two{padding:10px 16px}`）。 */
     val rowTwoLinePad: Dp = 10.dp
-    /** 图标砖：28 见方、圆角 7、砖 ↔ 文字 12。 */
+    /** 图标砖：28 见方、圆角 8（琉璃 2.0 卷二 7 → 8）、砖 ↔ 文字 12。 */
     val tile: Dp = 28.dp
-    val tileCorner: Dp = 7.dp
+    val tileCorner: Dp = 8.dp
     val tileGap: Dp = 12.dp
     /** 组内分隔发丝起点：有砖 = 16 + 28 + 12 = 56；无砖 = 16。 */
     val dividerInsetTile: Dp = groupPadH + tile + tileGap
@@ -74,15 +74,11 @@ object LiuliPageGeometry {
     val groupGap: Dp = 24.dp
 
     // ── 详情页（T3·§4.1 · A-8–A-11） ────────────────────────────────────────────
-    /** 头图高（满宽）与底部遮罩带高。 */
-    val hero: Dp = 280.dp
-    val heroScrim: Dp = 130.dp
     /**
-     * 头图收起判据的尾巴**名义值**：契约 §6.5 写的「图底 − 88」= 44 状态栏 + 44 收起顶栏。
-     * 实际判据用**真状态栏**（`WindowInsets.statusBars` + [compactBar]·复核 R1 🔴-1）：状态栏矮于 44 的机型
-     * 若照 88 算会早收、切段落位也漏掉状态栏那一段。本值只留作契约对表与测试钉。
+     * 资料页头部（卷四 §4.9）在状态栏以下的固定高 = 12 顶距 + 100 光环 + 12 + 36 名行 + 4 + 20 副行 + 20 底留白 = 204。
+     * 头部实高 = 真状态栏 + 本值（收起判据按实高算·复核 R1 🔴-1）。
      */
-    val heroCollapseTail: Dp = 88.dp
+    val profileHead: Dp = 204.dp
     /** 动作排：圆钮视觉 56 · 版位 68 · 缝 16（4×68 + 3×16 = 320 = 360 − 2×20·窄屏不换行）。 */
     val action: Dp = 56.dp
     val actionSlot: Dp = 68.dp
@@ -139,6 +135,18 @@ object LiuliPageGeometry {
      */
     val progressTrack: Dp = 4.dp
     val progressCorner: Dp = 2.dp
+
+    // ── 琉璃 2.0 卷六·一：屏边渐进模糊 / 浮动胶囊钮 / 悬浮底条 ──
+    /** 屏边渐进模糊带越过它所衬 chrome 的尾巴（= 聊天页 62 − 顶栏顶距 6 − 顶栏 44·卷四复核 R1 落值）。 */
+    val edgeTail: Dp = 12.dp
+    /** 浮动胶囊钮高（= 暖陶「写一笔」胶囊最小高·E 甲只换材质）。 */
+    val fabPill: Dp = 48.dp
+    /** 悬浮玻璃底条：条高 56 · 左右离屏 12 · 离导航栏 / 键盘 12（卷六设计稿 D3 `.gbar`）。 */
+    val floatingBar: Dp = 56.dp
+    val floatingBarInset: Dp = 12.dp
+    val floatingBarGap: Dp = 12.dp
+    /** 底条在导航栏 / 键盘之上占走的高（内容区要让出这么多）= 56 + 12。 */
+    val floatingBarReserve: Dp = floatingBar + floatingBarGap
 }
 
 /**

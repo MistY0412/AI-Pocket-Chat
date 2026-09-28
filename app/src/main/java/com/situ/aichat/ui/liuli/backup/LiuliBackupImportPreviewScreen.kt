@@ -65,7 +65,9 @@ import com.situ.aichat.ui.designsystem.AppTypography
 import com.situ.aichat.ui.liuli.designsystem.LiuliButton
 import com.situ.aichat.ui.liuli.designsystem.LiuliButtonStyle
 import com.situ.aichat.ui.liuli.designsystem.LiuliSpinner
-import com.situ.aichat.ui.liuli.designsystem.liuliCardSurface
+import com.situ.aichat.ui.liuli.designsystem.liuliCardMaterial
+import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import com.situ.aichat.ui.liuli.page.LiuliLargeTitle
 import com.situ.aichat.ui.liuli.page.LiuliPage
 import com.situ.aichat.ui.liuli.page.LiuliPageGeometry
@@ -241,7 +243,7 @@ private fun LiuliCharacterPreviewRow(
 ) {
     val colors = AppTheme.colors
     Column(
-        modifier.fillMaxWidth().liuliCardSurface().padding(CARD_PAD),
+        modifier.fillMaxWidth().liuliCardMaterial(LiuliShapes.medium, LocalIsDarkTheme.current).padding(CARD_PAD),
         verticalArrangement = Arrangement.spacedBy(CARD_GAP),
     ) {
         Row(Modifier.semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {

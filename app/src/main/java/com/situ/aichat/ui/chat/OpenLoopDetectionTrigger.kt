@@ -3,6 +3,7 @@ package com.situ.aichat.ui.chat
 import com.situ.aichat.data.local.entity.CharacterEntity
 import com.situ.aichat.data.local.entity.OpenLoopEntity
 import com.situ.aichat.data.local.entity.OpenLoopStatus
+import com.situ.aichat.data.local.entity.OpenLoopType
 import com.situ.aichat.data.model.MessageKind
 import com.situ.aichat.data.remote.llm.ApiConfigValues
 import com.situ.aichat.data.remote.llm.ChatMessageDto
@@ -13,6 +14,7 @@ import com.situ.aichat.data.repository.OpenLoopRepository
 import com.situ.aichat.data.repository.PromiseRepository
 import com.situ.aichat.diagnostics.ContextLogService
 import com.situ.aichat.diagnostics.LogSource
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.meeting.MeetingDetectionService
 import com.situ.aichat.meeting.MeetingDisplayFormatter
 import com.situ.aichat.openloop.OpenLoopScanService
@@ -23,6 +25,7 @@ import androidx.work.ExistingWorkPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlin.coroutines.EmptyCoroutineContext
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -55,11 +58,11 @@ internal class OpenLoopDetectionTrigger(
     private val recentWindow = 30
 
     /** AI 回复完成后：判定是否到点扫描 → 过期清理 → 扫 → 落库 + 排到期 worker → 记成功/失败冷却。 */
-    fun checkAndTrigger(character: CharacterEntity, config: ApiConfigValues, userName: String) {
+    fun checkAndTrigger(character: CharacterEntity, config: ApiConfigValues, userName: String, trace: LogTrace? = null) {
         if (isScanning) return
 
         isScanning = true
-        scope.launch {
+        scope.launch(trace ?: EmptyCoroutineContext) {
             try {
                 val conversation = conversationRepo.get(conversationUuid) ?: return@launch
                 if (conversation.isInOfflineMode) return@launch // 见面中跳过
@@ -135,6 +138,7 @@ internal class OpenLoopDetectionTrigger(
 
                 // 对 dueAt 在未来的新 loop 排到期 worker（已到期的靠对话内注入兜底，不排）。
                 for (row in newRows) {
+                    if (row.typeRaw == OpenLoopType.PLAN_CHAR) continue // 四期：她自己的打算只进日程，不排「就是今天」
                     val due = row.dueAt ?: continue
                     if (due <= now) continue
                     backgroundScheduler.scheduleOneShot(

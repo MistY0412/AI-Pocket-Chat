@@ -82,6 +82,8 @@ class ProactivePipelineInMeetingTest {
         coEvery { evaluator.latestMessageUuid(charId) } returns "m-1"
         coEvery { deliveryDao.countDeliveredSince(any(), any()) } returns 0
         coEvery { deliveryDao.recentDeliveredBodies(any(), any()) } returns emptyList()
+        // 四期 §3.8 补桩：relaxed mock 对 String? 回空串而非 null——显式钉普通日（null），既有断言零改。
+        coEvery { composer.specialDayOccasion(any(), any(), any()) } returns null
     }
 
     @Test

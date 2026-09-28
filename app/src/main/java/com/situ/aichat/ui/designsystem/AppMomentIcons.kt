@@ -148,4 +148,23 @@ object AppMomentIcons {
             }
         }.build()
     }
+
+    /** 「@」（小圆 + 弯尾·描边·朋友圈发布页·乙 §4.12：设计稿 `i-at` 路径逐段翻译）——「提醒谁看」钮与「提醒了 …」一行。 */
+    val At: ImageVector by lazy {
+        builder("MomentAt").apply {
+            path(stroke = PLACEHOLDER, strokeLineWidth = W, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(15.8f, 12f)
+                arcTo(3.8f, 3.8f, 0f, isMoreThanHalf = false, isPositiveArc = true, 8.2f, 12f)
+                arcTo(3.8f, 3.8f, 0f, isMoreThanHalf = false, isPositiveArc = true, 15.8f, 12f)
+                close()
+            }
+            path(stroke = PLACEHOLDER, strokeLineWidth = W, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(15.8f, 8.4f)
+                verticalLineToRelative(4.8f)
+                arcToRelative(2.8f, 2.8f, 0f, isMoreThanHalf = false, isPositiveArc = false, 5.6f, 0f)
+                verticalLineTo(12f)
+                arcToRelative(9.4f, 9.4f, 0f, isMoreThanHalf = true, isPositiveArc = false, -3.8f, 7.5f)
+            }
+        }.build()
+    }
 }

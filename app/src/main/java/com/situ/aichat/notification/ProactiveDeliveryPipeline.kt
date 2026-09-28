@@ -13,6 +13,7 @@ import com.situ.aichat.data.repository.ConversationRepository
 import com.situ.aichat.data.repository.SettingsRepository
 import com.situ.aichat.offline.OfflineMeetingGate
 import com.situ.aichat.prompt.notification.ProactiveMessageComposer
+import com.situ.aichat.util.DateFormatters
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -139,7 +140,11 @@ class ProactiveDeliveryPipeline @Inject constructor(
 
         // f. 现做（失败 → 重试；重试用尽 → 兜底链）
         val config = apiConfigRepository.resolveConfigValues(ApiFunction.NOTIFICATION_TEMPLATE)
-        val occasion = input.occasion?.takeIf { it.isNotBlank() } ?: ProactiveMessageComposer.FALLBACK_OCCASION
+        // 特别日子（四期·图纸一 §3.8）：今天还没投递过这个角色的主动消息 → 这一条的由头换成「今天是七夕」这类。
+        val firstToday = deliveryDao.countDeliveredSince(input.characterId, DateFormatters.startOfDayMillis(now, zone)) == 0
+        val specialOccasion = if (firstToday) composer.specialDayOccasion(character, now, zone) else null
+        val occasion = specialOccasion
+            ?: input.occasion?.takeIf { it.isNotBlank() } ?: ProactiveMessageComposer.FALLBACK_OCCASION
         val fresh = composer.compose(character, occasion, state, config, now, zone)
         val body = when {
             fresh != null -> fresh

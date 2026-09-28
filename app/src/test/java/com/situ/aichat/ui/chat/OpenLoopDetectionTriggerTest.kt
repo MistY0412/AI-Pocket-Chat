@@ -101,6 +101,25 @@ class OpenLoopDetectionTriggerTest {
         coVerify { conv.recordOpenLoopScanResult("conv1", true, any()) }
     }
 
+    // ── 四期·图纸一 §3.6（T2-4·E33）：她自己的打算照常落库，但不排「就是今天」到期 worker ──
+
+    @Test fun scan_planChar_persistsButNeverSchedulesWorker() {
+        val (conv, msg, repo, log) = baseMocks()
+        val scheduler = mockk<BackgroundScheduler>(relaxed = true)
+        stub(
+            log,
+            """{"loops":[{"content":"进货","type":"plan_char","due":"2099-06-01T09:00"},""" +
+                """{"content":"面试结果","type":"user_event","due":"2099-06-02T09:00"}],"resolved":[]}""",
+        )
+
+        trigger(conv, msg, repo, log, scheduler).checkAndTrigger(character, mockk(relaxed = true), "用户")
+
+        coVerify { repo.upsertAll(match { rows -> rows.any { it.content == "进货" && it.typeRaw == OpenLoopType.PLAN_CHAR } }) }
+        // 两条都有未来 due：只有 user_event 那条排 worker（对照组证明排程路径本身是通的）。
+        verify(exactly = 1) { scheduler.scheduleOneShot(any(), OpenLoopDueWorker::class.java, any(), any(), any(), any()) }
+        coVerify { conv.recordOpenLoopScanResult("conv1", true, any()) }
+    }
+
     // ── 过期清理 + resolved 流转 ──
 
     @Test fun scan_expiresStaleLoops_beforeScan() {

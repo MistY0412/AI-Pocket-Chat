@@ -1,13 +1,18 @@
 package com.situ.aichat.ui.liuli.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -182,19 +187,30 @@ internal fun LiuliContactsContent(
                 item(key = "large-title") { LiuliLargeTitle(title) }
                 if (shareMode) item(key = "share-banner") { LiuliShareBanner(onCancelShare) }
                 item(key = "search") { LiuliContactsSearchSlot(query, onQueryChange) }
-                items(rows, key = { it.character.uuid }) { row ->
-                    Column(Modifier.animateItem()) {
-                        LiuliContactRow(
-                            row = row,
-                            nowMillis = nowMillis,
-                            hasFallback = row.character.uuid in fallbackUuids,
-                            onOpen = { onOpenRow(row) },
-                            onOpenProfile = { onOpenProfile(row) },
-                            onEdit = { onEdit(row) },
-                            onDelete = { onRequestDelete(row) },
-                            onLongPress = { onLongPress(row) },
-                        )
-                        LiuliRowDivider()
+                // 两列卡（卷三 §4.9·用户选甲）：LazyColumn 两两成行——大标题收起判据与分享横幅 / 搜索槽都在同一个列表里。
+                items(rows.chunked(2), key = { pair -> pair.joinToString("|") { it.character.uuid } }) { pair ->
+                    Row(
+                        Modifier
+                            .animateItem()
+                            .padding(horizontal = LiuliHomeGeometry.gutter)
+                            .padding(bottom = LiuliHomeGeometry.contactGridGap)
+                            .height(IntrinsicSize.Max),
+                        horizontalArrangement = Arrangement.spacedBy(LiuliHomeGeometry.contactGridGap),
+                    ) {
+                        pair.forEach { row ->
+                            LiuliContactCard(
+                                row = row,
+                                nowMillis = nowMillis,
+                                hasFallback = row.character.uuid in fallbackUuids,
+                                onOpen = { onOpenRow(row) },
+                                onOpenProfile = { onOpenProfile(row) },
+                                onEdit = { onEdit(row) },
+                                onDelete = { onRequestDelete(row) },
+                                onLongPress = { onLongPress(row) },
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                            )
+                        }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }

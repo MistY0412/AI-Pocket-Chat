@@ -104,7 +104,7 @@ class PromptBuilderTimeDividerTest {
 
     @Test
     fun continuousChat_today_noDivider() {
-        // 全在今天、间隔都 <30 分钟 → 零分割线（不改动连续聊天的 prompt）。
+        // 全在今天、间隔都 <5 分钟且同一半小时格 → 零分割线（不改动连续聊天的 prompt）。
         val out = build(
             listOf(
                 msg("user", "早", ms(2026, 6, 26, 9, 0)),
@@ -193,8 +193,9 @@ class PromptBuilderTimeDividerTest {
         assertEquals("恰 2 条长版注记：$longOnes", 2, longOnes.size)
         assertTrue("倒数第二个缝（8月30日 → 9月1日）", longOnes[0].contains("以上对话发生在8月30日"))
         assertTrue("最后一个缝（9月1日 → 9月3日）", longOnes[1].contains("以上对话发生在9月1日"))
-        // 更早的三个缝仍是短版（总分割线数 = 起始锚 1 + 5 个缝 = 6）。
+        // 更早的三个缝出带间隔的停顿标记（四期·E17；总分割线数 = 起始锚 1 + 5 个缝 = 6）。
         assertEquals(6, dividers(out).size)
+        assertEquals(3, dividers(out).count { it.endsWith(" · 距离上条消息过去了约 2 天】") })
     }
 
     @Test
@@ -260,5 +261,39 @@ class PromptBuilderTimeDividerTest {
             scene = PromptScene.BUSY_REPLY,
         )
         assertTrue("非在线聊天场景应门控关闭分割线：${dividers(out)}", dividers(out).isEmpty())
+    }
+
+    // MARK: - 四期停顿标记 / 半点刻度端到端（图纸一 §7.1 T2-3）
+
+    @Test
+    fun pauseMarkerAndHalfHourTick_endToEnd() {
+        // 9:00 / 9:12 / 9:14 / 9:31：9:12 前停顿 12 分钟；9:14 前（2 分钟、同格）无；9:31 前（17 分钟 ≥5）停顿标记。
+        // 图纸原文「9:31 前刻度」按 §3.3 锁定算法反推是停顿标记（见图纸 §11 D-1），此处以 §3.3 算法为准。
+        val out = build(
+            listOf(
+                msg("user", "早", ms(2026, 6, 26, 9, 0)),
+                msg("assistant", "早呀", ms(2026, 6, 26, 9, 12)),
+                msg("user", "今天忙吗", ms(2026, 6, 26, 9, 14)),
+                msg("assistant", "还好", ms(2026, 6, 26, 9, 31)),
+            ),
+            now = inst(2026, 6, 26, 9, 35),
+        )
+        assertEquals(
+            listOf("【时间 · 今天 09:12 · 距离上条消息过去了约 12 分钟】", "【时间 · 今天 09:31 · 距离上条消息过去了约 17 分钟】"),
+            dividers(out),
+        )
+        // 标记恒为独立 system 消息（整条内容 = 标记本身），不塞进正文。
+        dividers(out).forEach { d -> assertTrue(out.any { it.role == "system" && it.content == d }) }
+
+        // 刻度路端到端补一例：9:27 / 9:29（同格 2 分钟·无）/ 9:32（3 分钟跨 :30·刻度写真实时间）。
+        val tick = build(
+            listOf(
+                msg("user", "在吗", ms(2026, 6, 26, 9, 27)),
+                msg("assistant", "在", ms(2026, 6, 26, 9, 29)),
+                msg("user", "吃了没", ms(2026, 6, 26, 9, 32)),
+            ),
+            now = inst(2026, 6, 26, 9, 35),
+        )
+        assertEquals(listOf("【时间 · 今天 09:32】"), dividers(tick))
     }
 }

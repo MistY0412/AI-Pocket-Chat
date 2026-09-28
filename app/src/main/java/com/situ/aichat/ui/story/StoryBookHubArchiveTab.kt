@@ -59,41 +59,47 @@ internal fun LazyListScope.storyHubArchiveItems(
     onOpenBeats: () -> Unit,
     regenerating: Boolean,
     onRegenerateOutline: () -> Unit,
+    /** 卡面材质（琉璃 2.0 卷六·三「材质外给」：默认 = 暖陶承托）。 */
+    cardSurface: @Composable () -> Modifier = { Modifier.appCardSurface() },
+    /** 大纲卡第三区的重排动作行（默认 = 暖陶行：发丝 + 陶环 / 刷新图标 + 文案）。 */
+    regenRow: @Composable (regenerating: Boolean, onClick: () -> Unit) -> Unit = { regenerating, onClick -> OutlineRegenRow(regenerating, onClick) },
+    /** 重排确认（默认 = 暖陶 AppDialog·非破坏性走 Primary）。 */
+    regenConfirm: @Composable (onConfirm: () -> Unit, onDismiss: () -> Unit) -> Unit = { onConfirm, onDismiss -> OutlineRegenConfirmDialog(onConfirm, onDismiss) },
 ) {
     item(key = "archive_notestrip") { ArchiveNoteStrip() }
-    item(key = "archive_outline") { OutlineAndArcCard(story, onOpenField, regenerating, onRegenerateOutline) }
-    item(key = "archive_beats") { BeatsCard(story, onOpenBeats) }
+    item(key = "archive_outline") { OutlineAndArcCard(story, onOpenField, regenerating, onRegenerateOutline, cardSurface(), regenRow, regenConfirm) }
+    item(key = "archive_beats") { BeatsCard(story, onOpenBeats, cardSurface()) }
     item(key = "archive_intimacy") {
         ArchiveCard(
             story, StoryEditableField.INTIMACY, R.string.story_hub_tag_ai_appended,
-            R.string.story_hub_empty_intimacy, { onOpenField(StoryEditableField.INTIMACY) }, isNew = true,
+            R.string.story_hub_empty_intimacy, { onOpenField(StoryEditableField.INTIMACY) }, cardSurface(), isNew = true,
         )
     }
     item(key = "archive_scene_ledger") {
         ArchiveCard(
             story, StoryEditableField.SCENE_LEDGER, R.string.story_hub_tag_ai_appended,
-            R.string.story_hub_empty_scene_ledger, { onOpenField(StoryEditableField.SCENE_LEDGER) }, isNew = true,
+            R.string.story_hub_empty_scene_ledger, { onOpenField(StoryEditableField.SCENE_LEDGER) }, cardSurface(), isNew = true,
         )
     }
     item(key = "archive_scene_state") {
         ArchiveCard(
             story, StoryEditableField.SCENE_STATE, R.string.story_hub_tag_ai_maintained,
-            R.string.story_hub_empty_scene_state, { onOpenField(StoryEditableField.SCENE_STATE) }, isNew = true,
+            R.string.story_hub_empty_scene_state, { onOpenField(StoryEditableField.SCENE_STATE) }, cardSurface(), isNew = true,
         )
     }
     item(key = "archive_states") {
         ArchiveCard(
             story, StoryEditableField.CHARACTER_STATES, R.string.story_hub_tag_ai_maintained,
-            R.string.story_settings_states_empty, { onOpenField(StoryEditableField.CHARACTER_STATES) },
+            R.string.story_settings_states_empty, { onOpenField(StoryEditableField.CHARACTER_STATES) }, cardSurface(),
         )
     }
     item(key = "archive_threads") {
         ArchiveCard(
             story, StoryEditableField.OPEN_THREADS, R.string.story_hub_tag_ai_maintained,
-            R.string.story_settings_threads_empty, { onOpenField(StoryEditableField.OPEN_THREADS) },
+            R.string.story_settings_threads_empty, { onOpenField(StoryEditableField.OPEN_THREADS) }, cardSurface(),
         )
     }
-    item(key = "archive_summary_bible") { SummaryAndBibleCard(story, onOpenField) }
+    item(key = "archive_summary_bible") { SummaryAndBibleCard(story, onOpenField, cardSurface()) }
 }
 
 /** 顶部一条说明：把「AI 续记 / 你随时可改 / 改过之后在你的版本上继续」一次讲清，各卡不再重复。 */
@@ -126,11 +132,12 @@ private fun ArchiveCard(
     @StringRes tagRes: Int,
     @StringRes emptyRes: Int,
     onClick: () -> Unit,
+    surface: Modifier,
     isNew: Boolean = false,
     subline: String? = null,
 ) {
     val value = field.currentValue(story)
-    HubCard(onClick = onClick) {
+    HubCard(onClick = onClick, surface = surface) {
         CardHeader(stringResource(field.titleRes), tagRes, isNew, chevron = true)
         subline?.let { CardSubline(it) }
         CardPreview(value, emptyRes)
@@ -149,9 +156,9 @@ internal fun storyHubBeatsTagRes(story: StoryEntity): Int =
  * 卡②「下一章节拍」——**只读**：AI 每章预排一份，改它的家在卷三章末导演台（两处编辑会打架）。
  */
 @Composable
-private fun BeatsCard(story: StoryEntity, onOpen: () -> Unit) {
+private fun BeatsCard(story: StoryEntity, onOpen: () -> Unit, surface: Modifier) {
     val beats = storyHubBeatsText(story)
-    HubCard(onClick = onOpen.takeIf { beats != null }) {
+    HubCard(onClick = onOpen.takeIf { beats != null }, surface = surface) {
         CardHeader(stringResource(R.string.story_hub_sec_beats), storyHubBeatsTagRes(story), isNew = false, chevron = beats != null)
         CardPreview(beats, R.string.story_hub_empty_beats)
     }
@@ -170,9 +177,12 @@ private fun OutlineAndArcCard(
     onOpenField: (StoryEditableField) -> Unit,
     regenerating: Boolean,
     onRegenerateOutline: () -> Unit,
+    surface: Modifier,
+    regenRow: @Composable (regenerating: Boolean, onClick: () -> Unit) -> Unit,
+    regenConfirm: @Composable (onConfirm: () -> Unit, onDismiss: () -> Unit) -> Unit,
 ) {
     var confirmRegen by remember { mutableStateOf(false) }
-    HubCard(onClick = null) {
+    HubCard(onClick = null, surface = surface) {
         Column(Modifier.fillMaxWidth().clickable { onOpenField(StoryEditableField.OUTLINE) }) {
             CardHeader(
                 stringResource(StoryEditableField.OUTLINE.titleRes),
@@ -184,21 +194,24 @@ private fun OutlineAndArcCard(
             CardPreview(StoryEditableField.OUTLINE.currentValue(story), R.string.story_hub_empty_outline)
         }
         SubEntryRow(StoryEditableField.CURRENT_ARC, story, R.string.story_settings_arc_empty, onOpenField)
-        OutlineRegenRow(regenerating) { confirmRegen = true }
+        regenRow(regenerating) { confirmRegen = true }
     }
 
-    if (confirmRegen) {
-        AppDialog(
-            onDismissRequest = { confirmRegen = false },
-            title = stringResource(R.string.story_outline_regen_title),
-            body = stringResource(R.string.story_outline_regen_body),
-            // 非破坏性动作（重排可重做）→ 确认钮走 Primary 陶土而非 Danger 深琥珀（样图画面①要点）
-            confirmText = stringResource(R.string.story_outline_regen_confirm),
-            onConfirm = { confirmRegen = false; onRegenerateOutline() },
-            dismissText = stringResource(R.string.action_cancel),
-            onDismiss = { confirmRegen = false },
-        )
-    }
+    if (confirmRegen) regenConfirm({ confirmRegen = false; onRegenerateOutline() }, { confirmRegen = false })
+}
+
+@Composable
+private fun OutlineRegenConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AppDialog(
+        onDismissRequest = onDismiss,
+        title = stringResource(R.string.story_outline_regen_title),
+        body = stringResource(R.string.story_outline_regen_body),
+        // 非破坏性动作（重排可重做）→ 确认钮走 Primary 陶土而非 Danger 深琥珀（样图画面①要点）
+        confirmText = stringResource(R.string.story_outline_regen_confirm),
+        onConfirm = onConfirm,
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+    )
 }
 
 /**
@@ -239,8 +252,8 @@ private fun OutlineRegenRow(regenerating: Boolean, onClick: () -> Unit) {
 
 /** 卡⑧：前情摘要与故事圣经同住一张卡，两行各进各自的编辑页（原独立圣经编辑屏并入此处）。 */
 @Composable
-private fun SummaryAndBibleCard(story: StoryEntity, onOpenField: (StoryEditableField) -> Unit) {
-    HubCard(onClick = null) {
+private fun SummaryAndBibleCard(story: StoryEntity, onOpenField: (StoryEditableField) -> Unit, surface: Modifier) {
+    HubCard(onClick = null, surface = surface) {
         CardHeader(
             stringResource(R.string.story_hub_sec_summary_bible),
             R.string.story_hub_tag_compressed,
@@ -278,8 +291,8 @@ private fun SubEntryRow(
 }
 
 @Composable
-private fun HubCard(onClick: (() -> Unit)?, content: @Composable () -> Unit) {
-    val base = Modifier.fillMaxWidth().appCardSurface()
+private fun HubCard(onClick: (() -> Unit)?, surface: Modifier, content: @Composable () -> Unit) {
+    val base = Modifier.fillMaxWidth().then(surface)
     Column(
         modifier = (if (onClick != null) base.clickable(onClick = onClick) else base)
             .padding(horizontal = 14.dp, vertical = 13.dp),

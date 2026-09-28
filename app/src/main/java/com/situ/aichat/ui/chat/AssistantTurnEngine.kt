@@ -14,7 +14,6 @@ import com.situ.aichat.gift.GiftHistoryPromptService
 import com.situ.aichat.moments.MomentChatContextService
 import com.situ.aichat.moments.MomentGenerationService
 import com.situ.aichat.offline.OfflineMeetingAction
-import com.situ.aichat.meeting.FutureMeetingTool
 import com.situ.aichat.meeting.MeetingAppointmentStore
 import com.situ.aichat.offline.ToolCallActionExtractor
 import com.situ.aichat.openloop.OpenLoopScanService
@@ -35,15 +34,16 @@ import com.situ.aichat.data.model.StructuredMemory
 import com.situ.aichat.data.remote.llm.ApiConfigValues
 import com.situ.aichat.data.remote.llm.ChatMessageDto
 import com.situ.aichat.data.remote.llm.CompletedToolCall
+import com.situ.aichat.data.remote.llm.DeepSeekReasoningPlaceholder
 import com.situ.aichat.data.remote.llm.LlmClient
-import com.situ.aichat.data.remote.llm.RequestToolCallDto
-import com.situ.aichat.data.remote.llm.RequestToolCallFunctionDto
+import com.situ.aichat.data.remote.llm.LlmRequestCapture
 import com.situ.aichat.data.remote.llm.StreamToken
 import com.situ.aichat.data.remote.llm.ToolCallAccumulator
 import com.situ.aichat.data.remote.llm.UsageDto
 import com.situ.aichat.diagnostics.ContextLogService
 import com.situ.aichat.diagnostics.LogSource
 import com.situ.aichat.diagnostics.LogToolInfo
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.data.repository.ApiConfigRepository
 import com.situ.aichat.data.repository.CharacterRepository
 import com.situ.aichat.data.repository.ConversationRepository
@@ -77,6 +77,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
 
 /**
@@ -226,7 +227,7 @@ internal class AssistantTurnEngine(
         // 无边无记忆 → null）·纯读 + 一次 ONNX 嵌入·query=最新真实用户消息（与向量检索同源）。
         val worldContext = worldChatContextProvider.forTurn(character, query, settings)
         // 承诺回连注入（活人感一期 P2·§3.2）：预取该角色 open 惦记的事，注入选择/格式化在 PromptBuilder 内用 timeSnapshot 完成。
-        val openLoops = openLoopRepository.openLoopsForCharacter(character.uuid)
+        val openLoops = openLoopRepository.openLoopsForChat(character.uuid)
         // 长线回访（活人感二期 M2·图纸 §3.2）：已 resolved 的「惦记的事」在 7–30 天后由角色回头问一次进展（一次为限）。
         // 两门控全过才取候选——①非线下 ②无到期 open 项（有到期让位·E4）；取到则随 openLoops 透传给
         // selectLoopsForInjection（resolved 项走回访分支），回合成功后 markRevisited 置终态（E6 失败不标）。now 预取时取一次。
@@ -290,7 +291,7 @@ internal class AssistantTurnEngine(
         )
         // M17 表情包：自定义贴纸（createdAt 升序）+ 被隐藏的内置 → STICKER_LIBRARY 模块 + 历史别名转换。
         val customStickers = stickerRepo.getAllForPrompt()
-        val disabledStickers = DisabledBuiltInStickerStore.disabledIds(appContext)
+        val disabledStickers = DisabledBuiltInStickerStore.loadDisabledIds(appContext) // IO 线程读 prefs（防线 B）
         // M11 宠物：角色宠物 + 其他角色宠物社交 → PET_STATUS 模块（宠物系统关或无宠物自动跳过）。
         val pet = if (settings.petSystemEnabled) petRepo.getForCharacter(character.uuid) else null
         val otherPets = if (pet != null) resolveOtherPets(character.uuid) else emptyList()
@@ -388,6 +389,7 @@ internal class AssistantTurnEngine(
         var mediaFellBackToText = false
         // 本轮合并等待窗覆盖的用户消息：降级提示据此判断「剥掉的图是不是这一轮发的」（谓词体在 TurnMediaAttachments）。
         val turnUserMessageUuids = TurnMediaAttachments.turnUserMessageUuids(history)
+        val logTrace = LogTrace.newTurn(conversationUuid, character.uuid, LogTrace.anchorOf(history, turnUserMessageUuids)) // 四期·图纸三：本轮日志关联
 
         val dotsAppearMillis = System.currentTimeMillis()
         replyDeliverer.openTypingSlot() // B1：打字点亮起即预分配首段 uuid + 发布渲染占位槽（dots 在流式生成期就显示）
@@ -413,16 +415,17 @@ internal class AssistantTurnEngine(
                 // 批 D 上下文日志：每次流式尝试单独计时 + 捕获末帧 usage（onUsage 穿到本轮所有内部 streamChat/completion）。
                 val turnStart = System.currentTimeMillis()
                 var turnUsage: UsageDto? = null
+                val requestCapture = LlmRequestCapture() // 四期·图纸三：本次尝试实际发出的请求
                 result = try {
                     // 去媒体降级后强制不发工具（1:1 iOS buildFallbackMessages：toolCallingEnabled=false，纯文本回合）。
-                    streamOneTurn(chatMessages, config, useToolCalling && !mediaStripped, canInitiateOffline, allowEndMeeting, convo.isInOfflineMode, settings.calendarIntegrationEnabled, settings.calendarActionConfirmation, sb, settings.sanitizedLlmTemperature, onUsage = { turnUsage = it }) {
+                    withContext(requestCapture) { streamOneTurn(chatMessages, config, useToolCalling && !mediaStripped, canInitiateOffline, allowEndMeeting, convo.isInOfflineMode, settings.calendarIntegrationEnabled, settings.calendarActionConfirmation, sb, settings.sanitizedLlmTemperature, onUsage = { turnUsage = it }) {
                         assembleMessages(false, withMedia = !mediaStripped)
-                    }
+                    } }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     // 失败落库（本尝试真实发生过一次 LLM 调用，每 attempt 各记一条）；fire-and-forget 不阻塞 UI 流。
-                    contextLog.recordError(LogSource.CHAT, character.name, config.modelName, chatMessages, e, chatSegments)
+                    contextLog.recordError(LogSource.CHAT, character.name, config.modelName, chatMessages, e, chatSegments, trace = logTrace, capture = requestCapture)
                     // P13.4b 媒体降级重试（1:1 iOS retryStreamWithoutMedia）：本轮挂了音频段且流式失败 → 去音频 + 去工具
                     // 改纯文本（端侧转写当用户轮）重试一次；不消耗空响应重试额度。仍失败/无音频 → 上抛原异常。
                     if (hasAttachedMedia && !mediaStripped) {
@@ -438,7 +441,7 @@ internal class AssistantTurnEngine(
                 contextLog.recordSuccess(
                     LogSource.CHAT, character.name, config.modelName, chatMessages, result.text,
                     System.currentTimeMillis() - turnStart, turnUsage, chatSegments,
-                    toolInfo = result.toolInfo,
+                    toolInfo = result.toolInfo, trace = logTrace, capture = requestCapture,
                 )
                 turn = replyDeliverer.deliverAssistantReply(
                     result.text, character, settings, dotsAppearMillis, immediate = false, voicePlan = voicePlan,
@@ -497,17 +500,17 @@ internal class AssistantTurnEngine(
                 // M05 记忆层：回复完成后触发滚动 LLM 摘要 + 结构化记忆抽取（背景、各自带触发判定）。
                 // 记忆功能可单独分配 API 配置（APIFunctionRouter，未分配则回退当前激活配置 = config）。
                 val memoryConfig = apiConfigRepo.resolveConfigValues(ApiFunction.MEMORY_SUMMARY) ?: config
-                memoryAnalysisTrigger.checkAndTriggerMemorySummary(character.uuid, memoryConfig, settings, userName)
-                memoryAnalysisTrigger.incrementStructuredMemoryRoundAndCheck(character.uuid, memoryConfig, settings, userName)
+                memoryAnalysisTrigger.checkAndTriggerMemorySummary(character.uuid, memoryConfig, settings, userName, trace = logTrace)
+                memoryAnalysisTrigger.incrementStructuredMemoryRoundAndCheck(character.uuid, memoryConfig, settings, userName, trace = logTrace)
                 // 场内滚动压缩·前情提要（记忆改造二期·部件⑤·§3.2-B）：见面回合尾后台把本场早期被丢弃部分压缩成前情提要
                 // （内部守卫仅见面中生效·单飞 + 冷却）。fire-and-forget 不阻塞回合后段（随既有触发段调度惯例）。
-                scope.launch { inSceneRecapCoordinator.checkMeetingRecap(conversationUuid) }
+                scope.launch(logTrace) { inSceneRecapCoordinator.checkMeetingRecap(conversationUuid) }
                 // M14 成长分析（功能可单独分配 API；未分配回退当前激活 = config）
                 val growthConfig = apiConfigRepo.resolveConfigValues(ApiFunction.GROWTH_ANALYSIS) ?: config
                 relationshipAnalysisTrigger.incrementGrowthRoundAndCheck(character.uuid, growthConfig, settings, userName, // 卷四层 ①：本轮文本
-                    userText = userMessageForEmbed?.content.orEmpty())
+                    userText = userMessageForEmbed?.content.orEmpty(), trace = logTrace)
                 // M14 关系评估：每轮递增 relationshipMessageCount + 保底触发判定（链式触发在成长分析完成后）
-                relationshipAnalysisTrigger.incrementRelationshipRoundAndCheck(character.uuid, settings, userName)
+                relationshipAnalysisTrigger.incrementRelationshipRoundAndCheck(character.uuid, settings, userName, trace = logTrace)
                 // 约定账本工具路（图纸 2026-09-06 §3.3-D）：工具 + 暗号两来源合并，落库与提示交 handler
                 // （内部见面中短路 / 全闸 / 不抛）。跑在回合协程里 → 用户中途退出聊天屏账照记。
                 val promiseActions = result.promiseToolActions + turn.promiseMarkerActions
@@ -517,9 +520,9 @@ internal class AssistantTurnEngine(
                 // 未来约定见面·快路（工具/文本暗号·8d-3b）：当场识别的候选即时入库冒确认卡（不过扫描节奏）。
                 meetingDetectionTrigger.ingestFastPath(meetingFastCandidates, character)
                 // 未来约定见面识别（骨干路·8d-3a）：按节奏后台扫最近对话识别约定 → coordinator 入库（NEW 过确认卡）。
-                meetingDetectionTrigger.checkAndTrigger(character, config, userName)
+                meetingDetectionTrigger.checkAndTrigger(character, config, userName, trace = logTrace)
                 // 承诺回连（活人感一期 P2·骨干路）：按节奏后台扫最近对话提取「惦记的事」→ 落库 + 排到期 worker。
-                openLoopDetectionTrigger.checkAndTrigger(character, config, userName)
+                openLoopDetectionTrigger.checkAndTrigger(character, config, userName, trace = logTrace)
                 // 长线回访（活人感二期 M2·§3.2）：本轮确实带了回访项 → 置终态 revisited（一次为限·E12）；resolvedAt 原值保留（E8）。
                 // 回合失败/被打断走不到此处 → 不标记 → 下回合重新候选（E6）。
                 revisitLoop?.let { openLoopRepository.markRevisited(it, System.currentTimeMillis()) }
@@ -595,13 +598,15 @@ internal class AssistantTurnEngine(
         }
 
         val accumulator = ToolCallAccumulator()
+        val echoReasoning = StringBuilder() // 同轮工具回喂须原样带回的 reasoning_content（图纸 2026-09-26）
         val tools = buildChatToolDefinitions(includeCalendarTool = includeCalendarTool, canInitiateOffline = canInitiateOffline, allowEndMeeting = allowEndMeeting, offlineMeeting = inOfflineMode)
+        val sendMessages = DeepSeekReasoningPlaceholder.fill(toolMessages, config) // 末尾是角色记录时补空思考，免 DeepSeek 400（图纸 2026-09-26-末尾助手消息补空思考）
         try {
-            llmClient.streamChat(messages = toolMessages, config = config, temperature = temperature, tools = tools, onUsage = onUsage).collect { token ->
+            llmClient.streamChat(messages = sendMessages, config = config, temperature = temperature, tools = tools, onUsage = onUsage, sessionKey = conversationUuid).collect { token ->
                 when (token) {
                     is StreamToken.Content -> sb.append(token.text)
                     is StreamToken.ToolCallDelta -> accumulator.process(token.chunk)
-                    is StreamToken.Reasoning -> Unit // 思考内容已剥离，展示延后
+                    is StreamToken.Reasoning -> if (token.fromReasoningContent) echoReasoning.append(token.text) // 不外显，只留作回喂
                 }
             }
         } catch (e: CancellationException) {
@@ -639,7 +644,7 @@ internal class AssistantTurnEngine(
         // ③ 只回 tool_calls 没正文时，发工具结果取文字回复（线下卡本身即完整回复 → 不 follow-up）。
         val usedTextFollowUp = AssistantResponsePreprocessor.needsTextFollowUp(calRes.actions, offRes.actions, promiseActs) && text.isBlank()
         if (usedTextFollowUp) {
-            text = fetchToolCallFollowUp(toolMessages, completed, config, temperature, calendarNeedsConfirmation)
+            text = fetchToolCallFollowUp(sendMessages, completed, echoReasoning.toString().ifEmpty { null }, config, temperature, calendarNeedsConfirmation)
         }
         return TurnStreamResult(
             text, calRes.actions, offRes.actions, offRes.actions.isNotEmpty(), meetingCandidates, promiseActs,
@@ -661,54 +666,27 @@ internal class AssistantTurnEngine(
         temperature: Double,
         onUsage: ((UsageDto) -> Unit)? = null,
     ) {
-        llmClient.streamChat(messages = messages, config = config, temperature = temperature, onUsage = onUsage).collect { token ->
+        llmClient.streamChat(messages = messages, config = config, temperature = temperature, onUsage = onUsage, sessionKey = conversationUuid).collect { token ->
             if (token is StreamToken.Content) sb.append(token.text)
         }
     }
 
     /**
      * 模型只返回 tool_calls 没文本时，回传工具调用 + 工具结果，取一段文字回复（1:1 iOS fetchToolCallFollowUp）。
-     * 日历工具按 call.id 索引动作给具体执行描述；线下工具给明确结果文案；网络失败回用户友好提示（非内部元数据）。
-     * 注：DeepSeek thinking 的同轮 reasoning 回传暂略（安卓 chat 路当前不外显 reasoning）。
+     * 消息装配在 [buildToolCallFollowUpMessages]（含同轮 reasoning_content 回传·DeepSeek 思考模式缺了必 400）；
+     * 网络失败回用户友好提示（非内部元数据）。
      */
     private suspend fun fetchToolCallFollowUp(
         originalMessages: List<ChatMessageDto>,
         completedCalls: List<CompletedToolCall>,
+        reasoningContent: String?,
         config: ApiConfigValues,
         temperature: Double,
         calendarNeedsConfirmation: Boolean,
     ): String {
-        val assistantMsg = ChatMessageDto(
-            role = "assistant",
-            content = null,
-            toolCalls = completedCalls.map {
-                RequestToolCallDto(id = it.id, type = "function", function = RequestToolCallFunctionDto(it.name, it.arguments))
-            },
-        )
-
-        val followUp = ArrayList<ChatMessageDto>(originalMessages.size + completedCalls.size + 1)
-        followUp.addAll(originalMessages)
-        followUp.add(assistantMsg)
-        for (call in completedCalls) {
-            // 每个 call 按自身参数**就地**解析对应日历动作（替代旧的「按位下标映射 calendarActions」——
-            // 解析失败 / 线下 / 约见面混调时下标会错配，把别的调用的结果文案安到这条上，见 H3）。
-            val calendarAction = if (
-                !OfflineMeetingAction.isOfflineMeetingTool(call.name) && !FutureMeetingTool.isFutureMeetingTool(call.name)
-            ) {
-                runCatching { CalendarAction.fromToolCallArguments(call.arguments) }.getOrNull()
-            } else {
-                null
-            }
-            // 据实陈述、绝不预报「已完成」（确认卡待确认 / 自动执行将写入），口吻交角色提示词把关（决定 C）。
-            // ③ 大输出安全阀（单点接线）：结果文案过阀截断。当前状态串短、永不触发（0-3 golden 看门）；
-            // 将来「内容返回型工具」的大输出经此自动截断、防撑爆对话。
-            val resultText = truncateToolResultText(
-                toolFollowUpResultText(calendarAction, call.name, calendarNeedsConfirmation),
-            )
-            followUp.add(ChatMessageDto(role = "tool", content = resultText, toolCallId = call.id))
-        }
+        val followUp = DeepSeekReasoningPlaceholder.fill(buildToolCallFollowUpMessages(originalMessages, completedCalls, calendarNeedsConfirmation, reasoningContent), config) // 流里没思考时官方 DeepSeek 补空串（图纸 2026-09-26-末尾助手消息补空思考 §9）
         return try {
-            llmClient.completion(messages = followUp, config = config, temperature = temperature)
+            llmClient.completion(messages = followUp, config = config, temperature = temperature, sessionKey = conversationUuid)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

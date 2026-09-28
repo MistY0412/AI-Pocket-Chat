@@ -4,6 +4,8 @@ import android.app.Notification
 import android.os.Build
 import android.app.NotificationManager
 import android.content.Context
+import android.os.SystemClock
+import android.service.notification.StatusBarNotification
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -24,6 +26,11 @@ import org.junit.runner.RunWith
  * 都能成功**构建 + 发布**到通知栏、且为常驻态、标题正确。这条路径就是故事生成时灵动岛进度药丸的渲染来源。
  *
  * （不断言「是否真被升格成药丸」——促发资格由系统/OEM 的 Live Updates 开关裁决，断言它会假阴；那一档留真机肉眼验。）
+ *
+ * **读通知栏一律轮询等待**（[awaitActive] / [awaitCleared]）：`notify` / `cancel` 只是把请求异步交给系统，
+ * NotificationManagerService 要等 system_server 主线程腾出空来才登记——首例 @Before 连上 UiAutomation 会触发全系统
+ * 无障碍状态广播，恰把那条线程堵上一阵。旧写法「notify 后立刻读」因此随机读空（2026-09-24 取证：Pixel_9_Pro API 36
+ * 单跑 12 遍挂 3 遍；失败轮 logcat 无任何 `Shedding` 限速日志，是读早了，不是被限速）。
  */
 @RunWith(AndroidJUnit4::class)
 class LlmForegroundNotificationDeviceTest {
@@ -37,6 +44,9 @@ class LlmForegroundNotificationDeviceTest {
         InstrumentationRegistry.getInstrumentation().uiAutomation
             .grantRuntimePermission(context.packageName, "android.permission.POST_NOTIFICATIONS")
         NotificationChannels.ensureCreated(context)
+        // 两对用例共用同一 ID，而上一例 finally 的 cancel 同样异步：不等它清掉，本例的轮询可能读到上一例的旧通知而假绿。
+        // （这里不再补发 cancel——对已取消的 ID 重复 cancel 会被 API 36 的客户端节流当「重复取消」计数。）
+        assertTrue("上一例的测试通知应已清空", awaitCleared(TEST_ID, TEST_ID_2))
     }
 
     @Test
@@ -45,7 +55,7 @@ class LlmForegroundNotificationDeviceTest {
         assertTrue("应为常驻(ongoing)", (notif.flags and Notification.FLAG_ONGOING_EVENT) != 0)
         nm.notify(TEST_ID, notif)
         try {
-            val active = nm.activeNotifications.firstOrNull { it.id == TEST_ID }
+            val active = awaitActive(TEST_ID)
             assertNotNull("进度通知应已发布到通知栏（API36 ProgressStyle 路径未崩）", active)
             assertEquals(
                 "《测试故事》 第 3 章",
@@ -72,7 +82,7 @@ class LlmForegroundNotificationDeviceTest {
         assertTrue("应为常驻(ongoing)", (notif.flags and Notification.FLAG_ONGOING_EVENT) != 0)
         nm.notify(TEST_ID_2, notif)
         try {
-            assertNotNull("通用前台通知应已发布", nm.activeNotifications.firstOrNull { it.id == TEST_ID_2 })
+            assertNotNull("通用前台通知应已发布", awaitActive(TEST_ID_2))
         } finally {
             nm.cancel(TEST_ID_2)
         }
@@ -92,7 +102,7 @@ class LlmForegroundNotificationDeviceTest {
         assertEquals("短文案位应是二字阶段词、且绝不是百分比", "撰写", ex.getCharSequence("android.shortCriticalText")?.toString())
         nm.notify(TEST_ID, notif)
         try {
-            assertNotNull("API36 富渲染路径不得崩", nm.activeNotifications.firstOrNull { it.id == TEST_ID })
+            assertNotNull("API36 富渲染路径不得崩", awaitActive(TEST_ID))
         } finally {
             nm.cancel(TEST_ID)
         }
@@ -108,7 +118,7 @@ class LlmForegroundNotificationDeviceTest {
         assertTrue("typing 必须是不确定进度", notif.extras.getBoolean("android.progressIndeterminate"))
         nm.notify(TEST_ID_2, notif)
         try {
-            assertNotNull(nm.activeNotifications.firstOrNull { it.id == TEST_ID_2 })
+            assertNotNull("typing 通知应已发布", awaitActive(TEST_ID_2))
         } finally {
             nm.cancel(TEST_ID_2)
         }
@@ -126,8 +136,30 @@ class LlmForegroundNotificationDeviceTest {
         }
     }
 
+    /** 轮询到 [id] 出现在本包通知栏为止；[POLL_TIMEOUT_MS] 内仍没有则返回 null（交由调用方断言失败）。 */
+    private fun awaitActive(id: Int): StatusBarNotification? {
+        val deadline = SystemClock.uptimeMillis() + POLL_TIMEOUT_MS
+        while (true) {
+            nm.activeNotifications.firstOrNull { it.id == id }?.let { return it }
+            if (SystemClock.uptimeMillis() >= deadline) return null
+            SystemClock.sleep(POLL_INTERVAL_MS)
+        }
+    }
+
+    /** 轮询到 [ids] 全都不在本包通知栏为止；[POLL_TIMEOUT_MS] 内仍有残留则返回 false。 */
+    private fun awaitCleared(vararg ids: Int): Boolean {
+        val deadline = SystemClock.uptimeMillis() + POLL_TIMEOUT_MS
+        while (true) {
+            if (nm.activeNotifications.none { it.id in ids }) return true
+            if (SystemClock.uptimeMillis() >= deadline) return false
+            SystemClock.sleep(POLL_INTERVAL_MS)
+        }
+    }
+
     private companion object {
         const val TEST_ID = 0x71357
         const val TEST_ID_2 = 0x71358
+        const val POLL_TIMEOUT_MS = 3_000L
+        const val POLL_INTERVAL_MS = 50L
     }
 }

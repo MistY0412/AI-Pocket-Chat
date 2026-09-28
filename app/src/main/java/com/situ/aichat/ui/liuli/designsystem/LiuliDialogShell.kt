@@ -1,6 +1,5 @@
 package com.situ.aichat.ui.liuli.designsystem
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -29,10 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
-import com.situ.aichat.data.model.GlassTier
-import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
-import com.situ.aichat.ui.liuli.glass.liuliGlass
+import com.situ.aichat.ui.liuli.glass.liuliWindowGlass
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
 /** 弹窗 scrim = 18% 黑（§3.2·与 [LiuliSheetShell] 同值；平台 Dialog 的 dim 默认 ~60%，须显式压下来）。 */
@@ -44,10 +41,10 @@ private val DIALOG_BODY_MAX_HEIGHT = 400.dp
 /**
  * 琉璃确认弹窗「玻璃小卡」（图纸 2026-09-05 卷二C §4.11 · 落值 §3.2）。
  *
- * 底座 = 平台 [Dialog]（`usePlatformDefaultWidth = false` 拿全宽度确定性），皮 = 一片
- * [GlassTier].CLEAR 清透玻璃 + [LiuliShapes].overlay 20dp 圆角；左右各 26dp 让位。弹窗与弹层一样住
- * 独立 window，[liuliGlass] 拿不到 `LocalBackdrop` 会退纯染色——**壳底垫一层 `surface.raised` 纸面**
- * （R2 P-1·用户选①），清透档 60% 白覆在纸面上 = 比纸面再亮一档的磨砂小卡，身后内容不再透字。
+ * 底座 = 平台 [Dialog]（`usePlatformDefaultWidth = false` 拿全宽度确定性），皮 = [liuliWindowGlass] +
+ * [LiuliShapes].dialog 24dp 圆角；左右各 26dp 让位（琉璃 2.0 卷二 §4.7-2）。弹窗住独立 window：
+ * 通透 / 标准档 = **跨窗口真玻璃**（Haze 取宿主内容·大面板加厚配方）；毛玻璃档 / 安卓 13 以下 / 不在宿主里 =
+ * **不透明兜底**（卷一只着色兜底·观感 ≈ 原纸垫底）。
  *
  * 空白区点击关闭：平台 Dialog 的 `dismissOnClickOutside` 只认内容之外，而全宽内容把整屏都占了，
  * 所以外层 [Box] 自己挂一次无涟漪 `clickable`（卡本体再挂一次空 `clickable` 吃掉冒泡）。
@@ -77,10 +74,7 @@ fun LiuliDialogShell(
                     .fillMaxWidth()
                     .padding(horizontal = 26.dp)
                     .let { if (paneTitleText != null) it.semantics { paneTitle = paneTitleText } else it }
-                    .liuliGlass(LiuliShapes.overlay, dark = dark, tier = GlassTier.CLEAR)
-                    // 独立 window 无 backdrop → 玻璃层里面铺纸面（R2 P-1·用户 2026-09-05 选①·与弹层壳同口径；
-                    // 铺在层外面会让软影透过半透明层在卡中央留亮方块）。
-                    .background(AppTheme.colors.surface.raised)
+                    .liuliWindowGlass(LiuliShapes.dialog, dark)
                     // 卡面吃掉冒泡，别让「点卡里空白」也关掉弹窗。
                     .clickable(interactionSource = inside, indication = null, onClick = {})
                     .padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 14.dp),
@@ -95,7 +89,7 @@ fun LiuliDialogShell(
  *
  * 结构自上而下：标题（`titleSmall`）→ 10dp → 正文（[body] 纯文字自带滚动与高度帽 / [content] 自定义槽
  * 不包滚动）→ 20dp → 钮行（右对齐 `spacedBy(8.dp, End)`）。[confirmDanger] = true 时确认钮走
- * `LiuliButtonStyle.Text` + danger 红字（不可撤销动作），否则 Prominent 药丸；[onDismiss] 为 null 时
+ * `LiuliButtonStyle.Glass` + danger（淡红实底 + 红字·琉璃 2.0 卷二 §4.4·不可撤销动作），否则 Prominent 药丸；[onDismiss] 为 null 时
  * 取消钮回调走 [onDismissRequest]。[confirmText] 与 [dismissText] 皆 null → 整排不渲染。
  */
 @Composable
@@ -139,7 +133,7 @@ fun LiuliDialog(
                 if (confirmText != null) {
                     LiuliButton(
                         onClick = { onConfirm?.invoke() },
-                        style = if (confirmDanger) LiuliButtonStyle.Text else LiuliButtonStyle.Prominent,
+                        style = if (confirmDanger) LiuliButtonStyle.Glass else LiuliButtonStyle.Prominent,
                         enabled = confirmEnabled,
                         danger = confirmDanger,
                     ) { Text(confirmText) }

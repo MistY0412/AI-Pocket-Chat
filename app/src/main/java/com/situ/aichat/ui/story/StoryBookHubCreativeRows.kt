@@ -16,11 +16,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.situ.aichat.R
-import com.situ.aichat.data.model.UserStoryTemplatePayload
 import com.situ.aichat.story.StoryChapterLength
-import com.situ.aichat.story.StoryCreationCatalog
 import com.situ.aichat.story.StoryEditableField
-import com.situ.aichat.story.StoryNarrativePerson
 import com.situ.aichat.ui.designsystem.AppDialog
 import com.situ.aichat.ui.designsystem.AppTextField
 import com.situ.aichat.ui.designsystem.AppTheme
@@ -45,101 +42,25 @@ internal fun ColumnScope.StoryHubCreativeRows(
     var sheet by remember { mutableStateOf<HubCreativeTextField?>(null) }
     var namingTemplate by remember { mutableStateOf(false) }
     var atTemplateLimit by remember { mutableStateOf(false) }
-    val unfilled = stringResource(R.string.story_create_unfilled)
 
-    NavRow(stringResource(R.string.story_settings_genre_row), d.genre.ifBlank { unfilled }) { sheet = HubCreativeTextField.GENRE }
-    RowDivider()
-    NavRow(stringResource(R.string.story_settings_style_row), d.writingStyle.ifBlank { unfilled }) { dialog = HubCreativeChoice.STYLE }
-    RowDivider()
-    NavRow(stringResource(R.string.story_settings_person_row), narrativeName(d.narrativePerson)) { dialog = HubCreativeChoice.PERSON }
-    RowDivider()
-    NavRow(stringResource(R.string.story_settings_field_length), chapterLengthName(chapterLengthOf(d.chapterLengthPreference))) {
-        dialog = HubCreativeChoice.LENGTH
+    storyCreativeRows(d).forEachIndexed { i, row ->
+        if (i > 0) RowDivider()
+        NavRow(stringResource(row.titleRes), row.value) {
+            when (val t = row.target) {
+                is StoryCreativeTarget.Choice -> dialog = t.choice
+                is StoryCreativeTarget.Text -> sheet = t.field
+            }
+        }
     }
-    RowDivider()
-    NavRow(stringResource(R.string.story_settings_field_influence), chatInfluenceName(d.chatInfluenceWeight)) {
-        dialog = HubCreativeChoice.INFLUENCE
-    }
-    RowDivider()
-    NavRow(stringResource(R.string.story_settings_world_row), creativeRowSummary(d.worldSetting, unfilled)) { sheet = HubCreativeTextField.WORLD }
-    RowDivider()
-    NavRow(stringResource(R.string.story_settings_plot_row), creativeRowSummary(d.plotDirection, unfilled)) { sheet = HubCreativeTextField.PLOT }
     // 图纸四：存为「我的模板」——存的就是这一组的东西，落在组末最顺。到顶时点了直接弹上限提示。
     RowDivider()
     NavRow(stringResource(R.string.story_save_template_row), "") {
-        if (templateCount >= UserStoryTemplatePayload.MAX_USER_TEMPLATES) atTemplateLimit = true else namingTemplate = true
+        if (storyTemplateAtLimit(templateCount)) atTemplateLimit = true else namingTemplate = true
     }
 
-    when (dialog) {
-        HubCreativeChoice.STYLE -> HubChoiceDialog(
-            title = stringResource(R.string.story_settings_style_row),
-            options = StoryCreationCatalog.writingStyles,
-            current = d.writingStyle,
-            label = { it },
-            onSelect = { v -> update { it.copy(writingStyle = v) } },
-            onDismiss = { dialog = null },
-        )
-        HubCreativeChoice.PERSON -> HubChoiceDialog(
-            title = stringResource(R.string.story_settings_person_row),
-            // 顺序照创建屏高级表单：第二人称（默认）→ 第一人称 → 第三人称
-            options = listOf(StoryNarrativePerson.SECOND, StoryNarrativePerson.FIRST, StoryNarrativePerson.THIRD),
-            current = d.narrativePerson,
-            label = { narrativeName(it) },
-            onSelect = { v -> update { it.copy(narrativePerson = v) } },
-            onDismiss = { dialog = null },
-        )
-        HubCreativeChoice.LENGTH -> HubChoiceDialog(
-            title = stringResource(R.string.story_settings_field_length),
-            options = StoryChapterLength.entries,
-            current = chapterLengthOf(d.chapterLengthPreference),
-            label = { chapterLengthName(it) },
-            onSelect = { v -> update { it.copy(chapterLengthPreference = v.words) } },
-            onDismiss = { dialog = null },
-        )
-        HubCreativeChoice.INFLUENCE -> HubChoiceDialog(
-            title = stringResource(R.string.story_settings_field_influence),
-            options = StoryCreationCatalog.chatInfluenceWeights,
-            current = d.chatInfluenceWeight,
-            label = { chatInfluenceName(it) },
-            onSelect = { v -> update { it.copy(chatInfluenceWeight = v) } },
-            onDismiss = { dialog = null },
-        )
-        null -> Unit
-    }
+    dialog?.let { c -> HubChoiceDialog(storyCreativeChoiceSpec(c, d, update)) { dialog = null } }
 
-    sheet?.let { field ->
-        StoryTextEditorSheet(
-            title = stringResource(field.titleRes),
-            subtitle = when (field) {
-                // 十个预设只作参考：题材本身是自由文本（自定义题材合法存在）
-                HubCreativeTextField.GENRE -> stringResource(
-                    R.string.story_settings_genre_sub,
-                    StoryCreationCatalog.genres.joinToString(" / "),
-                )
-                else -> null
-            },
-            placeholder = stringResource(field.placeholderRes),
-            initialText = when (field) {
-                HubCreativeTextField.GENRE -> d.genre
-                HubCreativeTextField.WORLD -> d.worldSetting
-                HubCreativeTextField.PLOT -> d.plotDirection
-            },
-            maxLength = null,
-            fillDefaultLabel = null,
-            fillDefault = null,
-            onConfirm = { value ->
-                update {
-                    when (field) {
-                        // 题材空白不在这里兜底：persist 侧统一回退原值（绝不落空题材·图纸 §3.1）
-                        HubCreativeTextField.GENRE -> it.copy(genre = value.trim())
-                        HubCreativeTextField.WORLD -> it.copy(worldSetting = value)
-                        HubCreativeTextField.PLOT -> it.copy(plotDirection = value)
-                    }
-                }
-            },
-            onDismiss = { sheet = null },
-        )
-    }
+    sheet?.let { f -> StoryTextEditorSheet(storyCreativeTextSpec(f, d, update)) { sheet = null } }
 
     if (namingTemplate) {
         HubSaveTemplateDialog(
@@ -169,7 +90,7 @@ private fun HubSaveTemplateDialog(defaultName: String, onConfirm: (String) -> Un
         title = stringResource(R.string.story_save_template_row),
         confirmText = stringResource(R.string.action_save),
         onConfirm = { onConfirm(value.text) },
-        confirmEnabled = value.text.trim().isNotEmpty(),
+        confirmEnabled = storyTemplateNameValid(value.text),
         dismissText = stringResource(R.string.action_cancel),
         onDismiss = onDismiss,
         content = {
@@ -186,16 +107,6 @@ private fun HubSaveTemplateDialog(defaultName: String, onConfirm: (String) -> Un
     )
 }
 
-/** 四个封闭枚举字段（单选弹窗）。 */
-private enum class HubCreativeChoice { STYLE, PERSON, LENGTH, INFLUENCE }
-
-/** 三个自由文本字段（[StoryTextEditorSheet]）。世界观/剧情方向复用创建屏同一对标题与占位词条。 */
-private enum class HubCreativeTextField(val titleRes: Int, val placeholderRes: Int) {
-    GENRE(R.string.story_settings_genre_row, R.string.story_settings_genre_placeholder),
-    WORLD(R.string.story_field_world_title, R.string.story_field_world_placeholder),
-    PLOT(R.string.story_field_plot_title, R.string.story_field_plot_placeholder),
-}
-
 /** 行尾值摘要：空 → 「未填写」；否则首 12 字（换行折成空格，长文补省略号）——与设定 Tab 值标同一口径单源。 */
 internal fun creativeRowSummary(text: String, emptyLabel: String): String {
     if (text.isBlank()) return emptyLabel
@@ -208,23 +119,16 @@ internal fun chapterLengthOf(words: Int): StoryChapterLength =
 
 /** 单选弹窗（造型照既有 `ReminderChooserDialog`：标题 + 选项行列表 + 取消）。 */
 @Composable
-private fun <T> HubChoiceDialog(
-    title: String,
-    options: List<T>,
-    current: T,
-    label: @Composable (T) -> String,
-    onSelect: (T) -> Unit,
-    onDismiss: () -> Unit,
-) {
+private fun HubChoiceDialog(spec: StoryChoiceSpec, onDismiss: () -> Unit) {
     AppDialog(
         onDismissRequest = onDismiss,
-        title = title,
+        title = spec.title,
         dismissText = stringResource(R.string.action_cancel),
         onDismiss = onDismiss,
         content = {
             Column {
-                options.forEach { option ->
-                    ChoiceOptionRow(label(option), selected = option == current) { onSelect(option); onDismiss() }
+                spec.options.forEach { o ->
+                    ChoiceOptionRow(o.label, selected = o.selected) { o.onSelect(); onDismiss() }
                 }
             }
         },

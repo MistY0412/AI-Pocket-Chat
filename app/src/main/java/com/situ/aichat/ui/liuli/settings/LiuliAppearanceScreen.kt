@@ -30,7 +30,7 @@ import com.situ.aichat.data.model.GlassTier
 import com.situ.aichat.ui.designsystem.LightAppColors
 import com.situ.aichat.ui.designsystem.LiuliLightAppColors
 import com.situ.aichat.ui.liuli.designsystem.LiuliOptionCard
-import com.situ.aichat.ui.liuli.glass.realtimeBlurSupported
+import com.situ.aichat.ui.liuli.glass.hazeGlassSupported
 import com.situ.aichat.ui.liuli.page.LiuliGroup
 import com.situ.aichat.ui.liuli.page.LiuliLargeTitle
 import com.situ.aichat.ui.components.contentMaxWidth
@@ -90,7 +90,7 @@ internal fun LiuliAppearanceContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
-    blurSupported: Boolean = realtimeBlurSupported,
+    hazeSupported: Boolean = hazeGlassSupported,
     dynamicColorSupported: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
 ) {
     val title = stringResource(R.string.appearance_title)
@@ -135,18 +135,21 @@ internal fun LiuliAppearanceContent(
                             }
                         }
                     }
-                    // 透明度：只在琉璃 + 有实时模糊能力时给选（API 29–30 强制着色，没得选就不给选项）。
-                    if (skin == AppSkin.LIULI && blurSupported) {
+                    // 玻璃质感：琉璃脸下恒显；安卓 13 以下整行置灰、显示毛玻璃、脚注换成原因（设计稿 ② 末行）。
+                    if (skin == AppSkin.LIULI) {
                         LiuliGroup(
                             header = stringResource(R.string.appearance_glass_section),
-                            footer = stringResource(R.string.appearance_glass_footer),
+                            footer = stringResource(
+                                if (hazeSupported) R.string.appearance_glass_footer else R.string.appearance_glass_needs_android13,
+                            ),
                         ) {
                             LiuliSegmentRow(
                                 title = null, // 组标题已点名（复核 R1 🟡-2）
                                 options = GlassTier.entries,
-                                selected = glassTier,
+                                selected = if (hazeSupported) glassTier else GlassTier.FROSTED,
                                 label = { stringResource(it.labelRes()) },
                                 onSelect = onSetGlassTier,
+                                enabled = hazeSupported,
                                 divider = false,
                             )
                         }

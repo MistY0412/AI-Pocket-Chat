@@ -176,7 +176,7 @@ class DiaryExchangeService @Inject constructor(
         val promiseBlock = PromiseInjectionRenderer.render(promiseRepository.injectableForCharacter(ch.uuid, now), now, zone)
         val loopBlock = OpenLoopScanService.formatInjectionBlock(
             OpenLoopScanService.selectLoopsForInjection(
-                openLoopRepository.openLoopsForCharacter(ch.uuid), null, Instant.ofEpochMilli(now), zone,
+                openLoopRepository.openLoopsForChat(ch.uuid), null, Instant.ofEpochMilli(now), zone,
             ),
             Instant.ofEpochMilli(now), ps,
         )

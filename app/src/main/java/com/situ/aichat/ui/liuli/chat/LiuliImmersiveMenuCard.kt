@@ -50,16 +50,18 @@ import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
 import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
 import com.situ.aichat.ui.liuli.designsystem.LiuliTheme
+import com.situ.aichat.ui.liuli.glass.LiuliGlassRole
 import com.situ.aichat.ui.liuli.glass.liuliGlass
 import com.situ.aichat.ui.liuli.page.liuliFootprint
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
 /**
- * 琉璃菜单卡（自 [LiuliImmersiveMenuOverlay] 只搬不改地分出来·图纸 §2.1 行数预算）：一片 20dp 圆角玻璃，
+ * 琉璃菜单卡（自 [LiuliImmersiveMenuOverlay] 只搬不改地分出来·图纸 §2.1 行数预算）：一片 18dp 圆角玻璃
+ * （形状 = 弹出菜单同款 18（卷三）），
  * 顶行五个表情回应 + 一道发丝 + 动作行。宽**恒 200dp**（契约 §5.7·不再 `IntrinsicSize`）。
  *
  * 卷帘生长、项级联、收起上浮、首项读屏焦点全部照抄暖陶 `ImmersiveMenuCard`；表情行算级联的第 0 项。
- * 玻璃走 `blurEnabled = false`——身后已经是那张一次性磨砂快照（A-1），再取一次 backdrop 既多余又冻不住。
+ * 玻璃走 `blurEnabled = false`（大面板角色）——身后已经是那张一次性磨砂快照（A-1），再取一次景既多余又冻不住。
  */
 @Composable
 internal fun LiuliImmersiveMenuCard(
@@ -99,7 +101,7 @@ internal fun LiuliImmersiveMenuCard(
                         translationY = -closeRisePx * close
                     }
                     .drawWithContentClipReveal(appear)
-                    .liuliGlass(LiuliShapes.overlay, dark = dark, blurEnabled = false)
+                    .liuliGlass(LiuliShapes.menu, dark = dark, role = LiuliGlassRole.Panel, blurEnabled = false)
                     .padding(MenuCardPadding),
             ) {
                 LiuliMenuReactionRow(
@@ -216,13 +218,26 @@ private fun menuActionIcon(action: ImmersiveMenuAction) = when (action) {
     ImmersiveMenuAction.DELETE -> Icons.Filled.Delete
 }
 
-/** 卷帘生长（Telegram backScaleY 的裁剪式等价·非 View 缩放）：内容自顶向下按进度显露。 */
+/**
+ * 卷帘生长（Telegram backScaleY 的裁剪式等价·非 View 缩放）：内容自顶向下按进度显露。
+ *
+ * 卷三复核 R1：裁剪框左 / 右 / 上各外放 [MenuShadowReach]（那里只有玻璃投影、没有内容，不多露一像素内容），长满后
+ * 不再裁——否则矩形裁剪把玻璃投影切在卡边上，圆角外露出方形影（暖陶菜单卡无投影，故无此病）。
+ */
 private fun Modifier.drawWithContentClipReveal(progress: () -> Float): Modifier = drawWithContent {
     val reveal = progress().coerceIn(0f, 1f)
-    clipRect(top = 0f, left = 0f, right = size.width, bottom = size.height * reveal) {
-        this@drawWithContent.drawContent()
+    if (reveal >= 1f) {
+        drawContent()
+    } else {
+        val reach = MenuShadowReach.toPx()
+        clipRect(top = -reach, left = -reach, right = size.width + reach, bottom = size.height * reveal) {
+            this@drawWithContent.drawContent()
+        }
     }
 }
+
+/** 卷帘裁剪给投影外放的余量（> 大面板投影 8dp 的可见外扩）。 */
+private val MenuShadowReach = 24.dp
 
 // 落值（图纸 §3.2 菜单一节·孤值即打回）。
 private val MenuCardPadding = 6.dp

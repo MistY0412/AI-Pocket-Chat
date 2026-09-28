@@ -43,7 +43,9 @@ import com.situ.aichat.util.DateFormatters
 import com.situ.aichat.work.BackgroundScheduler
 import com.situ.aichat.work.MomentCatchUpWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -227,13 +229,15 @@ class MomentGenerationService @Inject constructor(
     /**
      * 聊天回复完成后调用：若该角色有当天有效欠帖，清欠帖标记并排 [MomentCatchUpWorker]（延迟 40~80s 补发，
      * 模拟「回完消息顺手发朋友圈」）。先清后排 + 唯一任务名 KEEP → 不重复补发；worker 跨进程死亡仍存活。
+     * 调用方在聊天一轮收尾（主线程）→ 查 / 清 / 排整段挪到 IO（稳定性防线 B：欠帖标记是 SharedPreferences，不在主线程读盘）；
+     * 块内无挂起点，三步照旧一气呵成。
      */
-    fun triggerCatchUpPostIfNeeded(
+    suspend fun triggerCatchUpPostIfNeeded(
         characterUuid: String,
         nowMillis: Long = System.currentTimeMillis(),
         zone: ZoneId = ZoneId.systemDefault(),
-    ) {
-        if (!MomentOwedPostStore.hasOwedPost(context, characterUuid, nowMillis, zone)) return
+    ) = withContext(Dispatchers.IO) {
+        if (!MomentOwedPostStore.hasOwedPost(context, characterUuid, nowMillis, zone)) return@withContext
         MomentOwedPostStore.clearOwedPost(context, characterUuid)
         backgroundScheduler.scheduleOneShot(
             uniqueName = MomentCatchUpWorker.uniqueName(characterUuid),

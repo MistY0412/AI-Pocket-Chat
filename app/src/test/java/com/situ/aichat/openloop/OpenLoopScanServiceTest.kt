@@ -59,13 +59,50 @@ class OpenLoopScanServiceTest {
         assertTrue(p.contains("你在帮 AI 角色「凛」维护一份\"心里惦记的事\"清单"))
         assertTrue(
             p.contains(
-                "{\"loops\":[{\"content\":\"一句话概括，不超过30字，第三人称\",\"type\":\"promise_char|user_event|open_topic\"," +
+                "{\"loops\":[{\"content\":\"一句话概括，不超过30字，第三人称\",\"type\":\"promise_char|user_event|open_topic|plan_char\"," +
                     "\"due\":\"能从对话确定具体日期就输出 yyyy-MM-dd'T'HH:mm（只有日期没有时间就用 09:00），确定不了就 null\"}]," +
                     "\"resolved\":[\"已在清单上、但对话显示已经解决或已经过去的事的 uuid\"]}",
             ),
         )
         assertTrue(p.contains("规则：一次最多提取 2 条新的；纯闲聊话题不算；拿不准的宁可不提取。"))
         assertTrue(p.endsWith("对话记录：\n对话文本"))
+    }
+
+    // ── 四期·图纸一 §3.6 / M10：第三类「她自己的打算」（T1-8） ──
+
+    @Test fun `prompt 第三类两行逐字紧跟第二类之后`() {
+        val p = OpenLoopScanService.buildScanPrompt("凛", "小柚", "NOW", emptyList(), "CONV", ledgerPromises = emptyList())
+        assertTrue(
+            p.contains(
+                "（面试、考试、看病、出差、搬家、在纠结的决定……）。\n" +
+                    "另外还有第三类：\n" +
+                    "3. 凛 自己说过的、之后要去做的打算（进货、看牙、回老家……），只收能确定具体日期的，type 用 plan_char；" +
+                    "content 只写要做的事，不写「明天」「周末」这类日期词，日期放进 due。\n\n当前时间：NOW",
+            ),
+        )
+        assertTrue("首句「两类」字面零改", p.contains("找出两类值得一个朋友之后主动问起的事"))
+    }
+
+    @Test fun `parse plan_char 无 due 丢弃_有 due 保留_丢弃不占上限`() {
+        val r = OpenLoopScanService.parseScanResult(
+            "{\"loops\":[" +
+                "{\"content\":\"进货\",\"type\":\"plan_char\",\"due\":null}," +
+                "{\"content\":\"看牙\",\"type\":\"plan_char\",\"due\":\"2026-09-28T15:00\"}," +
+                "{\"content\":\"面试结果\",\"type\":\"user_event\",\"due\":null}]}",
+            zone,
+        )
+        assertEquals(listOf("看牙", "面试结果"), r.newLoops.map { it.content })
+        assertEquals(OpenLoopType.PLAN_CHAR, r.newLoops[0].typeRaw)
+        assertEquals(millis("2026-09-28T15:00"), r.newLoops[0].dueAt)
+        assertTrue(OpenLoopType.PLAN_CHAR in OpenLoopType.ALL)
+        assertEquals("plan_char", OpenLoopType.PLAN_CHAR)
+    }
+
+    @Test fun `parse plan_char 坏 due 同样丢弃`() {
+        val r = OpenLoopScanService.parseScanResult(
+            "{\"loops\":[{\"content\":\"回老家\",\"type\":\"plan_char\",\"due\":\"下周\"}]}", zone,
+        )
+        assertTrue(r.newLoops.isEmpty())
     }
 
     @Test fun `prompt 空 existing 省略整段`() {

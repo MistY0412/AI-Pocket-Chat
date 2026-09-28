@@ -101,6 +101,7 @@ class ProactiveDeliveryPipelineTest {
                 modelName = "m",
             )
         coEvery { composer.compose(any(), any(), any(), any(), any(), any()) } returns composed
+        coEvery { composer.specialDayOccasion(any(), any(), any()) } returns null // 四期 §3.8：普通日（补桩·既有断言零改）
         coEvery { deliveryDao.countDeliveredSince(any(), any()) } returns 0
         coEvery { deliveryDao.recentDeliveredBodies(any(), any()) } returns emptyList()
     }
@@ -193,6 +194,8 @@ class ProactiveDeliveryPipelineTest {
         stubHappyPath(state(phase = ConversationPhase.DISTANT_EARLY, days = 5))
         val since = slot<Long>()
         coEvery { deliveryDao.countDeliveredSince(charId, capture(since)) } returns 0
+        // 四期 §3.8 补桩：步骤 f 的「今天投递过几条」查询另有专桩（后定义者优先），slot 只收降频窗那一次。
+        coEvery { deliveryDao.countDeliveredSince(charId, startOfToday) } returns 1
 
         run()
 
@@ -314,6 +317,45 @@ class ProactiveDeliveryPipelineTest {
 
         assertTrue(run(input(occasion = null)) is ProactiveVerdict.Deliver)
         assertEquals("想起对方，找个话题聊聊", occasion.captured)
+    }
+
+    // MARK: - 四期·图纸一 §3.8（T2-6·E37）：特别日子当天首条换由头
+
+    /** 当天 0 点（UTC 基准日 2026-01-15）——「今天投递过几条」的查库起点。 */
+    private val startOfToday: Long = LocalDateTime.of(2026, 1, 15, 0, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
+
+    @Test fun specialDay_firstToday_replacesOccasion() = runTest {
+        stubHappyPath()
+        coEvery { deliveryDao.countDeliveredSince(charId, startOfToday) } returns 0
+        coEvery { composer.specialDayOccasion(character, now, zone) } returns "今天是七夕"
+        val occasion = slot<String>()
+        coEvery { composer.compose(any(), capture(occasion), any(), any(), any(), any()) } returns "七夕快乐呀"
+
+        assertTrue(run() is ProactiveVerdict.Deliver)
+        assertEquals("今天是七夕", occasion.captured)
+    }
+
+    @Test fun specialDay_secondToday_keepsOriginalOccasion_andSkipsLookup() = runTest {
+        stubHappyPath()
+        coEvery { deliveryDao.countDeliveredSince(charId, startOfToday) } returns 1
+        val occasion = slot<String>()
+        coEvery { composer.compose(any(), capture(occasion), any(), any(), any(), any()) } returns "刚忙完"
+
+        run()
+        assertEquals("TA 的日程：[17:00-18:00] 画稿收尾", occasion.captured)
+        coVerify(exactly = 0) { composer.specialDayOccasion(any(), any(), any()) }
+    }
+
+    @Test fun ordinaryDay_firstToday_keepsOriginalOccasion() = runTest {
+        stubHappyPath()
+        coEvery { deliveryDao.countDeliveredSince(charId, startOfToday) } returns 0
+        coEvery { composer.specialDayOccasion(character, now, zone) } returns null
+        val occasion = slot<String>()
+        coEvery { composer.compose(any(), capture(occasion), any(), any(), any(), any()) } returns "刚忙完"
+
+        run()
+        assertEquals("TA 的日程：[17:00-18:00] 画稿收尾", occasion.captured)
+        coVerify(exactly = 1) { composer.specialDayOccasion(character, now, zone) }
     }
 
     /** 由头为空白串同样退兜底由头。 */

@@ -2,20 +2,25 @@ package com.situ.aichat.ui.liuli.chat
 
 import androidx.compose.animation.core.SnapSpec
 import androidx.compose.animation.core.TweenSpec
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.toArgb
 import com.situ.aichat.tts.EmotionType
 import com.situ.aichat.ui.components.AppMotion
+import com.situ.aichat.ui.designsystem.DarkAppColors
+import com.situ.aichat.ui.designsystem.LightAppColors
 import com.situ.aichat.ui.designsystem.LiuliDarkAppColors
 import com.situ.aichat.ui.designsystem.LiuliLightAppColors
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * T1-2 / T2-6 纯函数档（图纸 2026-09-05 卷二A §7）：心情四色的**族映射 / 派生 / 时段档 / 绕位轮转 / 动效档**。
+ * T1-2 / T2-6 纯函数档（图纸 2026-09-05 卷二A §7）：心情色的**族映射 / 派生 / 绕位轮转 / 动效档**。
  *
- * 断言从图纸 §0 ② 4 与 §3.2 的规格独立反推（族表逐条重打、混合比 0.62 / 0.70 / 0.72 重打、槽位表重打），
- * 不照抄实现输出。E4（无心情）/ E5（字典外 emoji）/ E6（同族异 emoji 同色）在此闭环。
+ * 琉璃 2.0 卷一（图纸 2026-09-25 §7 T1-6）：派生改为「柔光底四光晕 + 非平静族各向情绪色混 浅 0.22 / 深 0.28」（卷三 §0.2-5 起浅深都 0.16），
+ * 旧的时段档（22:00–06:00）随旧四色退役。断言从规格独立反推（族表逐条重打、光晕字面量与混合比重打、
+ * 槽位表重打），不照抄实现输出。E4 / E5 / E6 / E16 / E17 在此闭环。
  */
 class LiuliMoodPaletteTest {
 
@@ -53,49 +58,63 @@ class LiuliMoodPaletteTest {
 
     @Test fun sameFamilyDifferentEmoji_yieldsSameColors() {
         // E6：😊 与 🥳 同属 joy → 四色逐位相同（族不变就不换色）。
-        val a = liuliMoodBlobColors(liuliMoodFamily(EmotionType.from("😊")), LiuliLightAppColors, hour = 14)
-        val b = liuliMoodBlobColors(liuliMoodFamily(EmotionType.from("🥳")), LiuliLightAppColors, hour = 14)
+        val a = liuliMoodBlobColors(liuliMoodFamily(EmotionType.from("😊")), LiuliLightAppColors)
+        val b = liuliMoodBlobColors(liuliMoodFamily(EmotionType.from("🥳")), LiuliLightAppColors)
         assertEquals(a, b)
     }
 
-    @Test fun blobColors_returnFourPerTier_andTiersDiffer() {
-        val day = liuliMoodBlobColors(LiuliMoodFamily.JOY, LiuliLightAppColors, hour = 14)
-        val dayLate = liuliMoodBlobColors(LiuliMoodFamily.JOY, LiuliLightAppColors, hour = 23)
-        val night = liuliMoodBlobColors(LiuliMoodFamily.JOY, LiuliDarkAppColors, hour = 14)
-        listOf(day, dayLate, night).forEach { assertEquals(4, it.size) }
-        // 三档互不相同（昼 0.62 / 昼夜间 0.70 / 夜档换底混）。
-        assertNotEquals(day, dayLate)
-        assertNotEquals(day, night)
-        assertNotEquals(dayLate, night)
-        // 非 calm 族的四点彼此可辨（calm 族第 1、3 点本就同源=有意重合，不在此断言内）。
-        assertEquals(4, day.toSet().size)
+    /** 图纸 §4.1 / §4.3 的四个光晕——在测试里重打字面量（不引用 `LiuliAmbientSpec`）。 */
+    private val glowsLight = listOf(Color(0xFFFFCDB8), Color(0xFFD6C3FF), Color(0xFFBDE0FF), Color(0xFFFFD6EE))
+    private val glowsDark = listOf(Color(0xFF4A3590), Color(0xFF6B2D6A), Color(0xFF1E4A7A), Color(0xFF3F2C80))
+
+    private fun argbs(colors: List<Color>): List<Int> = colors.map { it.toArgb() }
+
+    @Test fun calm_isAmbientGlowsUnchanged_bothModes() {
+        // E16：平静族（含空 / 未知 emoji 落到的中性）= 原样柔光底。
+        assertEquals(argbs(glowsLight), argbs(liuliMoodBlobColors(LiuliMoodFamily.CALM, LiuliLightAppColors)))
+        assertEquals(argbs(glowsDark), argbs(liuliMoodBlobColors(LiuliMoodFamily.CALM, LiuliDarkAppColors)))
     }
 
-    @Test fun lateHourWindow_isTwentyTwoToSix() {
-        // 图纸 §0 ② 4：昼档 22:00–06:00 更沉一档。
-        listOf(22, 23, 0, 3, 5).forEach { assertTrue("$it 点应属夜间时段", isLateHour(it)) }
-        listOf(6, 7, 12, 21).forEach { assertTrue("$it 点不应属夜间时段", !isLateHour(it)) }
+    @Test fun nonCalmFamilies_tintEachGlowTowardEmotion_lightDark016() {
+        val lightEmotion = LightAppColors.emotion
+        val darkEmotion = DarkAppColors.emotion
+        val cases = listOf(
+            Triple(LiuliMoodFamily.JOY, lightEmotion.joy, darkEmotion.joy),
+            Triple(LiuliMoodFamily.SHY, lightEmotion.shy, darkEmotion.shy),
+            Triple(LiuliMoodFamily.SAD, lightEmotion.sad, darkEmotion.sad),
+            Triple(LiuliMoodFamily.ANGER, lightEmotion.anger, darkEmotion.anger),
+        )
+        cases.forEach { (family, lightMood, darkMood) ->
+            assertEquals(
+                "$family 浅",
+                argbs(glowsLight.map { lerp(it, lightMood, 0.16f) }),
+                argbs(liuliMoodBlobColors(family, LiuliLightAppColors)),
+            )
+            assertEquals(
+                "$family 深",
+                argbs(glowsDark.map { lerp(it, darkMood, 0.16f) }),
+                argbs(liuliMoodBlobColors(family, LiuliDarkAppColors)),
+            )
+        }
     }
 
-    @Test fun lateHour_mixesWhiter_thanPlainDay() {
-        // 更沉 = 向白混得更多 → 越接近白（亮度更高）。逐点比较红通道足以区分（同一底色系）。
-        val day = liuliMoodBlobColors(LiuliMoodFamily.SAD, LiuliLightAppColors, hour = 14)
-        val late = liuliMoodBlobColors(LiuliMoodFamily.SAD, LiuliLightAppColors, hour = 23)
-        day.indices.forEach { i ->
-            assertTrue("第 $i 点 22 点档应更向白", late[i].red >= day[i].red && late[i].green >= day[i].green)
+    @Test fun fiveFamilies_arePairwiseDistinct_bothModes() {
+        listOf(LiuliLightAppColors, LiuliDarkAppColors).forEach { scheme ->
+            val all = LiuliMoodFamily.entries.map { argbs(liuliMoodBlobColors(it, scheme)) }
+            assertEquals("五族两两不同（isDark=${scheme.isDark}）", LiuliMoodFamily.entries.size, all.toSet().size)
         }
     }
 
     @Test fun slots_rotateOneStepPerSendTurn_andStayAPermutation() {
-        // 图纸 §3.2 槽位表在此重打一遍（0.18/0.12 · 0.85/0.25 · 0.25/0.85 · 0.85/0.90）。
-        assertEquals(0.18f, MOOD_SLOTS[0].x, 1e-6f)
-        assertEquals(0.12f, MOOD_SLOTS[0].y, 1e-6f)
-        assertEquals(0.85f, MOOD_SLOTS[1].x, 1e-6f)
-        assertEquals(0.25f, MOOD_SLOTS[1].y, 1e-6f)
-        assertEquals(0.25f, MOOD_SLOTS[2].x, 1e-6f)
-        assertEquals(0.85f, MOOD_SLOTS[2].y, 1e-6f)
-        assertEquals(0.85f, MOOD_SLOTS[3].x, 1e-6f)
-        assertEquals(0.90f, MOOD_SLOTS[3].y, 1e-6f)
+        // 卷一图纸 §4.3 / §4.4 槽位表在此重打一遍（0.12/0.10 · 0.88/0.34 · 0.08/0.66 · 0.82/0.92）。
+        assertEquals(0.12f, MOOD_SLOTS[0].x, 1e-6f)
+        assertEquals(0.10f, MOOD_SLOTS[0].y, 1e-6f)
+        assertEquals(0.88f, MOOD_SLOTS[1].x, 1e-6f)
+        assertEquals(0.34f, MOOD_SLOTS[1].y, 1e-6f)
+        assertEquals(0.08f, MOOD_SLOTS[2].x, 1e-6f)
+        assertEquals(0.66f, MOOD_SLOTS[2].y, 1e-6f)
+        assertEquals(0.82f, MOOD_SLOTS[3].x, 1e-6f)
+        assertEquals(0.92f, MOOD_SLOTS[3].y, 1e-6f)
         // 第 0 轮 = 原位；每 +1 轮整体挪一格；四点始终占满四个槽（是轮换不是塌缩）。
         repeat(4) { i -> assertEquals(MOOD_SLOTS[i], liuliMoodSlot(i, 0)) }
         repeat(4) { i -> assertEquals(MOOD_SLOTS[(i + 1) % 4], liuliMoodSlot(i, 1)) }

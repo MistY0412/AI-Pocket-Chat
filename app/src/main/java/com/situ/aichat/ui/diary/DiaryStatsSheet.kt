@@ -78,7 +78,7 @@ internal fun DiaryStatsSheet(stats: DiaryInsights.Stats, onDismiss: () -> Unit) 
 
 /** 心情分布（情绪原型堆叠条 + emoji 计数冗余·统计面板与月度回顾面板共用）。 */
 @Composable
-private fun MoodDistribution(moodCounts: List<Pair<String, Int>>) {
+internal fun MoodDistribution(moodCounts: List<Pair<String, Int>>) {
     val colors = AppTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
@@ -125,10 +125,7 @@ internal fun DiaryReviewSheet(review: MonthlyReviewEntity, onDismiss: () -> Unit
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(
-                stringResource(
-                    R.string.diary_review_title,
-                    formatDiaryDate(review.monthStartMillis, stringResource(R.string.diary_fmt_month_title)),
-                ),
+                diaryReviewTitle(review),
                 style = AppTheme.typography.titleSmall,
                 color = colors.text.primary,
                 modifier = Modifier.semantics { heading() },
@@ -140,6 +137,11 @@ internal fun DiaryReviewSheet(review: MonthlyReviewEntity, onDismiss: () -> Unit
         }
     }
 }
+
+/** 月度回顾标题「yyyy年M月 · 月度回顾」（两张脸共用）。 */
+@Composable
+internal fun diaryReviewTitle(review: MonthlyReviewEntity): String =
+    stringResource(R.string.diary_review_title, formatDiaryDate(review.monthStartMillis, stringResource(R.string.diary_fmt_month_title)))
 
 @Composable
 private fun StatCell(value: String, label: String, modifier: Modifier = Modifier) {

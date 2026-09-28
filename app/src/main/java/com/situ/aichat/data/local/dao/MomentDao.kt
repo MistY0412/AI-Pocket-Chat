@@ -156,6 +156,14 @@ interface MomentDao {
     )
     suspend fun recentUserPostsInWindow(after: Long, before: Long, limit: Int): List<MomentPostEntity>
 
+    /** 恢复场景 D（朋友圈发布页重构·甲）：窗口内带「提醒了谁」的用户帖（新→旧）。 */
+    @Query(
+        "SELECT * FROM moment_post WHERE authorTypeRaw = 'user' AND isSoftDeleted = 0 " +
+            "AND mentionedCharacterUuidsJson != '' AND timestamp > :after AND timestamp < :before " +
+            "ORDER BY timestamp DESC LIMIT :limit"
+    )
+    suspend fun recentUserPostsWithMentionsInWindow(after: Long, before: Long, limit: Int): List<MomentPostEntity>
+
     /** Recovery scenario C (7.2.5): same window as [recentUserPostsInWindow] but AI-authored posts. */
     @Query(
         "SELECT * FROM moment_post WHERE authorTypeRaw = 'character' AND isSoftDeleted = 0 " +

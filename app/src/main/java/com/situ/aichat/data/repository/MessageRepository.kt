@@ -3,6 +3,7 @@ package com.situ.aichat.data.repository
 import com.situ.aichat.data.local.dao.MessageDao
 import com.situ.aichat.data.local.entity.MessageEntity
 import com.situ.aichat.data.model.MessageKind
+import com.situ.aichat.diagnostics.LogMessageBrief
 import com.situ.aichat.util.AudioStore
 import com.situ.aichat.util.ContentImageStore
 import kotlinx.coroutines.flow.Flow
@@ -120,6 +121,11 @@ class MessageRepository @Inject constructor(
 
     suspend fun get(uuid: String): MessageEntity? = dao.getByUuid(uuid)
     suspend fun upsert(message: MessageEntity) = dao.upsert(message)
+
+    /** 日志页消息轻投影（四期·图纸四·只读直通）。 */
+    suspend fun logBriefsByUuids(uuids: List<String>): List<LogMessageBrief> = dao.logBriefsByUuids(uuids)
+    suspend fun logBriefsInRange(conversationUuid: String, fromMillis: Long, toMillis: Long): List<LogMessageBrief> =
+        dao.logBriefsInRange(conversationUuid, fromMillis, toMillis)
 
     /**
      * 删单条消息（14.7c：先清其磁盘媒体再删库行，堵单删媒体泄漏）。删会话走 [ConversationMediaCleaner]、

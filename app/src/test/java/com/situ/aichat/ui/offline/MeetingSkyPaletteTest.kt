@@ -77,4 +77,23 @@ class MeetingSkyPaletteTest {
         assertEquals(0.2f, MeetingSky.spec(SkyBucket.LATE_NIGHT, OfflineMoodKind.MELANCHOLIC).starAlphaBoost, 0f)
         assertEquals(0f, MeetingSky.spec(SkyBucket.LATE_NIGHT, OfflineMoodKind.AWKWARD).starAlphaBoost, 0f)
     }
+
+    /** T1-5（朋友圈发布页·乙 §7·E30）：共用抽取只搬不改——本色三停逐色 = 原 hex；温暖天气色 = 两个新常量。 */
+    @Test
+    fun `乙 共用抽取 - 本色三停与暖阳霞色逐值不变`() {
+        val expected = mapOf(
+            SkyBucket.DAWN to listOf(0xFF4A5A84, 0xFF544F78, 0xFFA87B6B),
+            SkyBucket.DAY to listOf(0xFFA8C4DC, 0xFFC9DAE8, 0xFFE8E3D5),
+            SkyBucket.DUSK to listOf(0xFF3E3450, 0xFF6E4342, 0xFFAC7050),
+            SkyBucket.NIGHT to listOf(0xFF2E3450, 0xFF4A4668, 0xFF7A5E74),
+            SkyBucket.LATE_NIGHT to listOf(0xFF232A44, 0xFF2C3350, 0xFF4A4260),
+        )
+        for ((bucket, hex) in expected) {
+            assertEquals("$bucket", hex.map { androidx.compose.ui.graphics.Color(it) }, MeetingSky.baseStops(bucket))
+        }
+        assertEquals(androidx.compose.ui.graphics.Color(0xFFF2C978), MeetingSky.SunWarm)
+        assertEquals(androidx.compose.ui.graphics.Color(0xFFF2B98A), MeetingSky.GlowWarm)
+        assertEquals(MeetingSky.SunWarm, MeetingSky.spec(SkyBucket.DAY, OfflineMoodKind.WARM).weatherColor)
+        assertEquals(MeetingSky.GlowWarm, MeetingSky.spec(SkyBucket.DUSK, OfflineMoodKind.WARM).weatherColor)
+    }
 }

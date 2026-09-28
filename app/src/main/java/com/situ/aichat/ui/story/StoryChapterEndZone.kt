@@ -55,9 +55,9 @@ import com.situ.aichat.ui.components.LocalAppHaptics
  */
 
 /** ⋯ 触发钮的视觉直径 / 其内图标 / 浮层宽度（§9-② 锁定值·浮层比 ⋮ 菜单的 240 窄一档：只有三条动作行）。 */
-private val ACTIONS_TRIGGER_SIZE = 26.dp
-private val ACTIONS_TRIGGER_ICON = 14.dp
-private val ACTIONS_MENU_WIDTH = 200.dp
+internal val ACTIONS_TRIGGER_SIZE = 26.dp
+internal val ACTIONS_TRIGGER_ICON = 14.dp
+internal val ACTIONS_MENU_WIDTH = 200.dp
 
 /** 快评胶囊高度 / 胶囊间距 / 标签字号（§9-② 锁定值）。 */
 private val RATING_PILL_HEIGHT = 36.dp
@@ -208,7 +208,7 @@ private fun ChapterRatingRow(rating: Int?, isDark: Boolean, onRate: (Int?) -> Un
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            stringResource(if (rating != null) R.string.story_rating_done else R.string.story_rating_ask),
+            stringResource(storyRatingPromptRes(rating)),
             color = secondary,
             fontSize = 12.sp,
         )
@@ -217,9 +217,9 @@ private fun ChapterRatingRow(rating: Int?, isDark: Boolean, onRate: (Int?) -> Un
             horizontalArrangement = Arrangement.spacedBy(RATING_PILL_GAP, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RatingPill(R.string.story_rating_good, tier = 3, current = rating, isDark = isDark, onRate = onRate)
-            RatingPill(R.string.story_rating_ok, tier = 2, current = rating, isDark = isDark, onRate = onRate)
-            RatingPill(R.string.story_rating_bad, tier = 1, current = rating, isDark = isDark, onRate = onRate)
+            storyRatingTiers.forEach { (labelRes, tier) ->
+                RatingPill(labelRes, tier = tier, current = rating, isDark = isDark, onRate = onRate)
+            }
         }
     }
 }
@@ -248,7 +248,7 @@ private fun RatingPill(
     val stateDesc = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
     Surface(
         // 再点已选中的那一档 = 取消评分（§3.2）；触达 48dp 由 M3 可点 Surface 兜底（视觉仍 36dp）。
-        onClick = { haptics.light(); onRate(if (selected) null else tier) },
+        onClick = { haptics.light(); onRate(storyRatingNext(current, tier)) },
         shape = CircleShape,
         color = fill,
         border = if (selected) null else BorderStroke(1.dp, border),

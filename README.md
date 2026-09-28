@@ -50,6 +50,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"  
 | [bge-small-zh-v1.5](https://huggingface.co/BAAI/bge-small-zh-v1.5) | 中文向量记忆 | MIT |
 | [silero-vad](https://github.com/snakers4/silero-vad) | 语音活动检测 | MIT |
 | [three.js](https://github.com/mrdoob/three.js) | 世界屏 3D 渲染 | MIT |
+| [Haze](https://github.com/chrisbanes/haze) | 琉璃主题的实时毛玻璃效果 | Apache-2.0 |
 | [霞鹜文楷 Lite](https://github.com/lxgw/LxgwWenKai-Lite) | 楷体界面字体 | SIL OFL 1.1 |
 
 ### 项目性质与免责声明
@@ -107,6 +108,7 @@ Licensed under **GNU GPL-3.0** (see [LICENSE](LICENSE)): you are free to use, mo
 | [bge-small-zh-v1.5](https://huggingface.co/BAAI/bge-small-zh-v1.5) | Chinese vector memory | MIT |
 | [silero-vad](https://github.com/snakers4/silero-vad) | Voice activity detection | MIT |
 | [three.js](https://github.com/mrdoob/three.js) | 3D rendering for world screens | MIT |
+| [Haze](https://github.com/chrisbanes/haze) | Real-time frosted glass for the Liuli theme | Apache-2.0 |
 | [LXGW WenKai Lite](https://github.com/lxgw/LxgwWenKai-Lite) | Kai-style UI font | SIL OFL 1.1 |
 
 ### Project nature & disclaimer

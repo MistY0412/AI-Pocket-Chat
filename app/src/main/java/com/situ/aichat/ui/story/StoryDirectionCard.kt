@@ -91,7 +91,7 @@ internal fun StoryDirectionCard(
 }
 
 /** 走向正文的预览行数（图纸 §9 锁定值·超出省略号截断，全文在导演台里可编辑）。 */
-private const val DIRECTION_MAX_LINES = 4
+internal const val DIRECTION_MAX_LINES = 4
 
 /** 走向正文透明度（图纸 §4.1 锁定值·与 [com.situ.aichat.ui.designsystem.ColorContrastTest] 互指）。 */
 internal const val DIRECTION_BODY_ALPHA = 0.80f

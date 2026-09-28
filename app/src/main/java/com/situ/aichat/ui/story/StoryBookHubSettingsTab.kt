@@ -32,12 +32,8 @@ import androidx.compose.ui.unit.sp
 import com.situ.aichat.R
 import com.situ.aichat.data.local.entity.StoryCharacterRoleEntity
 import com.situ.aichat.data.local.entity.StoryEntity
-import com.situ.aichat.data.model.CustomStoryPrompts
 import com.situ.aichat.story.StoryEditableField
-import com.situ.aichat.story.StoryFieldKind
 import com.situ.aichat.story.StoryGlobalCraftValues
-import com.situ.aichat.story.StoryStatus
-import com.situ.aichat.story.StoryUpdateMode
 import com.situ.aichat.ui.designsystem.AppButton
 import com.situ.aichat.ui.designsystem.AppButtonStyle
 import com.situ.aichat.ui.designsystem.AppDialog
@@ -99,15 +95,14 @@ private fun CraftGroup(
     globals: StoryGlobalCraftValues,
     onOpenField: (StoryEditableField) -> Unit,
 ) {
-    // 七行值标共用同一份解码结果：不缓存的话每次重组要把同一段 JSON 解七遍。
-    val prompts = remember(story.customPromptsJson) { CustomStoryPrompts.decode(story.customPromptsJson) }
+    val prompts = rememberStoryPrompts(story)
     SettingsGroup(stringResource(R.string.story_hub_group_craft)) {
-        val craftFields = StoryEditableField.entries.filter { it.kind != StoryFieldKind.ARCHIVE }
+        val craftFields = storyHubCraftFields()
         craftFields.forEachIndexed { index, field ->
             if (index > 0) RowDivider()
             CraftRow(
                 label = stringResource(field.titleRes),
-                isNew = field == StoryEditableField.SCENE_BEATS || field == StoryEditableField.TASTE_PROFILE,
+                isNew = storyHubCraftFieldIsNew(field),
                 trailing = { HubValueLabel(field.valueLabel(story, globals, prompts)) },
                 onClick = { onOpenField(field) },
             )
@@ -134,19 +129,19 @@ private fun CraftRow(label: String, isNew: Boolean, trailing: @Composable () -> 
 /** 生成开关组：三个本书级开关（世界观注入只在绑定角色挂了设定集时出现·契约 §4）。 */
 @Composable
 private fun ToggleGroup(story: StoryEntity, hasWorldBooks: Boolean, cb: StoryHubSettingsCallbacks) {
-    val prompts = remember(story.customPromptsJson) { CustomStoryPrompts.decode(story.customPromptsJson) }
+    val prompts = rememberStoryPrompts(story)
     SettingsGroup(stringResource(R.string.story_hub_group_toggles)) {
         SwitchRow(
             title = stringResource(R.string.story_toggle_choices),
             subtitle = stringResource(R.string.story_toggle_choices_sub),
-            checked = prompts?.effectiveChapterChoices == true,
+            checked = storyChapterChoicesOn(prompts),
             onChange = cb.onChapterChoicesChange,
         )
         RowDivider()
         SwitchRow(
             title = stringResource(R.string.story_toggle_snapshot),
             subtitle = stringResource(R.string.story_toggle_snapshot_sub),
-            checked = prompts?.effectiveSceneSnapshot != false,
+            checked = storySceneSnapshotOn(prompts),
             onChange = cb.onSceneSnapshotChange,
         )
         if (hasWorldBooks) {
@@ -176,7 +171,7 @@ private fun SerialManageGroup(
     var showTimePicker by remember { mutableStateOf(false) }
     var showReminderChooser by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    val chase = d.updateMode == StoryUpdateMode.CHASE
+    val chase = storyDraftChase(d)
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SettingsGroup(
@@ -189,17 +184,17 @@ private fun SerialManageGroup(
                 title = stringResource(R.string.story_settings_mode_chase),
                 subtitle = stringResource(R.string.story_settings_chase_sub),
                 checked = chase,
-            ) { on -> cb.onUpdateDraft { it.copy(updateMode = if (on) StoryUpdateMode.CHASE else StoryUpdateMode.FREE) } }
+            ) { on -> cb.onUpdateDraft { storyDraftWithChase(it, on) } }
             if (chase) {
                 RowDivider()
                 NavRow(
                     stringResource(R.string.story_settings_unlock_time),
-                    "%02d:%02d".format(d.unlockHour, d.unlockMinute),
+                    storyUnlockTimeText(d),
                 ) { showTimePicker = true }
                 RowDivider()
                 NavRow(
                     stringResource(R.string.story_settings_reminder),
-                    stringResource(if (reminderEnabled) R.string.story_settings_reminder_on else R.string.action_close),
+                    stringResource(storyReminderLabelRes(reminderEnabled)),
                 ) { showReminderChooser = true }
             }
             RowDivider()
@@ -210,9 +205,7 @@ private fun SerialManageGroup(
             // 全局项已迁 App 设置（卷四）：组尾留一条弱化指路链（mockup 屏2 glink·非常规行），免得在书里找不到温度/段序/忌口。
             GlobalPrefsLink(cb.onOpenGlobalSettings)
         }
-        if (story.status == StoryStatus.COMPLETED || story.status == StoryStatus.PAUSED) {
-            SerialOpsButtons(story.status, cb.onContinue, cb.onRestart)
-        }
+        storySerialOps(story)?.let { ops -> SerialOpsButtons(ops, cb.onContinue, cb.onRestart) }
     }
 
     if (showTimePicker) {
@@ -259,10 +252,10 @@ private fun DangerRow(label: String, onClick: () -> Unit) {
 
 /** 连载操作两钮（「只搬不改」自退役的 `SerialOpsGroup`：条件、文案、造型逐字照旧，只是不再自带组头）。 */
 @Composable
-private fun SerialOpsButtons(status: String, onContinue: () -> Unit, onRestart: () -> Unit) {
+private fun SerialOpsButtons(ops: StorySerialOps, onContinue: () -> Unit, onRestart: () -> Unit) {
     val c = AppTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (status == StoryStatus.COMPLETED) {
+        if (ops == StorySerialOps.COMPLETED) {
             AppButton(onClick = onContinue, style = AppButtonStyle.Primary, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.story_settings_continue)) }
             AppButton(onClick = onRestart, style = AppButtonStyle.Tonal, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.story_settings_restart)) }
             Text(stringResource(R.string.story_settings_ops_footer_completed), style = AppTheme.typography.secondary, color = c.text.secondary)

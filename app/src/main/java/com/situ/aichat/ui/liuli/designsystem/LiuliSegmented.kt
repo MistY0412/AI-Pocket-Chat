@@ -3,7 +3,6 @@ package com.situ.aichat.ui.liuli.designsystem
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -38,8 +37,7 @@ import com.situ.aichat.ui.components.LocalAppHaptics
 import com.situ.aichat.ui.components.rememberReduceMotion
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
-import com.situ.aichat.ui.liuli.glass.LiuliGlassStyle
-import com.situ.aichat.ui.liuli.glass.liuliGlass
+import com.situ.aichat.ui.liuli.glass.liuliLens
 import com.situ.aichat.ui.liuli.page.LiuliPageGeometry
 import com.situ.aichat.ui.liuli.page.liuliTouchHeight
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
@@ -47,20 +45,21 @@ import kotlin.math.roundToInt
 
 /** 分段条两态（契约 §6.5「分段行」/「分段 sticky」）。 */
 enum class LiuliSegmentedStyle {
-    /** 纸面态：36 高 · 轨 `surface.sunken` · 选中段 `surface.raised` + 0.5 发丝 + 1 影。 */
+    /** 纸面态：36 高 · 轨 14 圆角 [LiuliMaterials.segTrack] · 选中片 11 圆角画出来的透镜 [liuliPaintedLens]（琉璃 2.0 卷二 §4.5-4·卷四换透镜）。 */
     Paper,
 
-    /** 玻璃态（T3 收起后住进顶栏）：40 高 · 轨透明（骑在同一片玻璃上）· 选中段 Button 档玻璃。 */
+    /** 玻璃态（T3 收起后住进顶栏）：40 高 · 轨透明（骑在同一片玻璃上）· 选中段透镜 [liuliLens]（卷四）。 */
     Glass,
 }
 
 /** 轨内边（选中段与轨之间的呼吸·对版稿 `.seg{padding:3px}` / `.segbar{padding:4px}`）。 */
 private val PAPER_INSET = 3.dp
 private val GLASS_INSET = 4.dp
-/** 段字 14/500（对版稿 `.seg span`）。 */
+/** 段字 14（对版稿 `.seg span`）；纸面态选中段 W600、其余 W500（卷二 §4.5-4）。 */
 private val LABEL_SIZE = 14.sp
-/** 纸面态选中片的影（对版稿 `0 1px 2px`）。 */
-private val PAPER_THUMB_SHADOW = 1.dp
+/** 纸面态轨 / 选中片圆角（卷二 §4.5-4·玻璃态仍 pill）。 */
+private val PAPER_TRACK_SHAPE = RoundedCornerShape(14.dp)
+private val PAPER_THUMB_SHAPE = RoundedCornerShape(11.dp)
 
 /**
  * 琉璃分段控件（图纸 2026-09-06 卷四 §2.1 · 契约 §6.5）。**禁 M3 `SegmentedButton`**（§9 ⑤）。
@@ -112,8 +111,8 @@ fun <T> LiuliSegmented(
         Box(
             Modifier
                 .matchParentSize()
-                .clip(LiuliShapes.pill)
-                .then(if (paper) Modifier.background(colors.surface.sunken) else Modifier)
+                .clip(if (paper) PAPER_TRACK_SHAPE else LiuliShapes.pill)
+                .then(if (paper) Modifier.background(LiuliMaterials.segTrack(dark)) else Modifier)
                 .padding(inset),
         ) {
             Box(
@@ -123,13 +122,10 @@ fun <T> LiuliSegmented(
                     .fillMaxHeight()
                     .then(
                         if (paper) {
-                            Modifier
-                                .shadow(PAPER_THUMB_SHADOW, LiuliShapes.pill)
-                                .clip(LiuliShapes.pill)
-                                .background(colors.surface.raised)
-                                .border(0.5.dp, colors.surface.stroke, LiuliShapes.pill)
+                            // 卷四：页面里的分段条 = 画出来的透镜（内容层放不了真玻璃）。
+                            Modifier.liuliPaintedLens(PAPER_THUMB_SHAPE, dark)
                         } else {
-                            Modifier.liuliGlass(LiuliShapes.pill, dark = dark, style = LiuliGlassStyle.Button)
+                            Modifier.liuliLens(LiuliShapes.pill, dark = dark)
                         },
                     ),
             )
@@ -161,7 +157,10 @@ fun <T> LiuliSegmented(
                 ) {
                     Text(
                         label(option),
-                        style = AppTypography.label.copy(fontSize = LABEL_SIZE, fontWeight = FontWeight.W500),
+                        style = AppTypography.label.copy(
+                            fontSize = LABEL_SIZE,
+                            fontWeight = if (paper && isSelected) FontWeight.W600 else FontWeight.W500,
+                        ),
                         color = when {
                             paper && isSelected -> colors.text.primary
                             paper -> colors.text.secondary

@@ -17,14 +17,17 @@ import com.situ.aichat.diagnostics.ContextLogService
 import com.situ.aichat.diagnostics.LogSource
 import com.situ.aichat.notification.ConversationPhase
 import com.situ.aichat.notification.ConversationState
+import com.situ.aichat.notification.ProactiveOccasionText
 import com.situ.aichat.prompt.DirtyMessageDetector
 import com.situ.aichat.prompt.memory.MemoryService
 import com.situ.aichat.prompt.messageLlmSafeText
+import com.situ.aichat.prompt.timesense.SpecialDays
 import com.situ.aichat.sticker.StickerTagParser
 import com.situ.aichat.util.DateFormatters
 import com.situ.aichat.util.JSONExtractor
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -87,6 +90,23 @@ class ProactiveMessageComposer @Inject constructor(
             return null
         }
         return parseSingle(raw)
+    }
+
+    /**
+     * 当天是特别日子 → 由头文本；否则 null（四期·图纸一 §3.8·日子判定单源 [SpecialDays.proactiveNames]）。
+     * 称呼口径同 [compose]：昵称空 → 「用户」。由调用方在「今天第一条」时才调。
+     */
+    suspend fun specialDayOccasion(character: CharacterEntity, now: Long, zone: ZoneId): String? {
+        val profile = userProfileDao.get()
+        val names = SpecialDays.proactiveNames(
+            SpecialDays.Inputs(
+                today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate(), zone = zone,
+                userLabel = (profile?.nickname ?: "").ifEmpty { "用户" },
+                userBirthdayUtcMillis = profile?.birthday, characterBirthdayUtcMillis = character.birthday,
+                firstMessageDateMillis = character.firstMessageDate,
+            ),
+        )
+        return names.takeIf { it.isNotEmpty() }?.let { ProactiveOccasionText.occasionForSpecialDay(it) }
     }
 
     /** 最近 8 条对话片段（每条≤80 字），过滤系统 / 空 / 脏消息，结构化卡走 [messageLlmSafeText] 脱敏。 */

@@ -24,6 +24,7 @@ import com.situ.aichat.ui.designsystem.AppProfileIcons
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
 import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
+import com.situ.aichat.ui.liuli.designsystem.LiuliTileTone
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextAlign
 
@@ -137,7 +138,7 @@ fun LiuliNavRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
-    tileColor: Color? = null,
+    tileColor: LiuliTileTone? = null,
     subtitle: String? = null,
     value: String? = null,
     valueWarning: Boolean = false,
@@ -192,7 +193,7 @@ fun LiuliValueRow(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     icon: ImageVector? = null,
-    tileColor: Color? = null,
+    tileColor: LiuliTileTone? = null,
     subtitle: String? = null,
     valueWarning: Boolean = false,
     divider: Boolean = true,

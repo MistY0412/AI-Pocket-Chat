@@ -52,7 +52,7 @@ internal enum class ReaderDialog {
 }
 
 /** 角色现状只读区封顶高度：内容长时内部滚动，确认键不被顶出弹窗。 */
-private val STATES_MAX_HEIGHT = 320.dp
+internal val STATES_MAX_HEIGHT = 320.dp
 
 @Composable
 internal fun ReaderDialogs(
@@ -79,11 +79,7 @@ internal fun ReaderDialogs(
         ReaderDialog.Continue -> AppDialog(
             onDismissRequest = onDismiss,
             title = stringResource(R.string.story_alert_continue_title),
-            body = if (currentHasPendingChoice) {
-                stringResource(R.string.story_alert_continue_pending_msg)
-            } else {
-                stringResource(R.string.story_alert_continue_msg)
-            },
+            body = stringResource(storyContinueAlertBodyRes(currentHasPendingChoice)),
             confirmText = stringResource(R.string.story_alert_continue_confirm),
             onConfirm = onForceContinue,
             dismissText = stringResource(R.string.action_cancel),
@@ -148,11 +144,10 @@ internal fun ReaderDialogs(
                 Column {
                     Text(stringResource(R.string.story_ending_picker_msg))
                     Spacer(Modifier.height(12.dp))
-                    AppButton(onClick = { onEnding(StoryEndingType.OPEN, null) }, style = AppButtonStyle.Text, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.story_ending_open))
-                    }
-                    AppButton(onClick = { onEnding(StoryEndingType.AI, null) }, style = AppButtonStyle.Text, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.story_ending_ai))
+                    storyEndingQuickOptions.forEach { (labelRes, type) ->
+                        AppButton(onClick = { onEnding(type, null) }, style = AppButtonStyle.Text, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(labelRes))
+                        }
                     }
                     AppButton(onClick = onOpenEndingCustom, style = AppButtonStyle.Text, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.story_ending_custom))
@@ -215,7 +210,7 @@ internal fun ReaderDialogs(
             message = stringResource(R.string.story_rewrite_instruction_msg),
             hint = stringResource(R.string.story_rewrite_instruction_hint),
             confirmLabel = stringResource(R.string.story_rewrite_instruction_confirm),
-            onConfirm = { onRewrite(it.ifEmpty { null }) },
+            onConfirm = { onRewrite(storyRewriteInstruction(it)) },
             onDismiss = onDismiss,
         )
 
@@ -238,7 +233,7 @@ internal fun ReaderDialogs(
             onConfirm = onDismiss,
             content = {
                 Text(
-                    text = characterStates?.takeIf { it.isNotBlank() } ?: stringResource(R.string.story_states_empty),
+                    text = storyCharacterStatesText(characterStates),
                     modifier = Modifier
                         .heightIn(max = STATES_MAX_HEIGHT)
                         .verticalScroll(rememberScrollState()),
@@ -309,7 +304,7 @@ private fun TextInputDialog(
         onDismissRequest = onDismiss,
         title = title,
         confirmText = confirmLabel,
-        onConfirm = { onConfirm(text.trim()); onDismiss() },
+        onConfirm = { storyDialogInputConfirm(text, onConfirm, onDismiss) },
         dismissText = stringResource(R.string.action_cancel),
         onDismiss = onDismiss,
         content = {

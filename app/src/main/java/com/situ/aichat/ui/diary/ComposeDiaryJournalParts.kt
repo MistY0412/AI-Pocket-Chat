@@ -71,10 +71,9 @@ private val TEAR_DOT_GAP = 6.dp
  * 视觉上像票根沿此撕下。取代编写页 [DiaryDashedDivider]（阅读页/时间线仍用旧虚线·本卷零碰）。
  */
 @Composable
-internal fun TearLine(modifier: Modifier = Modifier) {
+internal fun TearLine(modifier: Modifier = Modifier, notchColor: Color = AppTheme.colors.surface.base) {
     val colors = AppTheme.colors
     val dotColor = colors.text.primary.copy(alpha = if (colors.isDark) 0.14f else 0.16f)
-    val notchColor = colors.surface.base
     Box(
         modifier
             .fillMaxWidth()

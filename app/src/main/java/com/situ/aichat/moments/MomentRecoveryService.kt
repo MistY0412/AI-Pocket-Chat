@@ -3,6 +3,7 @@ package com.situ.aichat.moments
 import android.util.Log
 import com.situ.aichat.data.repository.MomentRepository
 import kotlinx.coroutines.delay
+import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -14,10 +15,11 @@ import kotlin.random.Random
  * 跑，被 HyperOS 杀后丢失；本服务在回前台 + 前台每 4 分钟扫一遍「丢失的 AI 互动」并补发——这是「延迟产物
  * 必须能被恢复重建」这一关键不变量的兑现。
  *
- * 三场景（合计上限 [MAX_RECOVERY_COUNT]=5，每项前随机延迟 10~20s 让产物陆续出现而非一齐刷出）：
+ * 四场景（合计上限 [MAX_RECOVERY_COUNT]=5，每项前随机延迟 10~20s 让产物陆续出现而非一齐刷出）：
  * - **A** 用户评论缺 AI 回复 → `generateReplyToComment`
  * - **B** 用户帖缺 AI 互动（评论/点赞）→ `autoInteractWithPost`
  * - **C** AI 帖缺「其他角色」互动 → `autoInteractWithPost`
+ * - **D** 用户帖里被提醒、醒着却还欠评论的 → `MomentMentionInteractor.settle`
  *
  * 每项都查 [MomentDelayedTaskRegistry] 去重（在途延迟任务不重复补）；B/C 只看 >5 分钟前的帖（`fiveMinAgo`
  * 防与刚发帖的延迟互动撞车）。[running] 重入锁（=iOS isRunning）保证回前台一次性与 4 分钟循环不并发。
@@ -26,6 +28,7 @@ import kotlin.random.Random
 class MomentRecoveryService @Inject constructor(
     private val momentRepo: MomentRepository,
     private val interactionService: MomentInteractionService,
+    private val mentionInteractor: MomentMentionInteractor,
 ) {
     /** 重入锁（=iOS `MomentRecoveryService.isRunning`）：并发触发时只跑一遍。 */
     private val running = AtomicBoolean(false)
@@ -38,6 +41,9 @@ class MomentRecoveryService @Inject constructor(
             recovered += recoverOrphanedUserComments(MAX_RECOVERY_COUNT - recovered, nowMillis)
             if (recovered < MAX_RECOVERY_COUNT) {
                 recovered += recoverOrphanedUserPosts(MAX_RECOVERY_COUNT - recovered, nowMillis)
+            }
+            if (recovered < MAX_RECOVERY_COUNT) {
+                recovered += recoverOwedMentions(MAX_RECOVERY_COUNT - recovered, nowMillis)
             }
             if (recovered < MAX_RECOVERY_COUNT) {
                 recovered += recoverOrphanedAIPosts(MAX_RECOVERY_COUNT - recovered, nowMillis)
@@ -86,6 +92,25 @@ class MomentRecoveryService @Inject constructor(
         return count
     }
 
+    // 场景 D（朋友圈发布页重构·甲 J-5）：窗口内带「提醒了谁」的用户帖，醒着、没在见面、还欠评论、也不在待互动队列的被提醒者——补兑现
+    // （被杀后台时评论链断在半路的兜底）；此刻不能来的由 takeAwakeOwed 顺手入队。
+    private suspend fun recoverOwedMentions(remaining: Int, nowMillis: Long): Int {
+        if (remaining <= 0) return 0
+        val zone = ZoneId.systemDefault()
+        val posts = momentRepo.recentUserPostsWithMentionsInWindow(nowMillis - DAY_MS, nowMillis - FIVE_MIN_MS, remaining * 2)
+        var count = 0
+        for (post in posts) {
+            if (count >= remaining) break
+            if (MomentDelayedTaskRegistry.containsTask(post.uuid, MomentDelayedTaskRegistry.Purpose.AutoInteraction)) continue
+            val awake = mentionInteractor.takeAwakeOwed(post, nowMillis, zone)
+            if (awake.isEmpty()) continue
+            delay(perItemDelayMs())
+            mentionInteractor.settle(post.uuid, awake, zone)
+            count++
+        }
+        return count
+    }
+
     // 场景 C：AI 帖缺「其他角色」互动 —— 同 B 窗口，扫 AI 帖、无非作者角色的评论/点赞的，补发互动。
     private suspend fun recoverOrphanedAIPosts(remaining: Int, nowMillis: Long): Int {
         if (remaining <= 0) return 0
@@ -111,7 +136,7 @@ class MomentRecoveryService @Inject constructor(
     private companion object {
         const val TAG = "MomentRecovery"
 
-        /** 单次恢复上限（场景 A+B+C 合计，iOS maxRecoveryCount=5）。 */
+        /** 单次恢复上限（场景 A+B+C+D 合计，iOS maxRecoveryCount=5）。 */
         const val MAX_RECOVERY_COUNT = 5
 
         /** 每项恢复前随机延迟 10~20s（iOS perItemDelayRange）。 */

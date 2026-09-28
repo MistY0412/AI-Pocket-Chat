@@ -15,13 +15,14 @@ import javax.inject.Singleton
  * DB 那条」旧路径，故需本扫描兜底。**只删不在引用集的文件 → 绝不误删在用壁纸**。
  *
  * 编辑会话内的常见重选/移除由 `CharacterEditScreen` 即时回收（只删本会话 save 出来的中间文件）；本服务是 catch-all 兜底。
+ * 每次回前台都跑，故只清放满一天的孤儿（[WallpaperStore.ORPHAN_MIN_AGE_MS]·卷四复核 R1：否则编辑中裁好未保存的壁纸会被删）。
  */
 @Singleton
 class WallpaperMaintenanceService @Inject constructor(
     @ApplicationContext private val context: Context,
     private val characterDao: CharacterDao,
 ) {
-    /** 冷启清孤儿壁纸（off-main·best-effort），返回删除数。失败/无目录返回 0。 */
+    /** 回前台清孤儿壁纸（off-main·best-effort·只清放满一天的），返回删除数。失败/无目录返回 0。 */
     suspend fun purgeOrphanWallpapers(): Int {
         val referenced = characterDao.allChatWallpaperPaths().toSet()
         return WallpaperStore.purgeOrphans(context, referenced)

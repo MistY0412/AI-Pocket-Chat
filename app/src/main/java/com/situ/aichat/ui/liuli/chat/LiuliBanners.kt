@@ -47,6 +47,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.situ.aichat.R
@@ -245,19 +246,21 @@ internal fun LiuliArrivalButton(onArrive: () -> Unit, modifier: Modifier = Modif
 /**
  * 日历操作提示 toast（照抄源 F31 `ui/chat/ChatCalendarViews.kt:132-168`）：`text != null` 即显、
  * 进出动画与 `liveRegion = Polite` 一字不动；4s 自动消仍由 VM 定时（本件不碰）。
+ * 卷四 §0.2-11：顶距 = [topPadding]（与约定提示 / 横幅同一个 `listTopPadding`·原来落在窗口顶 8dp、被顶栏盖住）。
  */
 @Composable
 internal fun BoxScope.LiuliCalendarToast(
     text: String?,
     isDelete: Boolean,
     reduceMotion: Boolean,
+    topPadding: Dp,
     onDismiss: () -> Unit,
 ) {
     val colors = AppTheme.colors
     val dark = LocalIsDarkTheme.current
     AnimatedVisibility(
         visible = text != null,
-        modifier = Modifier.align(Alignment.TopCenter),
+        modifier = Modifier.align(Alignment.TopCenter).padding(top = topPadding),
         enter = if (reduceMotion) EnterTransition.None else fadeIn() + expandIn(),
         exit = if (reduceMotion) ExitTransition.None else shrinkOut() + fadeOut(),
     ) {
@@ -265,7 +268,7 @@ internal fun BoxScope.LiuliCalendarToast(
             val dot = if (isDelete) colors.status.onWarning else colors.status.onSuccess
             Row(
                 modifier = Modifier
-                    .padding(8.dp)
+                    .padding(horizontal = 8.dp)
                     .height(TOAST_HEIGHT)
                     .liuliGlass(LiuliShapes.pill, dark = dark)
                     .padding(start = 12.dp, end = 6.dp)

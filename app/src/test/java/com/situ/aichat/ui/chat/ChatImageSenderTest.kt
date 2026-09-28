@@ -9,6 +9,7 @@ import com.situ.aichat.data.local.entity.ConversationEntity
 import com.situ.aichat.data.local.entity.MessageEntity
 import com.situ.aichat.data.repository.CharacterRepository
 import com.situ.aichat.data.repository.ConversationRepository
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.prompt.memory.MeetingArchiveVectorService
 import com.situ.aichat.prompt.memory.TextEmbedder
 import com.situ.aichat.prompt.memory.VectorMemoryService
@@ -23,6 +24,7 @@ import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -188,5 +190,18 @@ class ChatImageSenderTest {
         // 该不该为图片放宽这道下限（弱向量 vs 一堆同构向量互相挤占召回名额）属产品取舍，留用户/R4 裁。
         vectorService().embedImageMessageAfterSummary(imageMessage(summary = ""))
         coVerify(exactly = 0) { messageDao.updateEmbedding(any(), any()) }
+    }
+
+    // ── 时间感知四期·图纸三 T2-6（E15）：图片理解的日志挂在那条图片消息上 ──
+
+    @Test
+    fun `图纸三_图片理解在forMessage的trace里跑`() = runTest {
+        stubPickedImages()
+        val seen = mutableListOf<LogTrace?>()
+        coEvery { summaryService.summarize(any(), any(), any()) } coAnswers { seen += currentCoroutineContext()[LogTrace]; "海边的黄昏" }
+        sendAndDrain(2)
+
+        // 四期图纸四复核 R1：带上会话的角色 uuid（不带时日志页只能按角色名归属，改名后挂到旧名字下）
+        assertEquals(stored.map { LogTrace(conversationUuid, "char-1", null, it.messageUUID) }, seen)
     }
 }

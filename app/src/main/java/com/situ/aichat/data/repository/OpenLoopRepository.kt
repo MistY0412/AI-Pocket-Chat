@@ -3,6 +3,7 @@ package com.situ.aichat.data.repository
 import com.situ.aichat.data.local.dao.OpenLoopDao
 import com.situ.aichat.data.local.entity.OpenLoopEntity
 import com.situ.aichat.data.local.entity.OpenLoopStatus
+import com.situ.aichat.data.local.entity.OpenLoopType
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,6 +17,13 @@ class OpenLoopRepository @Inject constructor(
 ) {
     /** 某角色全部 open loops（createdAt 升序）——扫描去重简报 / 过期清理 / 注入选择的单一数据源。 */
     suspend fun openLoopsForCharacter(characterUuid: String): List<OpenLoopEntity> = dao.openByCharacter(characterUuid)
+
+    /**
+     * 「惦记的事」口径（四期·图纸一 §3.6）：去掉她自己的打算（[OpenLoopType.PLAN_CHAR]·只进日程）。
+     * 聊天注入 / 回访门控 / 日记 / 约定桥接用；扫描自身去重与过期仍用 [openLoopsForCharacter]。
+     */
+    suspend fun openLoopsForChat(characterUuid: String): List<OpenLoopEntity> =
+        dao.openByCharacter(characterUuid).filterNot { it.typeRaw == OpenLoopType.PLAN_CHAR }
 
     suspend fun byUuid(uuid: String): OpenLoopEntity? = dao.byUuid(uuid)
 

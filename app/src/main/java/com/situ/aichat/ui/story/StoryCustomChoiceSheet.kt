@@ -51,10 +51,10 @@ fun StoryCustomChoiceSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var text by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
-    val trimmed = text.trim()
+    val submitText = storyCustomChoiceSubmitText(text)
 
     LaunchedEffect(Unit) {
-        delay(250) // 等 Sheet 呈现动画完成再弹键盘，避免布局跳动（= iOS）
+        delay(STORY_CUSTOM_CHOICE_FOCUS_DELAY_MS) // 等 Sheet 呈现动画完成再弹键盘，避免布局跳动（= iOS）
         runCatching { focusRequester.requestFocus() }
     }
 
@@ -109,14 +109,9 @@ fun StoryCustomChoiceSheet(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), modifier = Modifier.fillMaxWidth()) {
                 AppButton(onClick = onDismiss, style = AppButtonStyle.Text) { Text(stringResource(R.string.action_cancel)) }
                 AppButton(
-                    onClick = {
-                        if (trimmed.isNotEmpty()) {
-                            onConfirm(trimmed)
-                            onDismiss()
-                        }
-                    },
+                    onClick = { submitText?.let { onConfirm(it); onDismiss() } },
                     style = AppButtonStyle.Primary,
-                    enabled = trimmed.isNotEmpty(),
+                    enabled = submitText != null,
                 ) { Text(stringResource(R.string.action_confirm)) }
             }
         }

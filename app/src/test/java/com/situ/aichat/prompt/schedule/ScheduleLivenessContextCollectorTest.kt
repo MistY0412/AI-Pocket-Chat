@@ -220,4 +220,35 @@ class ScheduleLivenessContextCollectorTest {
         assertTrue(ctx.upcomingPromises.isEmpty())
         assertEquals(listOf("惦记仍在"), ctx.openLoops)
     }
+
+    // ── 四期·图纸一 §3.7（T2-5·E35）：她自己的打算只收目标日、09:00 不标时刻、不混进惦记 ──
+
+    private fun plan(id: String, content: String, dueAt: Long?) = OpenLoopEntity(
+        uuid = id, conversationUuid = "conv", characterUuid = uuid, content = content,
+        typeRaw = "plan_char", dueAt = dueAt, createdAt = 1L,
+    )
+
+    @Test
+    fun `E35 打算只收目标日_09点不标时刻_其余标HHmm_且不进惦记`() = runBlocking {
+        val hour = 3_600_000L
+        db.openLoopDao().upsertAll(
+            listOf(
+                plan("p1", "看牙", dayStart + 15 * hour + 30 * 60_000L),
+                plan("p2", "进一批咖啡豆", dayStart + 9 * hour),
+                plan("p3", "回老家", dayEnd + 9 * hour), // 明天
+                plan("p4", "取快递", dayStart - 2 * hour), // 昨天
+                loop("l1", "用户下周面试"),
+            ),
+        )
+        val ctx = collector.collectFor(uuid, dayStart, zone)
+        assertEquals(listOf("进一批咖啡豆", "15:30 看牙"), ctx.ownPlans)
+        assertEquals("惦记不含打算", listOf("用户下周面试"), ctx.openLoops)
+    }
+
+    @Test
+    fun `打算最多3条_按时刻升序`() = runBlocking {
+        val hour = 3_600_000L
+        db.openLoopDao().upsertAll((1..4).map { plan("p$it", "事$it", dayStart + (20 - it) * hour) })
+        assertEquals(listOf("16:00 事4", "17:00 事3", "18:00 事2"), collector.collectFor(uuid, dayStart, zone).ownPlans)
+    }
 }

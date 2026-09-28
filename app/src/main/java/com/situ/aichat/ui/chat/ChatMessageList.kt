@@ -23,6 +23,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -133,6 +134,8 @@ internal fun ChatMessageList(
         }
         val placementSpec: FiniteAnimationSpec<IntOffset>? =
             if (removalSpringWindow) AppMotion.messageReceiveSpring(IntOffset.VisibilityThreshold) else null
+        // 卷四 §0.2-7：有壁纸时泡下时间戳换壁纸上的玻璃主字色 + 描边（无壁纸 = null = 原样）。
+        val stampTone = remember(wallpaper) { wallpaper?.let(::warmBubbleStampTone) }
         LazyColumn(
             state = listState,
             // 底部锚定（契约 REVERSE_LIST §2 ①）：index 0=最新钉在底边，视口缩放（键盘/面板）天然钉底。
@@ -226,25 +229,27 @@ internal fun ChatMessageList(
                                 // M3b：飞行期整行由覆盖层代画（含时间戳·落地帧像素一致交还）。
                                 .then(if (flightRow) Modifier.alpha(0f) else Modifier),
                         ) {
-                            MessageRow(
-                                message = msg,
-                                topPadding = renderItem.topPadding,
-                                characterName = characterName,
-                                avatarPath = avatarPath,
-                                userName = userName,
-                                userAvatarPath = userAvatarPath,
-                                customStickers = customStickers,
-                                isVoicePlaying = voicePlaying,
-                                // 审计 P3：只有播放中那一行拿到真 progress lambda；其余拿零常量（无快照依赖=绝不失效）。
-                                voiceProgress = if (voicePlaying) voiceProgress else ZeroProgress,
-                                actions = actions,
-                                canRegenerate = RegenerableTurn.canRegenerate(msg.messageUUID, regenerableUuids, isSending),
-                                deliveryRead = if (msg.roleRaw == "user") msg.messageUUID in readUserMessageUuids else null,
-                                voiceCascadePlay = voiceCascadePlay,
-                                flightTracking = flightRow,
-                                voiceSetupNeeded = voiceSetupNeeded,
-                                dividerEntryAnimation = newArrival, // 卷三 V3：离场分隔条落成只在新到达那一刻播
-                            )
+                            CompositionLocalProvider(LocalBubbleStampTone provides stampTone) {
+                                MessageRow(
+                                    message = msg,
+                                    topPadding = renderItem.topPadding,
+                                    characterName = characterName,
+                                    avatarPath = avatarPath,
+                                    userName = userName,
+                                    userAvatarPath = userAvatarPath,
+                                    customStickers = customStickers,
+                                    isVoicePlaying = voicePlaying,
+                                    // 审计 P3：只有播放中那一行拿到真 progress lambda；其余拿零常量（无快照依赖=绝不失效）。
+                                    voiceProgress = if (voicePlaying) voiceProgress else ZeroProgress,
+                                    actions = actions,
+                                    canRegenerate = RegenerableTurn.canRegenerate(msg.messageUUID, regenerableUuids, isSending),
+                                    deliveryRead = if (msg.roleRaw == "user") msg.messageUUID in readUserMessageUuids else null,
+                                    voiceCascadePlay = voiceCascadePlay,
+                                    flightTracking = flightRow,
+                                    voiceSetupNeeded = voiceSetupNeeded,
+                                    dividerEntryAnimation = newArrival, // 卷三 V3：离场分隔条落成只在新到达那一刻播
+                                )
+                            }
                         }
                     }
                 }

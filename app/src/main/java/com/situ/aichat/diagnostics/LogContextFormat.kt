@@ -7,7 +7,7 @@ import com.situ.aichat.data.remote.llm.ChatMessageDto
  * 把发给大模型的消息渲染成可读全文 + 统一截断（批 D·纯函数·移植 iOS `LogService.formatContextForDisplay` /
  * `clippedTextForLog`）。
  *
- * 纯展示用，**不被任何检测器/解析器消费**（与提示词段标题强耦合无关），故格式可自由演进。
+ * 纯展示用，不被提示词侧检测器消费；唯一的解析方是同文件的 [parseRendered]（日志页「改写前」·改表头须同步）。
  * **全量记录（D-3 打磨·2026-07-16 用户拍板）**：旧版承袭 iOS 对后台重任务落库前剪 1200 字/条 +
  * 8000 字全文 + 6000 字回复——故事圣经、记忆档案被剪掉大半，无法判断生成质量，已整体取消。
  * 现统一只留 [STORED_TEXT_HARD_LIMIT] 极端安全帽，体积靠「detail 默认关 + 容量轮转 + 列表轻投影
@@ -41,12 +41,15 @@ object LogContextFormat {
         msg.content?.takeIf { it.isNotEmpty() }?.let { return it }
         val parts = msg.contentParts ?: return msg.content.orEmpty()
         return parts.joinToString(separator = "\n") { part ->
-            when (part) {
-                is ChatContentPart.Text -> part.text
-                is ChatContentPart.ImageUrl -> "[图片 · 约 ${approxKb(part.url)} KB]"
-                is ChatContentPart.InputAudio -> "[语音 · 约 ${approxKb(part.base64)} KB]"
-            }
+            if (part is ChatContentPart.Text) part.text else mediaPlaceholder(part).orEmpty()
         }
+    }
+
+    /** 媒体段的替身文字（单源·四期·图纸三 §3.8 导出请求共用）：图片 / 语音 → `[图片 · 约 N KB]` / `[语音 · 约 N KB]`；文字段 → null。 */
+    internal fun mediaPlaceholder(part: ChatContentPart): String? = when (part) {
+        is ChatContentPart.Text -> null
+        is ChatContentPart.ImageUrl -> "[图片 · 约 ${approxKb(part.url)} KB]"
+        is ChatContentPart.InputAudio -> "[语音 · 约 ${approxKb(part.base64)} KB]"
     }
 
     /** base64 / data URI 的近似原始体积（KB）——只给量级，不落原文。 */
@@ -88,6 +91,38 @@ object LogContextFormat {
         val cut = if (Character.isHighSurrogate(text[limit - 1])) limit - 1 else limit
         return text.take(cut) + "\n\n[日志内容已截断，共 ${text.length} 字]"
     }
+
+    /** [parseRendered] 的一条：表头标签（系统提示 / 用户 / 角色 / 原 role）+ 正文。 */
+    data class RenderedMessage(val label: String, val body: String)
+
+    /**
+     * [render] 的逆（四期·图纸四 §3.7）：表头之后到下一个表头或整行 == [SEP] 之前为正文（去掉末尾一个空行；被 [clip]
+     * 截断的末条正文到全文结尾）；没有表头 → 空表。改表头格式须两处同改并跑往返测试（REDLINES §1）。
+     */
+    fun parseRendered(text: String): List<RenderedMessage> {
+        val out = ArrayList<RenderedMessage>()
+        var label: String? = null
+        val body = ArrayList<String>()
+        fun flush() {
+            val l = label ?: return
+            if (body.lastOrNull() == "") body.removeAt(body.lastIndex)
+            out += RenderedMessage(l, body.joinToString(separator = "\n"))
+            body.clear(); label = null
+        }
+        for (line in text.split('\n')) {
+            val header = RENDERED_HEADER.matchEntire(line)
+            when {
+                header != null -> { flush(); label = header.groupValues[1] }
+                line == SEP -> flush()
+                label != null -> body += line
+            }
+        }
+        flush()
+        return out
+    }
+
+    /** [render] 的逐条表头（组 1 = 标签）。 */
+    private val RENDERED_HEADER = Regex("""^───── \S+ (.+) \[\d+/\d+] ─────$""")
 
     private fun roleIconLabel(role: String): Pair<String, String> = when (role) {
         "system" -> "⚙️" to "系统提示"

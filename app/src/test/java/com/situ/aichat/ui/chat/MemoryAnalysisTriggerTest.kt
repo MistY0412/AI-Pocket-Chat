@@ -9,6 +9,7 @@ import com.situ.aichat.data.remote.llm.ApiConfigValues
 import com.situ.aichat.data.repository.CharacterRepository
 import com.situ.aichat.data.repository.CharacterWriteLock
 import com.situ.aichat.data.repository.ConversationRepository
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.prompt.memory.MemoryDigestCoordinator
 import com.situ.aichat.prompt.memory.MemoryService
 import com.situ.aichat.prompt.memory.MemorySummaryError
@@ -21,9 +22,12 @@ import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Before
 import org.junit.Test
 
@@ -285,5 +289,30 @@ class MemoryAnalysisTriggerTest {
             "c1", config, AppSettings(growthSystemEnabled = true, structuredMemoryInterval = 1), "用户",
         )
         verify(exactly = 0) { onStructuredMemoryExtracted(any()) }
+    }
+
+    // ---- 时间感知四期·图纸三 T2-5（E9）：带 trace 调触发器 → 下游在 trace 上下文里跑 ----
+    // 本测试假件停在 coordinator（contextLog 再往下两跳，同一条协程·图纸 §0.1）；读调用方上下文用 currentCoroutineContext()。
+
+    private val logTrace = LogTrace("conv-1", "c1", "turn-1", "msg-1")
+
+    @Test
+    fun 图纸三_摘要带trace_总结在trace上下文里跑() {
+        stubSummaryPath(outsideUserRounds = 10)
+        var seen: LogTrace? = null
+        coEvery { digestCoordinator.digestAndReconcile(any(), any(), any(), any(), any(), any()) } coAnswers { seen = currentCoroutineContext()[LogTrace]; "新摘要" }
+        trigger.checkAndTriggerMemorySummary("c1", config, AppSettings(autoSummarizeInterval = 10), "用户", trace = logTrace)
+        assertSame(logTrace, seen)
+    }
+
+    @Test
+    fun 图纸三_结构化带trace_抽取在trace上下文里跑_不带则无() {
+        coEvery { characterRepo.get("c1") } returns CharacterEntity(uuid = "c1", name = "测试", creationDate = 0L)
+        val seen = mutableListOf<LogTrace?>()
+        coEvery { structuredCoordinator.extractAndPersist(any(), any(), any()) } coAnswers { seen += currentCoroutineContext()[LogTrace]; false }
+        val settings = AppSettings(growthSystemEnabled = true, structuredMemoryInterval = 1)
+        trigger.incrementStructuredMemoryRoundAndCheck("c1", config, settings, "用户", trace = logTrace)
+        trigger.incrementStructuredMemoryRoundAndCheck("c1", config, settings, "用户")
+        assertEquals(listOf(logTrace, null), seen)
     }
 }

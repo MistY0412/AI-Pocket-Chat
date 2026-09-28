@@ -25,7 +25,7 @@ data class OpenLoopEntity(
     val characterUuid: String,
     /** 一句话概括（第三人称·≤30 字）。 */
     val content: String,
-    /** [OpenLoopType]：promise_char | user_event | open_topic。 */
+    /** [OpenLoopType]：promise_char | user_event | open_topic | plan_char（四期·图纸一 §3.6·TEXT 列零迁移）。 */
     val typeRaw: String,
     /** 到期时间（epoch millis·可空=无明确日期，仅对话内回连、不排到期 worker）。 */
     val dueAt: Long? = null,
@@ -42,7 +42,8 @@ object OpenLoopType {
     const val PROMISE_CHAR = "promise_char"  // 角色答应过对方的事
     const val USER_EVENT = "user_event"      // 用户提到的即将发生 / 未有结果的事
     const val OPEN_TOPIC = "open_topic"      // 悬而未决的开放话题
-    val ALL = setOf(PROMISE_CHAR, USER_EVENT, OPEN_TOPIC)
+    const val PLAN_CHAR = "plan_char"  // 角色自己说过、有具体日期的打算（只进日程，不进惦记）
+    val ALL = setOf(PROMISE_CHAR, USER_EVENT, OPEN_TOPIC, PLAN_CHAR)
 }
 
 /** [OpenLoopEntity.statusRaw] 取值。 */

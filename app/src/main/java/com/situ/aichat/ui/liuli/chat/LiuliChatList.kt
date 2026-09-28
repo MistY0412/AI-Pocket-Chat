@@ -30,18 +30,16 @@ import com.situ.aichat.ui.chat.ChatRenderItem
 import com.situ.aichat.ui.chat.ChatSendFlightState
 import com.situ.aichat.ui.chat.MessageRowActions
 import com.situ.aichat.ui.chat.RegenerableTurn
-import com.situ.aichat.ui.chat.bubbleGroupsWith
 import com.situ.aichat.ui.chat.emotionBubbleEntry
 import com.situ.aichat.ui.chat.giftRedPacketArcEntry
-import com.situ.aichat.ui.chat.isChatTimeBreak
 import com.situ.aichat.ui.chat.userBubbleEntryScale
 import com.situ.aichat.ui.components.AppMotion
 import kotlinx.coroutines.delay
 
 /**
  * 琉璃消息列表（图纸 2026-09-05 卷二A §4.4）：**反转底部锚定**四参数与行级动画记账逐条照抄暖陶
- * `ChatMessageList`（契约 REVERSE_LIST §2·`LiuliChatListBehaviorTest` 按同配置钉），只做两件琉璃事——
- * ① 每一行分派给 [LiuliMessageRow]（卷二C 收口后**不再 import 任何暖陶行级 UI**）② 连发段末条带尾巴（[isRunLast]）。
+ * `ChatMessageList`（契约 REVERSE_LIST §2·`LiuliChatListBehaviorTest` 按同配置钉），琉璃只做一件事——
+ * 每一行分派给 [LiuliMessageRow]（琉璃自己的行分派；卷三起叶子气泡用暖陶组件，连发段不再带尾巴）。
  *
  * 横幅族 / 日期胶囊 / 滚到底钮**不在本件内**（图纸 §3.1 把它们排在列表区 Box 的兄弟位，见 [LiuliChatLayout]）。
  */
@@ -92,10 +90,6 @@ internal fun LiuliChatList(
         set
     }
     val regenerableUuids = remember(messages) { RegenerableTurn.trailingUuids(messages) }
-    // 末条尾巴按 key 预算（保住 `items(listItems, key, contentType)` 的锁定形态·F5）。
-    val tailByKey = remember(listItems) {
-        listItems.indices.associate { listItems[it].key to isRunLast(listItems, it) }
-    }
     val flightPending = sendFlight.pending
     val flightUuid = sendFlight.flightUuid
     // V9 照抄：位移动画默认关（与变身长高刚性锁步），唯删除窗内启用弹簧收拢。
@@ -197,7 +191,6 @@ internal fun LiuliChatList(
                             actions = actions,
                             canRegenerate = canRegenerate,
                             deliveryRead = deliveryRead,
-                            tail = tailByKey[renderItem.key] ?: true,
                             flightTracking = flightRow,
                             reaction = reaction,
                             reduceMotion = reduceMotion,
@@ -211,25 +204,6 @@ internal fun LiuliChatList(
             }
         }
     }
-}
-
-/**
- * 连发段**末条**判定（图纸 §0 ② 7 · 纯函数 · T1-3）：反转序里 index 0 恒是末条（含打字占位）；
- * 其余看它与「更新的那一条」（index−1）成不成组——不成组即本段到此为止，带尾巴。
- * 成组判据复用暖陶纯函数 [bubbleGroupsWith] / [isChatTimeBreak]（同角色 + 无时间断层 + 双方 PLAIN_TEXT）。
- */
-internal fun isRunLast(items: List<ChatRenderItem>, index: Int): Boolean {
-    if (index <= 0) return true
-    val current = (items[index] as? ChatRenderItem.Message)?.entity ?: return true
-    val newer = (items[index - 1] as? ChatRenderItem.Message)?.entity ?: return true
-    val timeBreak = isChatTimeBreak(current.timestamp, newer.timestamp)
-    return !bubbleGroupsWith(
-        earlierRole = current.roleRaw,
-        earlierKindRaw = current.messageKindRaw,
-        laterRole = newer.roleRaw,
-        laterKindRaw = newer.messageKindRaw,
-        separatedByTimeBreak = timeBreak,
-    )
 }
 
 /** 非播放行的进度常量（审计 P3 照抄）：不触任何快照状态 → 行绝不因播放 tick 失效。 */

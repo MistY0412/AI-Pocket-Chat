@@ -9,9 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -24,15 +22,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,12 +42,10 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -71,8 +64,6 @@ import com.situ.aichat.ui.designsystem.AppSegmentedControl
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTopBar
 import java.time.Instant
-import java.time.YearMonth
-import java.time.ZoneId
 
 /**
  * 日记本主界面（日记重设计 R1·契约 §1.1 S1）：手账×杂志时间线（月分节大字 + 票据虚线 + 票据卡）+
@@ -105,12 +96,7 @@ fun DiaryListScreen(
     var shownReview by remember { mutableStateOf<com.situ.aichat.data.local.entity.MonthlyReviewEntity?>(null) }
     var deleteTarget by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) { viewModel.refreshApiMissing() }
-    // diary-1：进/出日记列表都标记已读，清枢纽日记卡未读角标。
-    DisposableEffect(Unit) {
-        viewModel.markDiaryAsRead()
-        onDispose { viewModel.markDiaryAsRead() }
-    }
+    DiaryListLifecycleEffects(viewModel)
 
     // 门楣升起态的滚动源：三视图各有各的列表，按当前视图取（日历视图不吃升起态）。
     val timelineState = rememberLazyListState()
@@ -174,11 +160,11 @@ fun DiaryListScreen(
             if (apiMissing) ApiMissingBanner()
             if (entries.isEmpty()) {
                 // 一篇都没有：不出筛选条，直接引导写第一篇。
-                DiaryEmptyState(onCompose)
+                DiaryEmptyState { AppButton(onClick = onCompose, style = AppButtonStyle.Primary) { Text(stringResource(R.string.diary_empty_action)) } }
             } else {
                 // U4：筛选条常驻（F1·三视图共用·F2）；筛在底层条目，切换视图跟着筛。
                 DiaryEntryFilterRow(selected = entryFilter, onSelect = { entryFilter = it })
-                val filtered = remember(entries, entryFilter) { entries.filter { entryFilter.matches(it.entry) } }
+                val filtered = remember(entries, entryFilter) { filterDiaryEntries(entries, entryFilter) }
                 // F3：非「全部」时藏顶部情境卡（交换信封 + 那年今天）→ 纯净档案。
                 val showContextCards = entryFilter == DiaryEntryFilter.ALL
                 when {
@@ -274,46 +260,6 @@ private fun ComposePill(onClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun ApiMissingBanner() {
-    val colors = AppTheme.colors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(AppTheme.shapes.small)
-            .background(colors.status.errorContainer)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Icon(Icons.Filled.Warning, contentDescription = null, tint = colors.status.onError, modifier = Modifier.size(16.dp))
-        Text(stringResource(R.string.diary_api_missing), style = AppTheme.typography.secondary, color = colors.status.onError)
-    }
-}
-
-@Composable
-private fun DiaryEmptyState(onCompose: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("📖", style = AppTheme.typography.titleLarge, modifier = Modifier.clearAndSetSemantics {}) // 装饰压停
-        Spacer(Modifier.height(12.dp))
-        Text(stringResource(R.string.diary_empty_title), style = AppTheme.typography.titleSmall, color = AppTheme.colors.text.primary)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            stringResource(R.string.diary_empty_desc),
-            style = AppTheme.typography.secondary,
-            color = AppTheme.colors.text.secondary,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(16.dp))
-        AppButton(onClick = onCompose, style = AppButtonStyle.Primary) { Text(stringResource(R.string.diary_empty_action)) }
-    }
-}
-
 /** U4 作者筛选条（复用已过审 [AppSegmentedControl]·陶土药丸滑块·三视图共用·F7 不带计数）。 */
 @Composable
 private fun DiaryEntryFilterRow(selected: DiaryEntryFilter, onSelect: (DiaryEntryFilter) -> Unit) {
@@ -324,28 +270,6 @@ private fun DiaryEntryFilterRow(selected: DiaryEntryFilter, onSelect: (DiaryEntr
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         label = { stringResource(it.labelRes) },
     )
-}
-
-/** U4 F5：某筛选无内容的空态（尊重语气·不塞按钮）。「全部」空态由外层 [DiaryEmptyState] 接管，此处只 MINE/THEIRS。 */
-@Composable
-private fun DiaryFilterEmptyState(filter: DiaryEntryFilter) {
-    val msg = if (filter == DiaryEntryFilter.THEIRS) {
-        R.string.diary_filter_empty_theirs
-    } else {
-        R.string.diary_filter_empty_mine
-    }
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            stringResource(msg),
-            style = AppTheme.typography.secondary,
-            color = AppTheme.colors.text.secondary,
-            textAlign = TextAlign.Center,
-        )
-    }
 }
 
 // MARK: - 时间线（月分节：M月 大字 + yyyy 小字 + 票据虚线）
@@ -375,10 +299,7 @@ private fun DiaryTimeline(
     val sections = rememberDiaryMonthSections(entries)
     val reduceMotion = rememberReduceMotion()
     // 当前未完月不出回顾 chip（月过完才小结）。
-    val currentMonthStart = remember {
-        YearMonth.now(ZoneId.systemDefault())
-            .atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-    }
+    val currentMonthStart = remember { diaryCurrentMonthStartMillis() }
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -412,11 +333,7 @@ private fun DiaryTimeline(
             }
             items(section.entries, key = { it.entry.uuid }) { ewc ->
                 // U3：活角色取活名，已删取快照名 + 「故友的信」淡标（§6.3 O1/O2）。
-                val authorDisplay = diaryAuthorDisplay(
-                    ewc.entry.authorCharacterUuid,
-                    ewc.entry.authorNameSnapshot,
-                    ewc.entry.authorCharacterUuid?.let { charactersByUuid[it]?.name },
-                )
+                val authorDisplay = diaryAuthorDisplayOf(ewc.entry, charactersByUuid)
                 DiaryEntryCard(
                     entry = ewc.entry,
                     commentCount = ewc.comments.size,

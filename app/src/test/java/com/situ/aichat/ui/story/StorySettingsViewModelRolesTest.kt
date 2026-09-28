@@ -84,7 +84,7 @@ class StorySettingsViewModelRolesTest {
                 stored += new
             }
         }
-        coEvery { repo.deleteRole(any()) } answers { stored.removeAll { it.id == firstArg<String>() }; Unit }
+        coEvery { repo.deleteRole(any()) } answers { stored.removeAll { it.id == firstArg<String>() } }
         return StorySettingsViewModel(
             SavedStateHandle(mapOf("storyId" to "s1")),
             repo,

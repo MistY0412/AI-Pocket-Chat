@@ -63,7 +63,8 @@ class PromptBuilderOfflineNowCardTest {
             character = CharacterEntity(uuid = "c1", name = "小雨", creationDate = 0L),
             conversation = conversation,
             sortedMessages = listOf(
-                // 3 小时前的角色消息：在线时应产出「对方隔了约 3 小时才回你」间隔行；线下专版必须退场。
+                // 3 小时前的角色消息 + 1 分钟前的用户消息：在线时现在卡出「这条消息距离上条过去了约 3 小时」
+                // （四期·图纸一 §3.5 取代旧方向化间隔行）；线下专版必须退场。
                 MessageEntity(
                     messageUUID = "a1", conversationUuid = "cv1", roleRaw = "assistant",
                     content = "上午忙完啦", timestamp = now.toEpochMilli() - 3 * 3_600_000,
@@ -90,6 +91,7 @@ class PromptBuilderOfflineNowCardTest {
         assertFalse("进行中时点不得再报", text.contains("预计还持续约"))
         assertFalse("短信示范不得注入", text.contains("刚到公司准备开会"))
         assertFalse("时间锚间隔行退场", text.contains("对方隔了"))
+        assertFalse("四期间隔行同样退场（E25）", text.contains("这条消息距离上条"))
         assertFalse("五档短信措辞退场", text.contains("重新拿起手机"))
         // 四小件图纸 §7 T2-7 / E15（2026-07-16）：裁决句属在线注入指令，线下专版全装配不得出现。
         // 独有句取「那些是过去，这是现在」（全库唯一·§9 独有句纪律）。
@@ -107,7 +109,9 @@ class PromptBuilderOfflineNowCardTest {
         val text = systemText(offline = false)
         assertTrue("在线【此刻】带进行中时点", text.contains("预计还持续约"))
         assertTrue("在线注入指令示范仍在", text.contains("刚到公司准备开会"))
-        assertTrue("在线间隔行仍在", text.contains("对方隔了约 3 小时才回你"))
+        // 四期·图纸一 §3.5：在线文字聊天的间隔行由「这条消息距离上条」取代（a1 → u1 = 2 小时 59 分 → 约 3 小时）。
+        assertTrue("在线间隔行仍在（四期新行）", text.contains("这条消息距离上条过去了约 3 小时"))
+        assertFalse("旧方向化间隔行不再出现", text.contains("对方隔了"))
     }
 
     @Test

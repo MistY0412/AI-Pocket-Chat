@@ -8,11 +8,13 @@ import com.situ.aichat.data.local.entity.MessageEntity
 import com.situ.aichat.data.model.MessageContentSentinels
 import com.situ.aichat.data.repository.CharacterRepository
 import com.situ.aichat.data.repository.ConversationRepository
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.offline.outgoingOfflineSessionId
 import com.situ.aichat.util.ContentImageStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /**
@@ -75,7 +77,7 @@ internal class ChatImageSender(
         if (pendingSummaries.isNotEmpty()) {
             scope.launch {
                 for ((uuid, path) in pendingSummaries) {
-                    runCatching { imageMemorySummaryService.summarize(uuid, path, characterName) }
+                    runCatching { withContext(LogTrace.forMessage(conversationUuid, convo.characterUuid, uuid)) { imageMemorySummaryService.summarize(uuid, path, characterName) } } // 四期·图纸三：日志挂在这条图片消息上
                         .onFailure { android.util.Log.w(TAG, "图片摘要失败(不影响主流程): ${it.message}") }
                     // 摘要落库后**才**嵌入这一条（VectorMemoryService 对「有图且无摘要」有意推迟）：
                     // 这样每条图片消息恰好嵌一次、且嵌的是带描述那版；同批多图也每条都嵌，

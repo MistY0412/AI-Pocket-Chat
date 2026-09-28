@@ -1,9 +1,6 @@
 package com.situ.aichat.ui.story
 
-import android.content.Intent
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -27,10 +24,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,7 +34,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -56,9 +50,6 @@ import com.situ.aichat.ui.designsystem.AppButton
 import com.situ.aichat.ui.designsystem.AppButtonStyle
 import com.situ.aichat.ui.designsystem.AppDialog
 import com.situ.aichat.ui.designsystem.AppTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 
@@ -76,39 +67,11 @@ fun StoryArchiveDetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val c = AppTheme.colors
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    // 「继续写这个故事」成功 → 提示 + 退出档案详情（书已回在读区、后台正写下一章）。
-    LaunchedEffect(Unit) {
-        viewModel.continueWritingDone.collect {
-            Toast.makeText(context, R.string.story_continue_writing_toast, Toast.LENGTH_SHORT).show()
-            onBack()
-        }
-    }
-
-    // txt 导出格式串（在 Composable 里解析，供非 Composable 的 launcher 回调用）。
-    val chapterHeaderFmt = stringResource(R.string.story_export_chapter_header)
-    val choicePrefixFmt = stringResource(R.string.story_export_choice_prefix)
-
-    val createDoc = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
-        if (uri != null) {
-            scope.launch {
-                // 整本正文拼装（长篇可上十万字）挪出主线程；null = 状态还没落定，早退语义同原来。
-                val text = withContext(Dispatchers.Default) {
-                    viewModel.buildTxt(chapterHeaderFmt, choicePrefixFmt)
-                } ?: return@launch
-                withContext(Dispatchers.IO) {
-                    runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } }
-                }
-                Toast.makeText(context, R.string.story_export_saved, Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
+    val actions = rememberStoryArchiveActions(viewModel, state, onBack)
 
     Box(Modifier.fillMaxSize().background(c.surface.base)) {
         state?.let { s ->
-            ArchiveContent(story = s.story, digest = s.digest, modifier = Modifier.fillMaxSize())
+            StoryArchiveContent(story = s.story, digest = s.digest, modifier = Modifier.fillMaxSize())
 
             // 底部固定两钮（浮于内容·mockup .arc-btns）。
             Column(
@@ -116,29 +79,14 @@ fun StoryArchiveDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(11.dp),
             ) {
                 AppButton(
-                    onClick = {
-                        val shareContent = buildShareContent(context, s.story, s.digest)
-                        scope.launch {
-                            val uri = viewModel.renderShareImage(context, shareContent)
-                            if (uri != null) {
-                                val send = Intent(Intent.ACTION_SEND).apply {
-                                    type = "image/png"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                runCatching { context.startActivity(Intent.createChooser(send, null)) }
-                            } else {
-                                Toast.makeText(context, R.string.story_share_failed, Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
+                    onClick = actions.share,
                     style = AppButtonStyle.Primary,
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                 ) { Text(stringResource(R.string.story_archive_share)) }
 
                 OutlineActionButton(
                     text = stringResource(R.string.story_archive_export_txt),
-                    onClick = { createDoc.launch("${s.story.title}.txt") },
+                    onClick = actions.export,
                 )
 
                 // 存量已完结书的救济（ST11 §4.5）：判定链改动不回溯，被旧规则（AI 说完结就完结）
@@ -176,7 +124,14 @@ fun StoryArchiveDetailScreen(
 }
 
 @Composable
-private fun ArchiveContent(story: StoryEntity, digest: StoryArchiveDigest, modifier: Modifier = Modifier) {
+internal fun StoryArchiveContent(
+    story: StoryEntity,
+    digest: StoryArchiveDigest,
+    modifier: Modifier = Modifier,
+    scrollState: ScrollState = rememberScrollState(),
+    contentPadding: PaddingValues = PaddingValues(start = 24.dp, end = 24.dp, top = 64.dp, bottom = 140.dp),
+    quoteSurface: Modifier = Modifier,
+) {
     val c = AppTheme.colors
     val zone = remember { ZoneId.systemDefault() }
     val startDate = remember(digest.startMillis) { Instant.ofEpochMilli(digest.startMillis).atZone(zone).toLocalDate() }
@@ -186,9 +141,8 @@ private fun ArchiveContent(story: StoryEntity, digest: StoryArchiveDigest, modif
 
     Column(
         modifier
-            .verticalScroll(rememberScrollState())
-            .padding(top = 64.dp, bottom = 140.dp)
-            .padding(horizontal = 24.dp),
+            .verticalScroll(scrollState)
+            .padding(contentPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         StoryCover(
@@ -216,7 +170,7 @@ private fun ArchiveContent(story: StoryEntity, digest: StoryArchiveDigest, modif
                 style = AppTheme.typography.kaiQuote.copy(fontSize = 14.5.sp, lineHeight = 27.sp),
                 color = c.text.secondary,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 6.dp),
+                modifier = Modifier.then(quoteSurface).padding(horizontal = 6.dp),
             )
         }
     }
@@ -297,22 +251,10 @@ private fun ContinueWritingButton(onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            "✎ " + stringResource(R.string.story_archive_continue_writing),
+            storyArchiveContinueLabel(),
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             color = c.accent.onContainer,
         )
     }
 }
-
-/** 组装分享长图内容（本地化文案在此解析·渲染器只画不查表）。 */
-private fun buildShareContent(context: android.content.Context, story: StoryEntity, digest: StoryArchiveDigest) =
-    StoryShareCardContent(
-        coverColorScheme = story.coverColorScheme,
-        storyId = story.id,
-        title = story.title,
-        genreLine = "${story.genre} · ${story.writingStyle}",
-        footprintLine = context.getString(R.string.story_share_footprint, digest.chapterCount, digest.choiceCount, digest.dayCount),
-        quote = digest.quote,
-        signatureLine = context.getString(R.string.story_share_signature),
-    )

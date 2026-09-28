@@ -1,6 +1,7 @@
 package com.situ.aichat.ui.liuli.designsystem
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
 import com.situ.aichat.ui.liuli.page.liuliFootprint
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
 /** 搜索槽几何（图纸 2026-09-06 卷三 A-14 / §3.2·对版稿 `.srch`）。 */
 private val SLOT_HEIGHT = 38.dp
@@ -42,8 +44,8 @@ private const val CLEAR_CIRCLE_ALPHA = 0.18f
 /**
  * 琉璃搜索槽（图纸 2026-09-06 卷三 A-14 · 契约 §7.2 点名的 `LiuliSearchField`）。
  *
- * **内容层的件，不是玻璃**（契约 §3.1 #2：玻璃只在导航层）——38 高 pill、`surface.sunken` 纸面沉底、
- * 无发丝无玻璃。底座是 foundation [BasicTextField]（IME / 光标 / 选择由它保证），M3 `TextField` 不碰（§9 ⑤）。
+ * **内容层的件，不是玻璃**（契约 §3.1 #2：玻璃只在导航层）——38 高 pill、[LiuliMaterials.chipFill] 半透明底
+ * + 1dp [LiuliMaterials.cardRim] 白边、搜索图标与占位字 `text.secondary`（琉璃 2.0 卷二 §4.6-4），无玻璃。底座是 foundation [BasicTextField]（IME / 光标 / 选择由它保证），M3 `TextField` 不碰（§9 ⑤）。
  *
  * 清除钮视觉 20、触达 48（[liuliFootprint] 外溢·不撑高 38 的槽）。
  */
@@ -56,6 +58,7 @@ fun LiuliSearchSlot(
     modifier: Modifier = Modifier,
 ) {
     val colors = AppTheme.colors
+    val dark = LocalIsDarkTheme.current
     val textStyle = AppTypography.listPreview.copy(color = colors.text.primary)
     BasicTextField(
         value = value,
@@ -69,15 +72,16 @@ fun LiuliSearchSlot(
                 modifier = Modifier
                     .height(SLOT_HEIGHT)
                     .clip(LiuliShapes.pill)
-                    .background(colors.surface.sunken)
+                    .background(LiuliMaterials.chipFill(dark))
+                    .border(1.dp, LiuliMaterials.cardRim(dark), LiuliShapes.pill)
                     .padding(horizontal = SLOT_PAD_H),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Filled.Search, contentDescription = null, tint = colors.text.tertiary, modifier = Modifier.size(LEADING_ICON))
+                Icon(Icons.Filled.Search, contentDescription = null, tint = colors.text.secondary, modifier = Modifier.size(LEADING_ICON))
                 Spacer(Modifier.width(SLOT_GAP))
                 Box(Modifier.weight(1f)) {
                     if (value.isEmpty()) {
-                        Text(placeholder, style = textStyle, color = colors.text.tertiary, maxLines = 1)
+                        Text(placeholder, style = textStyle, color = colors.text.secondary, maxLines = 1)
                     }
                     innerTextField()
                 }

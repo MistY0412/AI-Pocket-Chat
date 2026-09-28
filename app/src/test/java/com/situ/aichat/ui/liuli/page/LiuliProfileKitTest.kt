@@ -18,6 +18,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.situ.aichat.data.model.AppSkin
 import com.situ.aichat.ui.character.ProfileTab
 import com.situ.aichat.ui.components.AppHaptics
@@ -97,20 +99,39 @@ class LiuliProfileKitTest {
         compose.onAllNodesWithText("林").assertCountEquals(1)
     }
 
-    @Test
-    @Config(qualifiers = "zh-rCN-w411dp-h891dp-xhdpi")
-    fun 头图恒280高() {
+    /** 卷四 §4.9：头部总高恒 = topInset + 204（收起判据按精确数算）。 */
+    private fun headHeight(topInset: Dp, subtitle: String): Float {
         host {
             LiuliHeroHeader(
                 name = "林晚",
                 avatarPath = null,
                 relationshipLabel = "恋人",
-                subtitle = "",
+                subtitle = subtitle,
+                topInset = topInset,
                 modifier = Modifier.testTag("hero"),
             )
         }
         val hero = compose.onNodeWithTag("hero").getUnclippedBoundsInRoot()
-        assertEquals(280f, (hero.bottom - hero.top).value, 0.01f)
+        return (hero.bottom - hero.top).value
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w411dp-h891dp-xhdpi")
+    fun 头部恒204高_无顶距() {
+        assertEquals(204f, headHeight(0.dp, "24 岁 · 插画师"), 0.01f)
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w411dp-h891dp-xhdpi")
+    fun 头部恒顶距加204高() {
+        assertEquals(24f + 204f, headHeight(24.dp, "24 岁 · 插画师"), 0.01f)
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w411dp-h891dp-xhdpi")
+    fun 副行空时头部高度不变且关系标签在() {
+        assertEquals(204f, headHeight(0.dp, ""), 0.01f)
+        compose.onNodeWithText("恋人").assertExists()
     }
 
     // ── 统计卡 ──────────────────────────────────────────────────────────────

@@ -37,6 +37,7 @@ object MomentCommentPromptBuilder {
         visionEnabled: Boolean,
         existingComments: List<CommentContextLine>,
         replyTarget: CommentReplyTarget?,
+        mentionedByPoster: Boolean = false,
     ): String {
         val parts = mutableListOf<String>()
 
@@ -51,6 +52,7 @@ object MomentCommentPromptBuilder {
         parts.add("")
         parts.add(strings.friendPosted.format(postAuthorName))
         parts.add("[$postTimeDescription] 「$postContent」")
+        if (mentionedByPoster) parts.add(strings.mentionedYou.format(postAuthorName))
 
         parts.add("")
         parts.add(strings.emotionTone)

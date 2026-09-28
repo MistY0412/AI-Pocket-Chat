@@ -16,6 +16,7 @@ import com.situ.aichat.data.repository.MessageRepository
 import com.situ.aichat.data.repository.OfflineMeetingMemoryRepository
 import com.situ.aichat.data.repository.SettingsRepository
 import com.situ.aichat.diagnostics.ContextLogService
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.meeting.FutureMeetingTool
 import com.situ.aichat.promise.PromiseChatTool
 import io.mockk.coEvery
@@ -25,8 +26,12 @@ import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.currentCoroutineContext
 import org.junit.After
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -139,5 +144,22 @@ class RecoveryReplyMarkerStripTest {
         val preview = slot<String>()
         coVerify { conversationRepo.applyMaterialization("conv-1", capture(preview), any(), any()) }
         assertFalse("列表预览不许带暗号：${preview.captured}", preview.captured.contains("[promise]") || preview.captured.contains("[future_meeting]"))
+    }
+
+    // ── 时间感知四期·图纸三 T2-6（E14）：补回复自成一轮——completion 执行时上下文里有新 trace ──
+
+    @Test
+    fun 图纸三_补回复_completion在新一轮trace里跑_锚点为空() = runBlocking {
+        val seen = mutableListOf<LogTrace?>()
+        coEvery {
+            contextLog.completion(any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } coAnswers { seen += currentCoroutineContext()[LogTrace]; rawReply }
+        assertTrue(generator.generateAndPersist("conv-1"))
+        assertTrue(generator.generateAndPersist("conv-1"))
+        val first = seen[0]!!
+        assertEquals("conv-1", first.conversationUuid)
+        assertEquals("c1", first.characterUuid)
+        assertNull("补回复没有用户消息锚点", first.anchorMessageUuid)
+        assertNotEquals("每次补回复各自一轮", first.turnId, seen[1]!!.turnId)
     }
 }

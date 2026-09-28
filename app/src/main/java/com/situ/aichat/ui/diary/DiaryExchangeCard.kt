@@ -56,6 +56,7 @@ internal fun DiaryExchangeSlot(
     ui: DiaryExchangeUiState,
     onCompose: () -> Unit,
     onUnlock: () -> Unit,
+    surface: Modifier = Modifier.appCardSurface(),
 ) {
     val state = ui.state
     if (state is DiaryExchangeService.State.Hidden || state is DiaryExchangeService.State.Unlocked) return
@@ -68,7 +69,7 @@ internal fun DiaryExchangeSlot(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             // 承托改 appCardSurface；虚线信封边 drawBehind 移到其后（J3·叠于卡底上、内容下）。
-            .appCardSurface()
+            .then(surface)
             .drawBehind {
                 drawRoundRect(
                     color = dashColor,

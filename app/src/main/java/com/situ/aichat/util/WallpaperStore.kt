@@ -122,13 +122,26 @@ object WallpaperStore {
         existingFiles.filter { it !in referenced }
 
     /**
-     * 清 `filesDir/wallpapers/` 下**无任何角色引用**的孤儿文件（裁剪编辑重选中间图 / 裁完取消未保存 / 删角色残留），
-     * 返回删除数。冷启维护调（off-main）。[referenced] = 全部角色 `chatWallpaperPath` 绝对路径集（DAO 取）——
-     * 因只删「不在引用集」的文件，**绝不误删在用壁纸**（契约 §5.3「防孤儿」+ 备份模块孤儿清理先例）。
+     * 孤儿文件至少放这么久才清（卷四复核 R1·装机 O-7）：编辑页裁好、还没点「保存」的新壁纸在数据库里也还没有引用——
+     * 维护是**每次回前台**都跑的（`AppViewModel.onAppForeground`），若立刻清，裁完壁纸再去选头像 / 切个 App 回来，
+     * 刚裁的壁纸文件就被删了，保存后数据库指向一个不存在的文件（聊天页没壁纸）。放一天再清，进程死亡草稿恢复也够用。
+     */
+    const val ORPHAN_MIN_AGE_MS: Long = 24L * 60 * 60 * 1000
+
+    /** 纯函数：[existingFiles]（路径 → 最后修改时刻 ms）中不被 [referenced] 引用、且已放满 [ORPHAN_MIN_AGE_MS] 的孤儿。 */
+    fun findStaleOrphans(existingFiles: Map<String, Long>, referenced: Set<String>, nowMs: Long): List<String> =
+        findOrphans(existingFiles.keys.toList(), referenced).filter { nowMs - existingFiles.getValue(it) >= ORPHAN_MIN_AGE_MS }
+
+    /**
+     * 清 `filesDir/wallpapers/` 下**无任何角色引用**、且放满一天的孤儿文件（裁剪编辑重选中间图 / 裁完取消未保存 / 删角色残留），
+     * 返回删除数。回前台维护调（off-main）。[referenced] = 全部角色 `chatWallpaperPath` 绝对路径集（DAO 取）——
+     * 因只删「不在引用集」的文件，**绝不误删在用壁纸**（契约 §5.3「防孤儿」+ 备份模块孤儿清理先例）；
+     * 只删放满 [ORPHAN_MIN_AGE_MS] 的，**绝不误删编辑中还没保存的新壁纸**。
      */
     suspend fun purgeOrphans(context: Context, referenced: Set<String>): Int = withContext(Dispatchers.IO) {
-        val files = dir(context).listFiles()?.mapNotNull { it.takeIf(File::isFile)?.absolutePath } ?: return@withContext 0
-        val orphans = findOrphans(files, referenced)
+        val files = dir(context).listFiles()?.filter(File::isFile)?.associate { it.absolutePath to it.lastModified() }
+            ?: return@withContext 0
+        val orphans = findStaleOrphans(files, referenced, System.currentTimeMillis())
         orphans.forEach { delete(it) }
         orphans.size
     }

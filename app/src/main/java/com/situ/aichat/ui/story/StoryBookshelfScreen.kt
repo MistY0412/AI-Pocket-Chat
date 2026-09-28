@@ -1,6 +1,5 @@
 package com.situ.aichat.ui.story
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -47,7 +45,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.situ.aichat.R
 import com.situ.aichat.data.local.entity.StoryEntity
-import com.situ.aichat.story.StoryStatus
 import com.situ.aichat.ui.components.LocalAppHaptics
 import com.situ.aichat.ui.components.rememberReduceMotion
 import com.situ.aichat.ui.designsystem.AppButton
@@ -87,31 +84,14 @@ fun StoryBookshelfScreen(
     var archiveTargetId by remember { mutableStateOf<String?>(null) }
     var archivedDeleteId by remember { mutableStateOf<String?>(null) }
     val haptics = LocalAppHaptics.current
-    val context = LocalContext.current
 
-    // 归档结果一次性提示（成功入档 / 生成中拒绝）。
-    LaunchedEffect(Unit) {
-        viewModel.toastEvents.collect { resId -> Toast.makeText(context, resId, Toast.LENGTH_SHORT).show() }
-    }
-    LaunchedEffect(Unit) { viewModel.refreshReadingProgress() }
-    // 续读异步结果 → 导航（有可读章进阅读器，否则退回章节列表）。
-    LaunchedEffect(Unit) {
-        viewModel.resumeTarget.collect { target ->
-            when (target) {
-                is StoryResumeTarget.Reader -> onOpenChapter(target.chapterId)
-                is StoryResumeTarget.ChapterList -> onOpenStory(target.storyId)
-            }
-        }
-    }
+    StoryBookshelfEffects(viewModel, onOpenChapter, onOpenStory)
 
-    val archived = stories.filter { it.status == StoryStatus.COMPLETED }
-    val active = stories.filter { it.status != StoryStatus.COMPLETED }
+    val split = storyShelfSplit(stories)
 
     // 菜单开着时书被并行删除/换区：条目连菜单一起从树上消失，onDismiss 不会再回调——兜底清态，
     // 否则 scrim 压暗层卡住不走（在读卡与归档卡两族菜单同护）。
-    LaunchedEffect(stories) {
-        menuStoryId?.let { open -> if (stories.none { it.id == open }) menuStoryId = null }
-    }
+    LaunchedEffect(stories) { if (storyMenuStale(menuStoryId, stories)) menuStoryId = null }
 
     val listState = rememberLazyListState()
     Scaffold(
@@ -130,7 +110,9 @@ fun StoryBookshelfScreen(
     ) { padding ->
         Box(Modifier.fillMaxSize()) {
             if (stories.isEmpty()) {
-                StoryEmptyState(onCreateStory, Modifier.padding(padding))
+                StoryEmptyState(Modifier.padding(padding)) {
+                    AppButton(onClick = onCreateStory, style = AppButtonStyle.Primary) { Text(stringResource(R.string.story_new_story_title)) }
+                }
             } else {
                 LazyColumn(
                     state = listState,
@@ -146,7 +128,7 @@ fun StoryBookshelfScreen(
                             color = AppTheme.colors.text.secondary,
                         )
                     }
-                    items(active, key = { it.id }) { story ->
+                    items(split.active, key = { it.id }) { story ->
                         Box {
                             StoryCard(
                                 story = story,
@@ -166,22 +148,22 @@ fun StoryBookshelfScreen(
                                     onDismiss = { menuStoryId = null },
                                     onAction = { action ->
                                         menuStoryId = null
-                                        when (action) {
-                                            StoryCardMenuAction.PAUSE, StoryCardMenuAction.RESUME -> viewModel.togglePause(story)
-                                            StoryCardMenuAction.ARCHIVE -> archiveTargetId = story.id
-                                            StoryCardMenuAction.SETTINGS -> onOpenSettings(story.id)
-                                            StoryCardMenuAction.DELETE -> deleteTarget = story
-                                        }
+                                        action.dispatch(
+                                            onTogglePause = { viewModel.togglePause(story) },
+                                            onArchive = { archiveTargetId = story.id },
+                                            onOpenSettings = { onOpenSettings(story.id) },
+                                            onDelete = { deleteTarget = story },
+                                        )
                                     },
                                 )
                             }
                         }
                     }
                     item(key = "_newstory") { NewStoryCard(onClick = onCreateStory) }
-                    if (archived.isNotEmpty()) {
+                    if (split.archived.isNotEmpty()) {
                         item(key = "_archive") {
                             StoryArchiveSection(
-                                archived,
+                                split.archived,
                                 onOpen = onOpenArchive,
                                 onViewAll = onViewAllArchive,
                                 menuStoryId = menuStoryId,
@@ -201,7 +183,7 @@ fun StoryBookshelfScreen(
 
     archiveTargetId?.let { targetId ->
         // 从当前流解析目标（只存 id）：书已不在（并行删除/已完结）→ 不渲染，弹窗自然消失。
-        stories.firstOrNull { it.id == targetId && it.status != StoryStatus.COMPLETED }?.let { target ->
+        storyActiveById(stories, targetId)?.let { target ->
             AppDialog(
                 onDismissRequest = { archiveTargetId = null },
                 title = stringResource(R.string.story_archive_confirm_title),
@@ -229,7 +211,7 @@ fun StoryBookshelfScreen(
 
     archivedDeleteId?.let { targetId ->
         // 从当前流按 id + 已完结解析（PITFALLS 1b）：书被并行删除/状态异动 → 不渲染，弹窗自然消失。
-        stories.firstOrNull { it.id == targetId && it.status == StoryStatus.COMPLETED }?.let { target ->
+        storyArchivedById(stories, targetId)?.let { target ->
             StoryArchivedDeleteDialog(
                 story = target,
                 onConfirm = { viewModel.deleteStory(target.id); archivedDeleteId = null },
@@ -278,7 +260,7 @@ private fun StoryCardGlassMenu(
     }
 }
 
-private fun menuActionLabel(action: StoryCardMenuAction): Int = when (action) {
+internal fun menuActionLabel(action: StoryCardMenuAction): Int = when (action) {
     StoryCardMenuAction.PAUSE -> R.string.story_menu_pause
     StoryCardMenuAction.RESUME -> R.string.story_menu_resume
     StoryCardMenuAction.ARCHIVE -> R.string.story_menu_archive
@@ -286,7 +268,7 @@ private fun menuActionLabel(action: StoryCardMenuAction): Int = when (action) {
     StoryCardMenuAction.DELETE -> R.string.story_menu_delete
 }
 
-private fun menuActionIcon(action: StoryCardMenuAction): ImageVector = when (action) {
+internal fun menuActionIcon(action: StoryCardMenuAction): ImageVector = when (action) {
     StoryCardMenuAction.PAUSE -> Icons.Filled.Pause
     StoryCardMenuAction.RESUME -> Icons.Filled.PlayArrow
     StoryCardMenuAction.ARCHIVE -> Icons.Outlined.Archive
@@ -295,7 +277,7 @@ private fun menuActionIcon(action: StoryCardMenuAction): ImageVector = when (act
 }
 
 @Composable
-private fun StoryEmptyState(onCreate: () -> Unit, modifier: Modifier = Modifier) {
+internal fun StoryEmptyState(modifier: Modifier = Modifier, action: @Composable () -> Unit) {
     Column(
         modifier = modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
@@ -312,6 +294,6 @@ private fun StoryEmptyState(onCreate: () -> Unit, modifier: Modifier = Modifier)
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(16.dp))
-        AppButton(onClick = onCreate, style = AppButtonStyle.Primary) { Text(stringResource(R.string.story_new_story_title)) }
+        action()
     }
 }

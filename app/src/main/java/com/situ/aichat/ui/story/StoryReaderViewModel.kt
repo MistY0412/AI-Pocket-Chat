@@ -56,7 +56,7 @@ data class StoryReaderError(val message: String, val retryable: Boolean)
  * [currentChapterId]（= iOS 改 currentChapterID）。生成统一走 [StoryGenerationService] + [StoryGenerationTaskManager]
  * （别另起生成路径）。落选择/进度/结局请求走 [StoryRepository] 定向写（D1 安全）。
  *
- * **行数豁免声明（CLAUDE.md §2 🔴 逻辑层 600 硬上限）**：本文件 664 行、越线 64。已存走向卷（图纸 2026-08-06）
+ * **行数豁免声明（CLAUDE.md §2 🔴 逻辑层 600 硬上限）**：本文件 661 行、越线 61（卷六·三·下甲把生成完成块逻辑体搬进 [StoryReaderGenerationWatcher]、只加三条接线，净减）。已存走向卷（图纸 2026-08-06）
  * 只 +36 行两条**薄接线**（overwriteDirection / withdrawDirection·逻辑体全在 [StoryDirectionEditor]，本 VM 只许
  * +接线不许 +逻辑体）；拆分本 VM 属独立重构，已登记 FILE_SIZE_REFACTOR_BACKLOG 观察名单等专门的拆分卷处理。
  */
@@ -130,6 +130,14 @@ class StoryReaderViewModel @Inject constructor(
     val activeGeneration: StateFlow<StoryGenerationTaskManager.GenerationProgress?> =
         combine(storyIdFlow, taskManager.activeGenerations) { sid, gens -> sid?.let { gens[it] } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** 生成完成后「翻不翻章」（琉璃 2.0 卷六·三·下甲·逻辑体在 [StoryReaderGenerationWatcher]，本 VM 只接线）。 */
+    private val generationWatcher = StoryReaderGenerationWatcher(
+        viewModelScope, activeGeneration, storyIdFlow, repository::getLatestChapterMeta, _currentChapterId,
+    )
+
+    /** 写好了、等用户点「翻开」的那一章（只有琉璃脸会有值·暖陶脸自动翻章，恒 null）。 */
+    val readyChapter: StateFlow<StoryReadyChapter?> = generationWatcher.ready
 
     // ── 「上回说到」回访前情条（卷三 C3）──
 
@@ -209,24 +217,7 @@ class StoryReaderViewModel @Inject constructor(
                 }
             }
         }
-        // 生成完成（活跃生成 非空→空）→ 跳到最新章（= iOS onChange progress nil 跳 latest）。
-        viewModelScope.launch {
-            var wasGenerating = false
-            activeGeneration.collect { gen ->
-                val nowGenerating = gen != null
-                if (wasGenerating && !nowGenerating) {
-                    val sid = storyIdFlow.value
-                    if (sid != null) {
-                        val latest = repository.getLatestChapterMeta(sid)
-                        if (latest != null && latest.id != _currentChapterId.value) {
-                            _currentChapterId.value = latest.id
-                            Log.i(TAG, "生成完成，跳到最新章 #${latest.chapterNumber}")
-                        }
-                    }
-                }
-                wasGenerating = nowGenerating
-            }
-        }
+        generationWatcher.start()
         // 生成失败错误 → 弹提示（= iOS onChange lastErrors）。
         viewModelScope.launch {
             combine(storyIdFlow, taskManager.lastErrors) { sid, errs -> sid?.let { errs[it] } }
@@ -255,6 +246,12 @@ class StoryReaderViewModel @Inject constructor(
         val idx = list.indexOfFirst { it.id == _currentChapterId.value }
         if (idx in 0 until list.lastIndex) goToChapter(list[idx + 1].id)
     }
+
+    /** 脸声明生成完成后是否自动翻章（暖陶 true = 现行为·琉璃 false = R2）。 */
+    fun setAutoJumpOnGenerated(enabled: Boolean) { generationWatcher.autoJump = enabled }
+
+    /** 琉璃「第 N 章写好了 · 翻开 ›」。 */
+    fun openReadyChapter() = generationWatcher.openReady()
 
     // ── 选择反悔窗口 ──
 

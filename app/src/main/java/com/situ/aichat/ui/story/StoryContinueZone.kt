@@ -1,7 +1,5 @@
 package com.situ.aichat.ui.story
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,8 +24,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -44,10 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.situ.aichat.R
 import com.situ.aichat.data.local.entity.StoryChapterEntity
-import com.situ.aichat.story.StoryChoiceClassifier
-import com.situ.aichat.ui.components.AppMotion
 import com.situ.aichat.ui.components.LocalAppHaptics
-import com.situ.aichat.ui.components.rememberReduceMotion
 import com.situ.aichat.ui.designsystem.AppButton
 import com.situ.aichat.ui.designsystem.AppButtonStyle
 
@@ -57,9 +50,6 @@ import com.situ.aichat.ui.designsystem.AppButtonStyle
  * 显示条件一律由 [StoryReaderEndgameLogic] 判定，本文件只管长相；两者都不碰选择区（[StoryChoiceSection] 零改）。
  * 配色全部走阅读器纸面单源（[StoryReaderLayout]），不硬编码陶土字面量——推进区浮在纸面上，跟着深浅换肤。
  */
-
-/** 呼吸动效：全周期 300ms → 去程/回程各 150ms（PITFALLS 1d：往复 N ms 指全周期）。 */
-private const val BREATHE_HALF_MS = 150
 
 /**
  * 建议卡正文的「可读次要」透明度（施工推导值·图纸 §11 D-6 登记）。
@@ -94,11 +84,7 @@ internal fun LazyListScope.storyEndingSuggestItem(
     onFinish: () -> Unit,
     onKeepWriting: () -> Unit,
 ) {
-    val show = chapter != null && StoryReaderEndgameLogic.showEndingSuggestCard(
-        isLatestChapter = isLatestChapter,
-        storyStatus = storyStatus.orEmpty(),
-        aiSuggestedEnding = chapter.aiSuggestedEnding,
-    )
+    val show = storyShowsEndingSuggest(chapter, isLatestChapter, storyStatus)
     if (!show) return
     item(key = "endingSuggest") {
         StoryEndingSuggestCard(
@@ -133,22 +119,16 @@ internal fun LazyListScope.storyContinueZoneItem(
     onFinaleClick: () -> Unit,
     onCancelFinaleClick: () -> Unit,
 ) {
-    val show = StoryReaderEndgameLogic.showContinueZone(
-        isLatestChapter = isLatestChapter,
-        storyStatus = storyStatus.orEmpty(),
-        hasChoice = chapter?.hasChoice == true,
-        userChoice = chapter?.userChoice,
-    )
+    val show = storyShowsContinueZone(chapter, isLatestChapter, storyStatus)
     if (!show) return
-    // 已存走向态 B（图纸 2026-08-06 §4.2）：走向 = 末章 userChoice 经分类器派生，零新 StateFlow / 零新 DB 列。
-    val freeform = StoryChoiceClassifier.freeformDirective(chapter)
+    val zone = storyContinueZoneState(chapter)
     item(key = "continueZone") {
         StoryContinueZone(
             isDark = isDark,
             breatheTrigger = breatheTrigger,
             finaleProgress = finaleProgress,
-            mode = StoryReaderEndgameLogic.continueZoneMode(chapter?.userChoice, freeform),
-            directionText = freeform,
+            mode = zone.mode,
+            directionText = zone.directionText,
             draftBeats = draftBeats,
             draftUserEdited = draftUserEdited,
             onWriteClick = onWriteClick,
@@ -202,19 +182,12 @@ internal fun StoryContinueZone(
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalAppHaptics.current
-    val reduceMotion = rememberReduceMotion()
     val scrim = StoryReaderLayout.chromeScrimColor(isDark)
     val border = StoryReaderLayout.chromeBorderColor(isDark)
     val secondary = StoryReaderLayout.secondaryTextColor(isDark)
     val accent = StoryReaderLayout.menuAccentColor(isDark)
 
-    // 呼吸：首帧不放（trigger 初值不该让卡片自己抖一下），只在 trigger 真变化时跑一次去回程。
-    val breathe = remember { Animatable(1f) }
-    LaunchedEffect(breatheTrigger) {
-        if (breatheTrigger == 0 || reduceMotion) return@LaunchedEffect
-        breathe.animateTo(1.03f, tween(BREATHE_HALF_MS, easing = AppMotion.EaseInOut))
-        breathe.animateTo(1f, tween(BREATHE_HALF_MS, easing = AppMotion.EaseInOut))
-    }
+    val breathe = rememberStoryBreatheScale(breatheTrigger)
 
     val byDirection = mode == ContinueZoneMode.BY_DIRECTION
     Column(modifier = modifier.fillMaxWidth()) {
@@ -269,13 +242,7 @@ internal fun StoryContinueZone(
                 ) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = onPill, modifier = Modifier.size(16.dp))
                     Text(
-                        stringResource(
-                            when (mode) {
-                                ContinueZoneMode.NATURAL_FLOW -> R.string.story_continue_flow
-                                ContinueZoneMode.NEXT_CHAPTER -> R.string.story_continue_next_chapter
-                                ContinueZoneMode.BY_DIRECTION -> R.string.story_continue_by_direction
-                            },
-                        ),
+                        stringResource(storyContinueFlowLabelRes(mode)),
                         color = onPill,
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.Medium,
@@ -297,16 +264,18 @@ internal fun StoryContinueZone(
  * [StoryReaderLayout.suggestGoldColor] 与建议卡现用的两个 alpha（[SUGGEST_GOLD_FILL_ALPHA] / 0.28f），
  * **不新造 token**。触达 48dp 由 M3 可点 `Surface` 的 `minimumInteractiveComponentSize` 自动保证（视觉 40dp 与
  * 左侧陶土胶囊等高）；无入场动效，随推进区整体出现。
+ * [enabled] / [modifier]：琉璃脸写作中上锁用（加法·默认 = 原行为）。
  */
 @Composable
-private fun FinalePill(isDark: Boolean, onClick: () -> Unit) {
+internal fun FinalePill(isDark: Boolean, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
     val gold = StoryReaderLayout.suggestGoldColor(isDark)
     Surface(
         onClick = onClick,
+        enabled = enabled,
         shape = CircleShape,
         color = gold.copy(alpha = SUGGEST_GOLD_FILL_ALPHA),
         border = BorderStroke(0.75.dp, gold.copy(alpha = SUGGEST_GOLD_LINE_ALPHA)),
-        modifier = Modifier.height(40.dp),
+        modifier = modifier.height(40.dp),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp),
@@ -326,7 +295,7 @@ private fun FinalePill(isDark: Boolean, onClick: () -> Unit) {
 
 /** 「收尾中 · 本弧第 K/L 章」状态 chip（同金族·**不可点**：它是状态显示，不是动作）。 */
 @Composable
-private fun FinaleStatusChip(isDark: Boolean, progress: StoryFinaleProgress) {
+internal fun FinaleStatusChip(isDark: Boolean, progress: StoryFinaleProgress) {
     val gold = StoryReaderLayout.suggestGoldColor(isDark)
     Surface(
         shape = CircleShape,
@@ -355,13 +324,14 @@ private fun FinaleStatusChip(isDark: Boolean, progress: StoryFinaleProgress) {
  * （drawBehind + dashPathEffect 10/8），色走纸面层 secondary，**不用金**（它不是完结动作）。
  */
 @Composable
-private fun CancelFinalePill(isDark: Boolean, onClick: () -> Unit) {
+internal fun CancelFinalePill(isDark: Boolean, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
     val secondary = StoryReaderLayout.secondaryTextColor(isDark)
     Surface(
         onClick = onClick,
+        enabled = enabled,
         shape = CircleShape,
         color = Color.Transparent,
-        modifier = Modifier
+        modifier = modifier
             .height(40.dp)
             .drawBehind {
                 drawRoundRect(
@@ -387,7 +357,7 @@ private fun CancelFinalePill(isDark: Boolean, onClick: () -> Unit) {
 
 /** 推进区分隔行：──── ✧ 接下来 ✧ ────（样式取自 StoryChoiceSection 的 StoryChoiceHeader 同族·仅搬样式不共享组件）。 */
 @Composable
-private fun ContinueHeader(isDark: Boolean) {
+internal fun ContinueHeader(isDark: Boolean) {
     val ornament = StoryReaderLayout.ornamentColor(isDark)
     val textColor = StoryReaderLayout.secondaryTextColor(isDark)
     Row(
@@ -425,6 +395,8 @@ fun StoryEndingSuggestCard(
     onFinish: () -> Unit,
     onKeepWriting: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 卡底三枚钮（琉璃 2.0 卷六·三·下甲「槽外给」：默认 = 暖陶三枚 AppButton，琉璃传三枚 LiuliButton）。 */
+    actions: @Composable () -> Unit = { StoryEndingSuggestWarmActions(onGracefulFinale, onFinish, onKeepWriting) },
 ) {
     // 金按**纸面深浅**取档（不跟 App 主题）：浅主题 + 深纸面会撞成深金压深纸（实测 2.97:1）。
     val gold = StoryReaderLayout.suggestGoldColor(isDark)
@@ -464,39 +436,44 @@ fun StoryEndingSuggestCard(
                     lineHeight = 21.25.sp, // 12.5 × 1.7
                     modifier = Modifier.padding(top = 8.dp),
                 )
-                // 卷二 §4.4 画面③：双钮改**竖排三钮**——新增主推「从容收尾」置顶（金实底=原主钮样式），
-                // 原「就此完结」降次钮（Tonal），「还想继续写」降 quiet（Text）。破坏性/终局动作不占主 CTA
-                // 是既有房规（PITFALLS 1d）：这里主 CTA 给的是「慢慢收好」而不是「立刻归档」。
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(top = 13.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    AppButton(
-                        onClick = onGracefulFinale,
-                        style = AppButtonStyle.Primary,
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                    ) {
-                        Text(stringResource(R.string.story_ending_suggest_graceful), textAlign = TextAlign.Center)
-                    }
-                    AppButton(
-                        onClick = onFinish,
-                        style = AppButtonStyle.Tonal,
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                    ) {
-                        Text(stringResource(R.string.story_ending_suggest_finish), textAlign = TextAlign.Center)
-                    }
-                    AppButton(
-                        onClick = onKeepWriting,
-                        style = AppButtonStyle.Text,
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                    ) {
-                        Text(stringResource(R.string.story_ending_suggest_continue), textAlign = TextAlign.Center)
-                    }
+                    actions()
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StoryEndingSuggestWarmActions(onGracefulFinale: () -> Unit, onFinish: () -> Unit, onKeepWriting: () -> Unit) {
+    // 卷二 §4.4 画面③：双钮改**竖排三钮**——新增主推「从容收尾」置顶（金实底=原主钮样式），
+    // 原「就此完结」降次钮（Tonal），「还想继续写」降 quiet（Text）。破坏性/终局动作不占主 CTA
+    // 是既有房规（PITFALLS 1d）：这里主 CTA 给的是「慢慢收好」而不是「立刻归档」。
+    AppButton(
+        onClick = onGracefulFinale,
+        style = AppButtonStyle.Primary,
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        modifier = Modifier.fillMaxWidth().height(44.dp),
+    ) {
+        Text(stringResource(R.string.story_ending_suggest_graceful), textAlign = TextAlign.Center)
+    }
+    AppButton(
+        onClick = onFinish,
+        style = AppButtonStyle.Tonal,
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        modifier = Modifier.fillMaxWidth().height(44.dp),
+    ) {
+        Text(stringResource(R.string.story_ending_suggest_finish), textAlign = TextAlign.Center)
+    }
+    AppButton(
+        onClick = onKeepWriting,
+        style = AppButtonStyle.Text,
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        modifier = Modifier.fillMaxWidth().height(44.dp),
+    ) {
+        Text(stringResource(R.string.story_ending_suggest_continue), textAlign = TextAlign.Center)
     }
 }

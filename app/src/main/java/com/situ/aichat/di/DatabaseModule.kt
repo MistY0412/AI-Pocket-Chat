@@ -12,6 +12,7 @@ import com.situ.aichat.data.local.dao.CustomStickerDao
 import com.situ.aichat.data.local.dao.DiaryDao
 import com.situ.aichat.data.local.dao.GiftDao
 import com.situ.aichat.data.local.dao.LogDao
+import com.situ.aichat.data.local.dao.LogStatsDao
 import com.situ.aichat.data.local.dao.PetDao
 import com.situ.aichat.data.local.dao.MeetingAppointmentDao
 import com.situ.aichat.data.local.dao.MessageDao
@@ -81,6 +82,7 @@ object DatabaseModule {
     @Provides fun provideRedeemCodeUsageDao(db: AppDatabase): RedeemCodeUsageDao = db.redeemCodeUsageDao()
     @Provides fun provideStoryDao(db: AppDatabase): StoryDao = db.storyDao()
     @Provides fun provideLogDao(db: AppDatabase): LogDao = db.logDao()
+    @Provides fun provideLogStatsDao(db: AppDatabase): LogStatsDao = db.logStatsDao()
     @Provides fun provideMeetingAppointmentDao(db: AppDatabase): MeetingAppointmentDao =
         db.meetingAppointmentDao()
     @Provides fun provideWorldBookDao(db: AppDatabase): WorldBookDao = db.worldBookDao()

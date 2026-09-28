@@ -10,6 +10,7 @@ import com.situ.aichat.data.local.dao.CustomStickerDao
 import com.situ.aichat.data.local.dao.DiaryDao
 import com.situ.aichat.data.local.dao.GiftDao
 import com.situ.aichat.data.local.dao.LogDao
+import com.situ.aichat.data.local.dao.LogStatsDao
 import com.situ.aichat.data.local.dao.PetDao
 import com.situ.aichat.data.local.dao.MeetingAppointmentDao
 import com.situ.aichat.data.local.dao.MessageDao
@@ -47,6 +48,7 @@ import com.situ.aichat.data.local.entity.DiaryCommentEntity
 import com.situ.aichat.data.local.entity.DiaryEntryEntity
 import com.situ.aichat.data.local.entity.DiaryReactionEntity
 import com.situ.aichat.data.local.entity.GiftRecordEntity
+import com.situ.aichat.data.local.entity.LogDailyStatEntity
 import com.situ.aichat.data.local.entity.LogEntryEntity
 import com.situ.aichat.data.local.entity.MeetingAppointmentEntity
 import com.situ.aichat.data.local.entity.MessageEntity
@@ -122,6 +124,7 @@ import com.situ.aichat.data.local.entity.WorldUserResidentEntity
         StoryCharacterRoleEntity::class,
         RedeemCodeUsageEntity::class,
         LogEntryEntity::class,
+        LogDailyStatEntity::class,
         MeetingAppointmentEntity::class,
         WorldBookEntity::class,
         WorldBookEntryEntity::class,
@@ -153,7 +156,7 @@ import com.situ.aichat.data.local.entity.WorldUserResidentEntity
         // 「我们的日子」卷一《沉淀》（总图纸 docs/handoff/2026-09-02-我们的日子-总图纸.md §3.1）：一天 × 一角色的事实快照 + 手记（无 FK·手动级联清）。
         OurDayEntity::class,
     ],
-    version = 49,
+    version = 51,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -177,6 +180,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun redeemCodeUsageDao(): RedeemCodeUsageDao
     abstract fun storyDao(): StoryDao
     abstract fun logDao(): LogDao
+    abstract fun logStatsDao(): LogStatsDao
     abstract fun meetingAppointmentDao(): MeetingAppointmentDao
     abstract fun worldBookDao(): WorldBookDao
     abstract fun worldDao(): WorldDao

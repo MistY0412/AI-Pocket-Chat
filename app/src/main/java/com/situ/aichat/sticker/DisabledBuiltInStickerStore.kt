@@ -1,6 +1,8 @@
 package com.situ.aichat.sticker
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Soft-hidden built-in stickers (1:1 iOS `DisabledBuiltInStickerStore`, Models/StickerTypes.swift).
@@ -22,6 +24,13 @@ object DisabledBuiltInStickerStore {
     /** 当前被隐藏的内置表情 ID 集合。 */
     fun disabledIds(context: Context): Set<String> =
         prefs(context).getStringSet(KEY, emptySet())?.toSet() ?: emptySet()
+
+    /**
+     * 同 [disabledIds]，但在 IO 线程读盘——给跑在主线程上的协程用（聊天一轮在 viewModelScope 的 Main.immediate 上装配；
+     * 稳定性防线 B）。值与同步版相同。
+     */
+    suspend fun loadDisabledIds(context: Context): Set<String> =
+        withContext(Dispatchers.IO) { disabledIds(context) }
 
     fun isDisabled(context: Context, id: String): Boolean = disabledIds(context).contains(id)
 

@@ -26,6 +26,7 @@ import com.situ.aichat.data.local.entity.ScheduleEventEntity
 import com.situ.aichat.data.local.entity.StoryChapterEntity
 import com.situ.aichat.data.local.entity.StoryCharacterRoleEntity
 import com.situ.aichat.data.local.entity.StoryEntity
+import com.situ.aichat.util.StringListJson
 import java.util.UUID
 
 // ════════════════════════════════ Export → Entity 映射（导入侧；从 BackupService 抽出·刀2·只搬不改） ════════════════════════════════
@@ -313,6 +314,7 @@ internal fun MomentPostExport.toEntity(imagePathsJson: String) = MomentPostEntit
     isSoftDeleted = isSoftDeleted,
     triggerTypeRaw = triggerTypeRaw,
     relatedGiftId = relatedGiftId,
+    mentionedCharacterUuidsJson = StringListJson.encode(mentionedCharacterUuids.orEmpty()),
 )
 
 internal fun MomentCommentExport.toEntity() = MomentCommentEntity(

@@ -12,6 +12,7 @@ import com.situ.aichat.data.repository.CharacterRepository
 import com.situ.aichat.data.repository.CharacterWriteLock
 import com.situ.aichat.data.repository.ConversationRepository
 import com.situ.aichat.data.repository.SettingsRepository
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.prompt.growth.AnalysisPacing
 import com.situ.aichat.prompt.memory.MemoryDigestCoordinator
 import com.situ.aichat.prompt.memory.MemoryService
@@ -23,6 +24,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * 「回合后台分析触发」之记忆簇协作者——从 ChatViewModel 抽出（对齐 iOS ChatViewModel+Memory/+Growth），方法体字节级不变。
@@ -74,13 +76,15 @@ internal class MemoryAnalysisTrigger(
         config: ApiConfigValues,
         settings: AppSettings,
         userName: String,
+        /** 本轮日志关联（四期·图纸三·可选尾参）：launch 时带上，下游 LLM 调用的日志归到这一轮。 */
+        trace: LogTrace? = null,
     ) {
         if (isSummarizing) return
         val interval = settings.autoSummarizeInterval
         if (interval <= 0) return
 
         isSummarizing = true
-        scope.launch {
+        scope.launch(trace ?: EmptyCoroutineContext) {
             try {
                 val character = characterRepo.get(characterUuid) ?: return@launch
                 val conversation = conversationRepo.get(conversationUuid) ?: return@launch
@@ -169,12 +173,14 @@ internal class MemoryAnalysisTrigger(
         config: ApiConfigValues,
         settings: AppSettings,
         userName: String,
+        /** 本轮日志关联（四期·图纸三·可选尾参）：launch 时带上，下游 LLM 调用的日志归到这一轮。 */
+        trace: LogTrace? = null,
     ) {
         if (!settings.growthSystemEnabled) return
         val interval = settings.structuredMemoryInterval
         if (interval <= 0) return
 
-        scope.launch {
+        scope.launch(trace ?: EmptyCoroutineContext) {
             // P12.6 D1：每角色写锁内「重读最新→+1→列级写回」，与成长/关系递增及各分析回写互不覆盖。
             val incremented = characterWriteLock.withCharacterLock(characterUuid) {
                 val character = characterRepo.get(characterUuid) ?: return@withCharacterLock null

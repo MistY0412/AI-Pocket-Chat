@@ -65,7 +65,7 @@ fun StoryTextEditorSheet(
 
             AppTextArea(
                 value = text,
-                onValueChange = { new -> text = if (maxLength != null && new.length > maxLength) new.take(maxLength) else new },
+                onValueChange = { new -> text = storyEditorClamp(new, maxLength) },
                 placeholder = placeholder,
                 minHeight = 200.dp,
                 // 封顶后字段内部自行滚动，长文不再把下方按钮行顶出屏幕（忌口默认全文 ~24 行是最狠场景）
@@ -94,3 +94,27 @@ fun StoryTextEditorSheet(
         }
     }
 }
+
+/** 文本弹层规格（琉璃 2.0 卷六·三：书页创作三字段 + 创建屏六字段两张脸共用同一份）。 */
+internal data class StoryTextSheetSpec(
+    val title: String,
+    val subtitle: String?,
+    val placeholder: String,
+    val initialText: String,
+    val maxLength: Int?,
+    val fillDefaultLabel: String?,
+    val fillDefault: (() -> String)?,
+    val onConfirm: (String) -> Unit,
+)
+
+/** 吃规格的重载（转给原签名·零行为差）。 */
+@Composable
+internal fun StoryTextEditorSheet(spec: StoryTextSheetSpec, onDismiss: () -> Unit) = StoryTextEditorSheet(
+    title = spec.title, subtitle = spec.subtitle, placeholder = spec.placeholder, initialText = spec.initialText,
+    maxLength = spec.maxLength, fillDefaultLabel = spec.fillDefaultLabel, fillDefault = spec.fillDefault,
+    onConfirm = spec.onConfirm, onDismiss = onDismiss,
+)
+
+/** 输入截断（原 onValueChange 式·纯·T1）：有上限且超了 → 截到上限，否则原样。 */
+internal fun storyEditorClamp(text: String, maxLength: Int?): String =
+    if (maxLength != null && text.length > maxLength) text.take(maxLength) else text

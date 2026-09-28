@@ -1,31 +1,19 @@
 package com.situ.aichat.ui.liuli.designsystem
 
 import androidx.compose.ui.graphics.Color
+import com.situ.aichat.ui.designsystem.Palette
 
 /**
  * 琉璃专属字面量的**唯一出口**（图纸 2026-09-05 卷二C A-10 · §9 ⑤「禁裸 `Color(0x…)`」）。
  *
  * 为什么这些色不进 [com.situ.aichat.ui.designsystem.AppColors]：它们是琉璃这张脸自己的长相
- * ——红包哑光红 / 恒暗舞台卡 / 图片戳压底 —— 暖陶那张脸没有对应槽位（暖陶红包是陶红
+ * ——红包哑光红 / 恒暗舞台卡 / 头像光环 —— 暖陶那张脸没有对应槽位（暖陶红包是陶红
  * `economy.redPacketStart/End`，两者**不可互换**）。`ui/designsystem/Palette.kt` 零碰。
  *
- * 深浅两档：本表全部**双档同值**——红包 / 恒暗卡 / 图片压底本身就是「自带底色的面」，
- * 不随主题翻浅（同暖陶红包卡与见面剧场的既有判例）。
+ * 深浅两档：红包 / 恒暗卡**双档同值**——它们本身就是「自带底色的面」，不随主题翻浅（同暖陶红包卡与
+ * 见面剧场的既有判例）；卷三的头像光环与半透明卡金币字按 `dark` 取值（[avatarRing] / [goldOnCard]）。
  */
 internal object LiuliPalette {
-
-    // ── AI 泡时间戳（卷二A 的唯二字面量·A-10 搬入·契约 §4.2 `bubble.aiTime`） ────────────
-    val aiStampLight = Color(0xFF8A8F9A)
-    val aiStampDark = Color(0xFF7C8390)
-
-    // ── 用户泡渐变窗口的末 stop（C7·用户 2026-09-05 选「乙 · 钴 → 紫」） ────────────────
-    /**
-     * 渐变窗口底端色。原值走 `Palette.Cobalt26GradEnd`（`#1557CC`·同色相略暗，白字对比 4.6 → 6.4），
-     * 换成偏紫的 `#3B3FC6` 后底端 7.7、区间内逐 0.01 仍 ≥ 4.5（`LiuliBubbleGradientTest` 钉）。
-     * `Palette.Cobalt26GradEnd` **不动**——它还喂着 `accent.gradientEnd`（钮）与暖陶 `bubble.userEnd`，
-     * 与本项无关；换色只发生在琉璃用户泡这一处。
-     */
-    val bubbleGradientEnd = Color(0xFF3B3FC6)
 
     // ── 红包卡（对版稿 `.card.red`·哑光红 160°·**非**暖陶陶红） ───────────────────────
     val packetRedTop = Color(0xFFC8443A)
@@ -50,39 +38,42 @@ internal object LiuliPalette {
     /** 恒暗卡图标块上的图标色（对版稿 `.card.dark .hd i svg{stroke:#9FC2FF}`）。 */
     val stageIcon = Color(0xFF9FC2FF)
 
-    // ── 图片泡右下时间戳 ────────────────────────────────────────────────────────
+    // ── 二级屏图标砖（契约 §6.5「图标砖色板」·琉璃 2.0 卷二 §4.2：六色渐变 · 乙版 · 白图标 ≥ 3） ─────────
     /**
-     * 图片戳的压底（A-6）：**不走** [com.situ.aichat.ui.liuli.glass.liuliGlass]——内容层拿不到
-     * `LocalBackdrop` 会退成浅色染色，压在照片上白字读不出来；故走对版稿的 `rgba(0,0,0,.35)` 实底。
+     * 为什么仍按组起名：十个设置分组各认一块砖（像 iOS 设置里的彩砖），取值收敛到 [LiuliTileTone] 六色渐变
+     * （用户 09-25 选乙：设计稿六色各加深一档）；相邻两组不同色（映射锁定·卷二 §4.2）。砖是**分类装饰**，
+     * 白 16 图标压渐变两端色的对比按非文字 3:1 由 `ColorContrastTest` 钉。夜档同色。
      */
-    val imageStampScrim = Color(0x59000000)
+    val tilePersonalize = LiuliTileTone.Lilac   // 个性化
+    val tileApi = LiuliTileTone.Sky             // API 与模型
+    val tileChat = LiuliTileTone.Peach          // 聊天行为
+    val tileMemory = LiuliTileTone.Mint         // 记忆与设定
+    val tileVoice = LiuliTileTone.Gold          // 语音
+    val tileCreation = LiuliTileTone.Rose       // AI 自动创作
+    val tileStory = LiuliTileTone.Lilac         // 故事
+    val tileWorld = LiuliTileTone.Sky           // 世界
+    val tileSystem = LiuliTileTone.Peach        // 系统与通知 / 功能开关
+    val tileData = LiuliTileTone.Mint           // 数据与诊断 / 关于
 
-    // ── 二级屏图标砖十色（契约 §6.5「图标砖色板」·一组一色·白图标 16·**夜档同色**） ───────────
-    /**
-     * 为什么是字面量：这十色是**分类标识**（一组一色，像 iOS 设置里的彩砖），不是语义色——
-     * `AppColors` 里没有「第 N 类」这种槽位，暖陶那张脸也不用彩砖。白 16 图标压在这十色上的对比
-     * 由 `ColorContrastTest` 钉（≥ 4.5:1）。红 `#C8443A` 只给危险行、**不做砖**（契约 §6.5）。
-     */
-    val tilePersonalize = Color(0xFF2570E8)   // 个性化 · 钴蓝
-    val tileApi = Color(0xFF3B3FC6)           // API 与模型 · 靛
-    val tileChat = Color(0xFF1F8A7A)          // 聊天行为 · 青
-    val tileMemory = Color(0xFF2F7A4F)        // 记忆与设定 · 绿
-    val tileVoice = Color(0xFFB7791F)         // 语音 · 琥珀
-    val tileCreation = Color(0xFFD2691E)      // AI 自动创作 · 橙
-    val tileStory = Color(0xFFC0397B)         // 故事 · 玫
-    val tileWorld = Color(0xFF3A8DDE)         // 世界 · 天蓝
-    val tileSystem = Color(0xFF4B5563)        // 系统与通知 / 功能开关 · 石墨
-    val tileData = Color(0xFF6B7280)          // 数据与诊断 / 关于 · 灰
+    /** 主页头像光环三色（过审稿 `ringG`·135°·纯装饰·卷三 §3.4）。 */
+    private val RingLight = Triple(Color(0xFFFFB38A), Color(0xFFC98AF0), Color(0xFF8FC8FF))
+    private val RingDark = Triple(Color(0xFFFF9E7A), Color(0xFFB77CEA), Color(0xFF6FB1FF))
+    fun avatarRing(dark: Boolean): Triple<Color, Color, Color> = if (dark) RingDark else RingLight
 
     /**
-     * 详情页头图底部遮罩的墨（契约 §6.5「底 130 遮罩 ink@0→55%」）：与玻璃上主文字同一枚墨
-     * （`#111318`），但语义是**压在照片上的幕**、昼夜同值——照片本身不随主题翻浅。
+     * 半透明卡上的金币数字（卷三 §0.2-6）：`economy.gold` 压半透明卡最坏 3.91 → 浅档压深到 #7E6119（最坏 4.68）；
+     * 夜档 `GoldDark` 压深卡 6.69 不改。**只用于半透明卡**，不透明面仍用 `economy.gold`。
      */
-    val heroScrimInk = Color(0xFF111318)
+    private val GoldOnCardLight = Color(0xFF7E6119)
+    fun goldOnCard(dark: Boolean): Color = if (dark) Palette.GoldDark else GoldOnCardLight
+}
 
-    /** 十砖色全表（`ColorContrastTest` 逐色核白图标对比用）。 */
-    val tileColors: List<Color> = listOf(
-        tilePersonalize, tileApi, tileChat, tileMemory, tileVoice,
-        tileCreation, tileStory, tileWorld, tileSystem, tileData,
-    )
+/** 设置图标块六色（用户 09-25 选乙：设计稿六色各加深一档，白图标 ≥ 3:1）。135° 渐变 start → end。 */
+enum class LiuliTileTone(val start: Color, val end: Color) {
+    Peach(Color(0xFFE8703F), Color(0xFFDB5A58)),
+    Lilac(Color(0xFF8E7CF0), Color(0xFF7361E0)),
+    Sky(Color(0xFF3F93E6), Color(0xFF3F7FDE)),
+    Mint(Color(0xFF2FA386), Color(0xFF238F77)),
+    Rose(Color(0xFFDE659D), Color(0xFFC9538B)),
+    Gold(Color(0xFFBF8718), Color(0xFFB8731C)),
 }

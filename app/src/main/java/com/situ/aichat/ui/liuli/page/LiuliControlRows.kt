@@ -26,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -45,6 +44,7 @@ import com.situ.aichat.ui.liuli.designsystem.LiuliRadio
 import com.situ.aichat.ui.liuli.designsystem.LiuliSegmented
 import com.situ.aichat.ui.liuli.designsystem.LiuliSlider
 import com.situ.aichat.ui.liuli.designsystem.LiuliSwitch
+import com.situ.aichat.ui.liuli.designsystem.LiuliTileTone
 import kotlin.math.roundToInt
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -78,7 +78,7 @@ private val MANUAL_FIELD_GAP = 10.dp
  * ——三处行族的标题落值必须同源，各写一份必漂（卷五 A-4 ①②）。
  */
 @Composable
-internal fun LiuliRowTitleColumn(title: String, subtitle: String?, modifier: Modifier = Modifier) {
+internal fun LiuliRowTitleColumn(title: String, subtitle: String?, modifier: Modifier = Modifier, subtitleMaxLines: Int = Int.MAX_VALUE) {
     Column(modifier) {
         Text(
             title,
@@ -90,6 +90,8 @@ internal fun LiuliRowTitleColumn(title: String, subtitle: String?, modifier: Mod
                 subtitle,
                 style = AppTypography.secondary.copy(fontSize = SUB_SIZE),
                 color = AppTheme.colors.text.secondary,
+                maxLines = subtitleMaxLines,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = SUB_TOP),
             )
         }
@@ -106,10 +108,12 @@ fun LiuliToggleRow(
     subtitle: String? = null,
     enabled: Boolean = true,
     icon: ImageVector? = null,
-    tileColor: Color? = null,
+    tileColor: LiuliTileTone? = null,
     /** 砖之外的自定义前导件（如每角色行的 28dp 头像·A-7）。与 [icon] 二选一，同占砖位。 */
     leading: (@Composable () -> Unit)? = null,
     divider: Boolean = true,
+    /** 副标行数上限（琉璃 2.0 卷六·三·加法零回归：默认不限 = 增补前行为）：创建故事的角色简介限两行（同暖陶）。 */
+    subtitleMaxLines: Int = Int.MAX_VALUE,
 ) {
     val haptics = LocalAppHaptics.current
     val interaction = remember { MutableInteractionSource() }
@@ -147,7 +151,7 @@ fun LiuliToggleRow(
             LiuliGroupIconTile(icon, tileColor)
             Spacer(Modifier.width(LiuliPageGeometry.tileGap))
         }
-        LiuliRowTitleColumn(title, subtitle, Modifier.weight(1f))
+        LiuliRowTitleColumn(title, subtitle, Modifier.weight(1f), subtitleMaxLines)
         Spacer(Modifier.width(LiuliPageGeometry.tileGap))
         // 纯视觉（null）：点击面只在行上；给它 `{}` 会成第二个 toggleable 节点把药丸上的点击吃掉（复核 R1 🔴-2）。
         LiuliSwitch(checked = checked, onCheckedChange = null, enabled = enabled)

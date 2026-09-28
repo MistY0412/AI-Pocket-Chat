@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -56,13 +57,15 @@ import com.situ.aichat.ui.chat.MessagePreviewText
 import com.situ.aichat.ui.chat.rememberQuoteTextOnlyHint
 import com.situ.aichat.ui.chat.ChatViewModel
 import com.situ.aichat.ui.chat.ChatWallpaper
+import com.situ.aichat.ui.chat.LocalBubbleStampTone
 import com.situ.aichat.ui.chat.ChatWorldPill
 import com.situ.aichat.ui.chat.SEND_FLIGHT_ENABLED
 import com.situ.aichat.ui.chat.sendFlightGatesOpen
 import com.situ.aichat.ui.chat.TypingSlot
 import com.situ.aichat.ui.chat.buildChatRenderItems
 import com.situ.aichat.ui.components.AppMotion
-import com.situ.aichat.ui.liuli.glass.BackdropHost
+import com.situ.aichat.ui.designsystem.AppTheme
+import com.situ.aichat.ui.liuli.glass.LiuliGlassHost
 import com.situ.aichat.ui.offline.OfflineBackgroundView
 import com.situ.aichat.ui.offline.OfflineModeView
 import com.situ.aichat.ui.offline.OfflineTheater
@@ -70,8 +73,8 @@ import com.situ.aichat.ui.offline.parseOfflineThemeColor
 
 /**
  * 琉璃聊天屏布局（图纸 2026-09-05 卷二A §3.1 通路图）：
- * [BackdropHost] `content` = 背景（心情四色 / 壁纸）+ 见面舞台 + 列表区 + 面板区；`overlay` = 顶栏 / 世界胶囊
- * / 输入区（玻璃片必须在 overlay，否则录进自己的 layer 成递归·卷一 `BackdropHost` KDoc）。
+ * [LiuliGlassHost] `content` = 背景（柔光底 / 壁纸）+ 见面舞台 + 列表区 + 面板区；`overlay` = 顶部模糊带 / 顶栏 / 世界胶囊
+ * / 回底钮 / 输入区（玻璃片必须在 overlay，否则取景取到自己·琉璃 2.0 卷一 `LiuliGlassHost` KDoc）。
  *
  * **C1 过渡态**：列表区暂借暖陶 `ChatMessageList`、输入区暂借 `ChatBottomBar`（图纸 §8 明写「本 chunk 内临时」），
  * C2 / C3 分别替换成 `LiuliChatList` / `LiuliInputBar`。
@@ -106,6 +109,8 @@ internal fun LiuliChatLayout(
     val characterUuid = conversation?.characterUuid
     val offlineChrome = conversation?.isInOfflineMode == true
     val moodEmoji = conversation?.moodEmoji.orEmpty()
+    val tones = liuliChatChromeTones(AppTheme.colors.isDark, chatWallpaper, offlineChrome) // 卷三 §0.2-8：玻璃件深浅 / 加厚
+    val stampTone = liuliBubbleStampTone(chatWallpaper) // 卷四 §0.2-7
 
     val messagesLoaded by viewModel.messagesLoaded.collectAsStateWithLifecycle()
     val customStickers by viewModel.customStickers.collectAsStateWithLifecycle()
@@ -175,9 +180,9 @@ internal fun LiuliChatLayout(
     val inputRegionPx: () -> Int = { session.inputPanel.regionPx(imeInsets.exclude(navBarInsets).getBottom(density)) }
 
     Box(Modifier.fillMaxSize()) {
-        BackdropHost(
+        LiuliGlassHost(
             modifier = Modifier.fillMaxSize(),
-            state = session.backdrop,
+            state = session.glassHost,
             content = {
                 if (!offlineChrome) {
                     LiuliChatBackground(
@@ -268,38 +273,40 @@ internal fun LiuliChatLayout(
                                     modifier = Modifier.fillMaxSize().padding(horizontal = LiuliChatGeometry.listHorizontal),
                                 )
                             } else {
-                                LiuliChatList(
-                                    listState = session.listState,
-                                    listItems = listItems,
-                                    messages = messages,
-                                    dismissKeyboardOnDrag = session.dismissKeyboardOnDrag,
-                                    playingVoiceId = playingVoiceId,
-                                    voiceProgress = voiceProgressProvider,
-                                    reduceMotion = reduceMotion,
-                                    emotionAnimationEnabled = appSettings.emotionAnimationEnabled,
-                                    animateArrivalsSinceMillis = session.animateArrivalsSinceMillis,
-                                    entryScalePlayed = session.entryScalePlayed,
-                                    emotionPlayed = session.emotionPlayed,
-                                    emotionHiddenIntervals = session.emotionHiddenIntervals,
-                                    actions = session.actions,
-                                    userScrollEnabled = !session.immersiveMenu.isOpen,
-                                    deleteArm = session.deleteArm,
-                                    sendFlight = session.sendFlight,
-                                    reaction = session.reaction,
-                                    fold = session.fold,
-                                    characterName = characterName,
-                                    avatarPath = avatarPath,
-                                    userName = userName,
-                                    userAvatarPath = userAvatarPath,
-                                    customStickers = customStickers,
-                                    isSending = isSending,
-                                    contentTopPadding = LiuliChatGeometry.listTopPadding(statusBarTop, hasWorldPill),
-                                    contentBottomPadding = listBottomPadding,
-                                    voiceSetupNeeded = voiceSetupNeeded,
-                                )
+                                CompositionLocalProvider(LocalBubbleStampTone provides stampTone) {
+                                    LiuliChatList(
+                                        listState = session.listState,
+                                        listItems = listItems,
+                                        messages = messages,
+                                        dismissKeyboardOnDrag = session.dismissKeyboardOnDrag,
+                                        playingVoiceId = playingVoiceId,
+                                        voiceProgress = voiceProgressProvider,
+                                        reduceMotion = reduceMotion,
+                                        emotionAnimationEnabled = appSettings.emotionAnimationEnabled,
+                                        animateArrivalsSinceMillis = session.animateArrivalsSinceMillis,
+                                        entryScalePlayed = session.entryScalePlayed,
+                                        emotionPlayed = session.emotionPlayed,
+                                        emotionHiddenIntervals = session.emotionHiddenIntervals,
+                                        actions = session.actions,
+                                        userScrollEnabled = !session.immersiveMenu.isOpen,
+                                        deleteArm = session.deleteArm,
+                                        sendFlight = session.sendFlight,
+                                        reaction = session.reaction,
+                                        fold = session.fold,
+                                        characterName = characterName,
+                                        avatarPath = avatarPath,
+                                        userName = userName,
+                                        userAvatarPath = userAvatarPath,
+                                        customStickers = customStickers,
+                                        isSending = isSending,
+                                        contentTopPadding = LiuliChatGeometry.listTopPadding(statusBarTop, hasWorldPill),
+                                        contentBottomPadding = listBottomPadding,
+                                        voiceSetupNeeded = voiceSetupNeeded,
+                                    )
+                                }
                             }
                         }
-                        // 横幅族（过渡借用·卷二C 换脸）+ 日期胶囊 + 回底钮：列表区 Box 的兄弟位（图纸 §3.1）。
+                        // 横幅族（过渡借用·卷二C 换脸）+ 日期胶囊：列表区 Box 的兄弟位（图纸 §3.1·回底钮卷四起住 overlay）。
                         // 声明序照抄暖陶：胶囊在横幅**之前**（横幅压其上），且横幅在场时胶囊并入抑制。
                         LiuliDatePill(
                             listState = session.listState,
@@ -319,17 +326,11 @@ internal fun LiuliChatLayout(
                             reduceMotion = reduceMotion,
                             promiseHintVisible = promiseHint != null,
                         )
-                        LiuliScrollToBottom(
-                            visible = session.showScrollDown,
-                            reduceMotion = reduceMotion,
-                            // 底缘 = 输入区实测顶 + 12dp（与列表底留白同一个数·见该件 KDoc）。
-                            bottomPadding = listBottomPadding,
-                            onClick = { if (listItems.isNotEmpty()) session.scrollCoordinator.stickToBottom(animate = !reduceMotion) },
-                        )
                         LiuliCalendarToast(
                             text = calendarToast?.text,
                             isDelete = calendarToast?.isDelete == true,
                             reduceMotion = reduceMotion,
+                            topPadding = LiuliChatGeometry.listTopPadding(statusBarTop, hasWorldPill),
                             onDismiss = { viewModel.dismissCalendarToast() },
                         )
                         LiuliPromiseHint(
@@ -346,134 +347,153 @@ internal fun LiuliChatLayout(
                 }
             },
             overlay = {
-                Column(
-                    modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(LiuliChatGeometry.worldPillTop),
-                ) {
-                    LiuliChatTopBar(
-                        characterName = characterName,
-                        loading = headerLoading,
-                        avatarPath = avatarPath,
-                        innerStateLine = innerStateLine,
-                        scheduleStatus = scheduleStatus,
-                        moodEmoji = moodEmoji,
-                        moodText = conversation?.moodText.orEmpty(),
-                        isInOfflineMode = offlineChrome,
-                        characterUuid = characterUuid,
-                        onBack = onBack,
-                        onOpenProfile = onOpenProfile,
-                        onEndMeeting = { viewModel.exitOfflineMode() },
-                        canStartCall = canStartCall,
-                        onStartCall = onStartCall,
-                    )
-                    LiuliWorldPill(
-                        pill = worldPill,
-                        offline = offlineChrome,
-                        onOpenWorldAt = onOpenWorldAt,
-                    )
+                LiuliChromeTone(tones.topDark, tones.thick) {
+                    LiuliChatScrollEdge(statusBarTop)
+                    Column(
+                        modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(LiuliChatGeometry.worldPillTop),
+                    ) {
+                        LiuliChatTopBar(
+                            characterName = characterName,
+                            loading = headerLoading,
+                            avatarPath = avatarPath,
+                            innerStateLine = innerStateLine,
+                            scheduleStatus = scheduleStatus,
+                            moodEmoji = moodEmoji,
+                            moodText = conversation?.moodText.orEmpty(),
+                            isInOfflineMode = offlineChrome,
+                            characterUuid = characterUuid,
+                            onBack = onBack,
+                            onOpenProfile = onOpenProfile,
+                            onEndMeeting = { viewModel.exitOfflineMode() },
+                            canStartCall = canStartCall,
+                            onStartCall = onStartCall,
+                        )
+                        LiuliWorldPill(
+                            pill = worldPill,
+                            offline = offlineChrome,
+                            onOpenWorldAt = onOpenWorldAt,
+                        )
+                    }
                 }
                 // 声明序即层级：面板在输入区**之前**——托盘永远盖在面板之上（图纸 §2.2 ③）。
-                LiuliPlusPanel(
-                    viewModel = viewModel,
-                    sheets = session.sheets,
-                    inputPanel = session.inputPanel,
-                    replyTarget = replyTarget,
-                    quoteHint = quoteHint,
-                    isOfflineMode = offlineChrome,
-                    chatModelHasVision = session.imageState.chatModelHasVision,
-                    reduceMotion = reduceMotion,
-                    regionPx = inputRegionPx,
-                )
-                LiuliInputBar(
-                    input = session.input,
-                    onInputChange = { session.input = it },
-                    // T2-4 / T2-5 可测点：输入区不持 VM，发送经回调（返回「是否被受理」）；
-                    // 清空押后到飞入握手（A-7）——闸关时 tryBegin 立即 commit = 与旧写法同帧。
-                    onSend = { text ->
-                        liuliSendHandler(
-                            text = text,
-                            send = viewModel::send,
-                            gatesOpen = sendFlightGatesOpen(
-                                enabled = SEND_FLIGHT_ENABLED,
-                                reduceMotion = reduceMotion,
-                                listAtBottom = !session.showScrollDown,
-                                quoteReplyActive = replyTarget != null,
-                                flightBusy = session.sendFlight.busy,
-                            ),
-                            sendFlight = session.sendFlight,
-                            commit = { session.input = "" },
-                            // 心情四色绕位一步（图纸 §4.1·只在发送被受理时·E7）。
-                            onAccepted = { session.sendTurn++ },
-                        )
-                    },
-                    panelOpen = session.inputPanel.panelOpen,
-                    onTogglePanel = {
-                        if (session.inputPanel.panelOpen) {
-                            session.inputPanel.requestKeyboard()
-                        } else {
-                            // 事件时读 ime（审计 P4·绝不在组合期读）。
-                            session.inputPanel.openPanel(imeInsets.exclude(navBarInsets).getBottom(density), session.panelFallbackPx)
-                        }
-                    },
-                    inputFieldModifier = Modifier
-                        .focusRequester(session.inputFieldFocus)
-                        .onFocusChanged { if (it.isFocused) session.inputPanel.onFieldFocused() }
-                        .onGloballyPositioned { session.sendFlight.inputBounds = it.boundsInWindow() },
-                    characterName = characterName,
-                    replyTarget = replyTarget,
-                    onClearReply = { viewModel.clearReplyTarget() },
-                    quoteHint = quoteHint,
-                    pendingCalendarAction = pendingCalendarActions.firstOrNull(),
-                    onConfirmCalendar = { viewModel.confirmPendingCalendarAction() },
-                    onCancelCalendar = { viewModel.cancelPendingCalendarAction() },
-                    voiceDraft = voiceDraft,
-                    draftPlaying = playingVoiceId != null && playingVoiceId == voiceDraft?.id,
-                    onPlayDraft = { viewModel.toggleVoiceDraftPlayback() },
-                    onCancelDraft = { viewModel.cancelVoiceDraft() },
-                    onSendDraft = { viewModel.sendVoiceDraft() },
-                    onRetryTranscription = { viewModel.retryVoiceTranscription() },
-                    micPermissionGranted = session.micPermission.granted,
-                    onRequestMicPermission = session.micPermission.request,
-                    onStartRecording = { viewModel.startVoiceRecording() },
-                    onRecordingDrag = { viewModel.updateVoiceRecordingDrag(it) },
-                    onFinishRecording = { viewModel.finishVoiceRecording() },
-                    voiceRecording = voiceRecording,
-                    voiceRecordingLevel = voiceRecordingLevel,
-                    voiceRecordingDurationMs = voiceRecordingDurationMs,
-                    voiceRecordingCancelling = voiceRecordingCancelling,
-                    offlineImmersiveInput = offlineChrome && appSettings.offlineImmersiveInputEnabled,
-                    offlineThemeColor = OfflineTheater.harmonize(parseOfflineThemeColor(character?.offlineThemeColorHex)),
-                    reduceMotion = reduceMotion,
-                    // M3b ④：握手 / 飞行期抑制占位符，免得输入框在飞行泡落地前就闪回「说点什么…」。
-                    hidePlaceholder = session.sendFlight.busy,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .offset { IntOffset(0, -session.inputPanel.regionPx(imeInsets.exclude(navBarInsets).getBottom(this))) }
-                        // 导航栏 padding 之内量（= 不含 navBar 的内容高·§4.7 底留白算式的入参）。
-                        .onSizeChanged { inputOverlayHeightPx = it.height },
-                )
+                LiuliChromeTone(tones.bottomDark, tones.thick) {
+                    LiuliScrollToBottom(
+                        visible = session.showScrollDown,
+                        reduceMotion = reduceMotion,
+                        // 底缘 = 输入区实测顶 + 12dp（与列表底留白同一个数·见该件 KDoc）。
+                        bottomPadding = listBottomPadding,
+                        liftPx = inputRegionPx,
+                        onClick = { if (listItems.isNotEmpty()) session.scrollCoordinator.stickToBottom(animate = !reduceMotion) },
+                    )
+                    LiuliPlusPanel(
+                        viewModel = viewModel,
+                        sheets = session.sheets,
+                        inputPanel = session.inputPanel,
+                        replyTarget = replyTarget,
+                        quoteHint = quoteHint,
+                        isOfflineMode = offlineChrome,
+                        chatModelHasVision = session.imageState.chatModelHasVision,
+                        reduceMotion = reduceMotion,
+                        regionPx = inputRegionPx,
+                    )
+                    LiuliInputBar(
+                        input = session.input,
+                        onInputChange = { session.input = it },
+                        // T2-4 / T2-5 可测点：输入区不持 VM，发送经回调（返回「是否被受理」）；
+                        // 清空押后到飞入握手（A-7）——闸关时 tryBegin 立即 commit = 与旧写法同帧。
+                        onSend = { text ->
+                            liuliSendHandler(
+                                text = text,
+                                send = viewModel::send,
+                                gatesOpen = sendFlightGatesOpen(
+                                    enabled = SEND_FLIGHT_ENABLED,
+                                    reduceMotion = reduceMotion,
+                                    listAtBottom = !session.showScrollDown,
+                                    quoteReplyActive = replyTarget != null,
+                                    flightBusy = session.sendFlight.busy,
+                                ),
+                                sendFlight = session.sendFlight,
+                                commit = { session.input = "" },
+                                // 心情四色绕位一步（图纸 §4.1·只在发送被受理时·E7）。
+                                onAccepted = { session.sendTurn++ },
+                            )
+                        },
+                        panelOpen = session.inputPanel.panelOpen,
+                        onTogglePanel = {
+                            if (session.inputPanel.panelOpen) {
+                                session.inputPanel.requestKeyboard()
+                            } else {
+                                // 事件时读 ime（审计 P4·绝不在组合期读）。
+                                session.inputPanel.openPanel(imeInsets.exclude(navBarInsets).getBottom(density), session.panelFallbackPx)
+                            }
+                        },
+                        inputFieldModifier = Modifier
+                            .focusRequester(session.inputFieldFocus)
+                            .onFocusChanged { if (it.isFocused) session.inputPanel.onFieldFocused() }
+                            .onGloballyPositioned { session.sendFlight.inputBounds = it.boundsInWindow() },
+                        characterName = characterName,
+                        replyTarget = replyTarget,
+                        onClearReply = { viewModel.clearReplyTarget() },
+                        quoteHint = quoteHint,
+                        pendingCalendarAction = pendingCalendarActions.firstOrNull(),
+                        onConfirmCalendar = { viewModel.confirmPendingCalendarAction() },
+                        onCancelCalendar = { viewModel.cancelPendingCalendarAction() },
+                        voiceDraft = voiceDraft,
+                        draftPlaying = playingVoiceId != null && playingVoiceId == voiceDraft?.id,
+                        onPlayDraft = { viewModel.toggleVoiceDraftPlayback() },
+                        onCancelDraft = { viewModel.cancelVoiceDraft() },
+                        onSendDraft = { viewModel.sendVoiceDraft() },
+                        onRetryTranscription = { viewModel.retryVoiceTranscription() },
+                        micPermissionGranted = session.micPermission.granted,
+                        onRequestMicPermission = session.micPermission.request,
+                        onStartRecording = { viewModel.startVoiceRecording() },
+                        onRecordingDrag = { viewModel.updateVoiceRecordingDrag(it) },
+                        onFinishRecording = { viewModel.finishVoiceRecording() },
+                        voiceRecording = voiceRecording,
+                        voiceRecordingLevel = voiceRecordingLevel,
+                        voiceRecordingDurationMs = voiceRecordingDurationMs,
+                        voiceRecordingCancelling = voiceRecordingCancelling,
+                        offlineImmersiveInput = offlineChrome && appSettings.offlineImmersiveInputEnabled,
+                        offlineThemeColor = OfflineTheater.harmonize(parseOfflineThemeColor(character?.offlineThemeColorHex)),
+                        reduceMotion = reduceMotion,
+                        // M3b ④：握手 / 飞行期抑制占位符，免得输入框在飞行泡落地前就闪回「说点什么…」。
+                        hidePlaceholder = session.sendFlight.busy,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .offset { IntOffset(0, -session.inputPanel.regionPx(imeInsets.exclude(navBarInsets).getBottom(this))) }
+                            // 导航栏 padding 之内量（= 不含 navBar 的内容高·§4.7 底留白算式的入参）。
+                            .onSizeChanged { inputOverlayHeightPx = it.height },
+                    )
+                }
             },
         )
 
-        LiuliChatBorrowedOverlays(
-            viewModel = viewModel,
-            session = session,
-            character = character,
-            characterName = characterName,
-            userName = userName,
-            userAvatarPath = userAvatarPath,
-            avatarPath = avatarPath,
-            appSettings = appSettings,
-            chatWallpaperPath = chatWallpaperPath,
-            customStickers = customStickers,
-            coinBalance = coinBalance,
-            offlineRecoveryVisible = offlineRecoveryVisible,
-            onOpenStickerManagement = onOpenStickerManagement,
-            inputOverlayHeight = inputOverlayHeight,
-            inputRegionPx = inputRegionPx,
-            reduceMotion = reduceMotion,
-        )
+        CompositionLocalProvider(
+            com.situ.aichat.ui.liuli.glass.LocalLiuliWindowGlassSource provides session.glassHost, // 卷三 O-1
+            LocalBubbleStampTone provides stampTone, // 卷四：飞入覆盖层的时间戳读它
+        ) {
+            LiuliChatBorrowedOverlays(
+                viewModel = viewModel,
+                session = session,
+                character = character,
+                characterName = characterName,
+                userName = userName,
+                userAvatarPath = userAvatarPath,
+                avatarPath = avatarPath,
+                appSettings = appSettings,
+                chatWallpaperPath = chatWallpaperPath,
+                customStickers = customStickers,
+                coinBalance = coinBalance,
+                offlineRecoveryVisible = offlineRecoveryVisible,
+                onOpenStickerManagement = onOpenStickerManagement,
+                inputOverlayHeight = inputOverlayHeight,
+                inputRegionPx = inputRegionPx,
+                reduceMotion = reduceMotion,
+                tones = tones,
+            )
+        }
     }
 }

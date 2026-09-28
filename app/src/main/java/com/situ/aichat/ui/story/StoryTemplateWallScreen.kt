@@ -1,6 +1,5 @@
 package com.situ.aichat.ui.story
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +27,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,7 +38,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
@@ -92,10 +89,7 @@ fun StoryTemplateWallScreen(
     var deleteTargetUuid by remember { mutableStateOf<String?>(null) }
     val templates = remember { StoryTemplates.all }
     val haptics = LocalAppHaptics.current
-    val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        viewModel.toastEvents.collect { resId -> Toast.makeText(context, resId, Toast.LENGTH_SHORT).show() }
-    }
+    StoryToastEvents(viewModel.toastEvents)
 
     val gridState = rememberLazyGridState()
 
@@ -125,11 +119,7 @@ fun StoryTemplateWallScreen(
             // ⚠️ 首项 key 恒为 `_head`、恒存在（只换文案）：模板是从库里异步来的，若首项随之新增，
             // LazyGrid 会锚住原首项、把新插的两项顶到可视区**上方**——整个区肉眼看不见（同上实测）。
             item(span = { GridItemSpan(maxLineSpan) }, key = "_head") {
-                SectionHeader(
-                    stringResource(
-                        if (myTemplates.isEmpty()) R.string.story_wall_subtitle else R.string.story_my_templates_header,
-                    ),
-                )
+                StoryWallSectionHeader(stringResource(storyWallHeadRes(myTemplates)))
             }
             if (myTemplates.isNotEmpty()) {
                 items(myTemplates, key = { it.uuid }) { row ->
@@ -151,7 +141,7 @@ fun StoryTemplateWallScreen(
                     }
                 }
                 item(span = { GridItemSpan(maxLineSpan) }, key = "_builtin_header") {
-                    SectionHeader(stringResource(R.string.story_wall_subtitle))
+                    StoryWallSectionHeader(stringResource(R.string.story_wall_subtitle))
                 }
             }
             items(templates, key = { it.id }) { template ->
@@ -209,12 +199,12 @@ fun StoryTemplateWallScreen(
 
 /** 区头（灰小字·样式与顶部副标题行同一对 token）。 */
 @Composable
-private fun SectionHeader(text: String) {
+internal fun StoryWallSectionHeader(text: String, modifier: Modifier = Modifier.padding(bottom = 2.dp)) {
     Text(
         text,
         style = AppTheme.typography.secondary,
         color = AppTheme.colors.text.secondary,
-        modifier = Modifier.padding(bottom = 2.dp),
+        modifier = modifier,
     )
 }
 
@@ -226,7 +216,7 @@ private fun SectionHeader(text: String) {
  * `coverMotif` 留空：卡与 sheet 的封面都由「题材配色 + id 种子」程序化生成，从不读 motif（图纸 §11 P-3）。
  */
 @Composable
-private fun UserStoryTemplateEntity.toDisplayTemplate(tagline: String): StoryTemplate {
+internal fun UserStoryTemplateEntity.toDisplayTemplate(tagline: String): StoryTemplate {
     val payload = remember(payloadJson) { UserStoryTemplatePayload.decode(payloadJson) }
     return StoryTemplate(
         id = UserStoryTemplatePayload.USER_TEMPLATE_ID_PREFIX + uuid,
@@ -243,7 +233,7 @@ private fun UserStoryTemplateEntity.toDisplayTemplate(tagline: String): StoryTem
 }
 
 /** 卡片副行的存入日期（「8/2」·跟随系统语言与时区）。 */
-private fun formatTemplateDate(millis: Long): String =
+internal fun formatTemplateDate(millis: Long): String =
     Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("M/d"))
 
 /** 「我的模板」卡长按菜单（族语言与书架卡菜单同源 = [StoryGlassMenu]）。 */
@@ -276,7 +266,7 @@ private fun TemplateNameDialog(titleRes: Int, initialName: String, onConfirm: (S
         title = stringResource(titleRes),
         confirmText = stringResource(R.string.action_save),
         onConfirm = { onConfirm(value.text) },
-        confirmEnabled = value.text.trim().isNotEmpty(),
+        confirmEnabled = storyTemplateNameValid(value.text),
         dismissText = stringResource(R.string.action_cancel),
         onDismiss = onDismiss,
         content = {
@@ -292,7 +282,7 @@ private fun TemplateNameDialog(titleRes: Int, initialName: String, onConfirm: (S
 
 /** 模板卡：程序化封面（竖排书名 + 题材种子微变）+ 模板名 + 钩子一行。[onLongPress] 非空 = 「我的模板」卡（可管理）。 */
 @Composable
-private fun TemplateCard(template: StoryTemplate, onClick: () -> Unit, onLongPress: (() -> Unit)? = null) {
+internal fun TemplateCard(template: StoryTemplate, onClick: () -> Unit, onLongPress: (() -> Unit)? = null) {
     val c = AppTheme.colors
     Column(
         Modifier.fillMaxWidth().clickableScale(onLongClick = onLongPress, onClick = onClick),
@@ -312,7 +302,7 @@ private fun TemplateCard(template: StoryTemplate, onClick: () -> Unit, onLongPre
 
 /** 尾卡「自己从头写」：虚线陶土框 3:4 + 笔 + 标题/副文案 → 空白高级自定义。 */
 @Composable
-private fun DiyCard(onClick: () -> Unit) {
+internal fun DiyCard(onClick: () -> Unit) {
     val c = AppTheme.colors
     Box(
         Modifier

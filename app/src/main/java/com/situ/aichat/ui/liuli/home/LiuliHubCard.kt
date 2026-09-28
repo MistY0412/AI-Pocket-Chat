@@ -1,7 +1,6 @@
 package com.situ.aichat.ui.liuli.home
 
 import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -24,8 +23,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,17 +30,21 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
+import com.situ.aichat.ui.designsystem.Palette
 import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
-import com.situ.aichat.ui.liuli.designsystem.liuliCardSurface
+import com.situ.aichat.ui.liuli.designsystem.LiuliTileTone
+import com.situ.aichat.ui.liuli.designsystem.liuliCardMaterial
 import com.situ.aichat.ui.liuli.designsystem.liuliPressable
+import com.situ.aichat.ui.liuli.designsystem.liuliToneFill
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
 /** 图标块内的图标尺寸（§3.2「卡片」：IconTile 40 / 12）。 */
 private val TILE_ICON = 22.dp
 
 /**
- * 琉璃纸白卡的通用外壳（§3.2「卡片」）：`liuliCardSurface(medium)` = 20 圆角纸面 + 0.5 发丝、**无软影**，
- * 内距 [contentPadding]（默认 16·身份卡 20），整卡可点。`clickable` 排在 `liuliCardSurface`（内含 `clip`）
- * **之后**，否则 ripple 是矩形、从四个圆角漏出来（PITFALLS §1d·卷二C R1 🟡-2）。
+ * 琉璃卡的通用外壳（§3.2「卡片」）：半透明卡片（卷三·`liuliCardMaterial(medium)` = 20 圆角 + 形状外柔影 + 半透明底 +
+ * 顶沿高光 + 1dp 白边），内距 [contentPadding]（默认 16·身份卡 20），整卡可点。`clickable` 排在 `liuliCardMaterial`
+ * （内含 `clip`）**之后**，否则 ripple 是矩形、从四个圆角漏出来（PITFALLS §1d·卷二C R1 🟡-2）。
  *
  * [decor] 排在卡面**之后、内容之前**：要「画在卡内、发丝之内」的装饰（身份卡顶沿微光）挂这里——挂在 [modifier]
  * 上会画到卡面**底下**（被纸面盖住）且溢出到卡外（R1 🔴-2）。
@@ -61,8 +62,8 @@ internal fun LiuliHubCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .liuliPressable(interactionSource = interaction, enabled = true, brighten = false)
-            .liuliCardSurface(LiuliShapes.medium)
+            .liuliPressable(interactionSource = interaction, enabled = true)
+            .liuliCardMaterial(LiuliShapes.medium, LocalIsDarkTheme.current)
             .then(decor)
             .clickable(interaction, LocalIndication.current, role = Role.Button, onClickLabel = onClickLabel, onClick = onClick)
             .padding(contentPadding),
@@ -93,14 +94,14 @@ internal fun LiuliStripHeader(
     }
 }
 
-/** 图标块（A-12）：40 见方、圆角 12，底色按功能族取（色族沿用暖陶·契约 §3.1 #3）。 */
+/** 图标块（A-12·卷三 §4.10）：40 见方、圆角 12，底 = 六色渐变 [LiuliTileTone]（与设置砖 / 加号面板共用 [liuliToneFill]）+ 白图标 22。 */
 @Composable
-fun LiuliIconTile(icon: ImageVector, tint: Color, ink: Color, modifier: Modifier = Modifier) {
+fun LiuliIconTile(icon: ImageVector, tone: LiuliTileTone, modifier: Modifier = Modifier) {
     Box(
-        modifier.size(LiuliHomeGeometry.tile).clip(RoundedCornerShape(LiuliHomeGeometry.tileCorner)).background(tint),
+        modifier.size(LiuliHomeGeometry.tile).liuliToneFill(tone, RoundedCornerShape(LiuliHomeGeometry.tileCorner)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = ink, modifier = Modifier.size(TILE_ICON))
+        Icon(icon, contentDescription = null, tint = Palette.White, modifier = Modifier.size(TILE_ICON))
     }
 }
 
@@ -121,8 +122,8 @@ internal fun LiuliHubRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .liuliPressable(interactionSource = interaction, enabled = true, brighten = false)
-            .then(if (surface) Modifier.liuliCardSurface(LiuliShapes.medium) else Modifier)
+            .liuliPressable(interactionSource = interaction, enabled = true)
+            .then(if (surface) Modifier.liuliCardMaterial(LiuliShapes.medium, LocalIsDarkTheme.current) else Modifier)
             .clickable(interaction, LocalIndication.current, role = Role.Button, onClickLabel = onClickLabel, onClick = onClick)
             .padding(LiuliHomeGeometry.cardPad),
         verticalAlignment = Alignment.CenterVertically,

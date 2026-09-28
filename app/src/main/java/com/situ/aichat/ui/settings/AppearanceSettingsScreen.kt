@@ -56,7 +56,7 @@ import com.situ.aichat.ui.designsystem.AppTopBar
 import com.situ.aichat.ui.designsystem.appCardSurface
 import com.situ.aichat.ui.designsystem.LightAppColors
 import com.situ.aichat.ui.designsystem.LiuliLightAppColors
-import com.situ.aichat.ui.liuli.glass.realtimeBlurSupported
+import com.situ.aichat.ui.liuli.glass.hazeGlassSupported
 import kotlin.math.roundToInt
 
 /**
@@ -113,9 +113,8 @@ fun AppearanceSettingsScreen(
                 }
             }
 
-            // 琉璃「透明度」两档（契约 D-7）：只在琉璃 + 有实时模糊能力时给选——API 29–30 强制着色，
-            // 没有可选项就不给选项（图纸 §0 ② 8）。与主题节同一 Row 几何。
-            if (skin == AppSkin.LIULI && realtimeBlurSupported) {
+            // 琉璃「玻璃质感」三档：只在琉璃 + 安卓 13+ 时给选（以下只有毛玻璃，不给选项）。与主题节同一 Row 几何。
+            if (skin == AppSkin.LIULI && hazeGlassSupported) {
                 SettingsSection(
                     title = stringResource(R.string.appearance_glass_section),
                     footer = stringResource(R.string.appearance_glass_footer),
@@ -363,10 +362,11 @@ internal fun AppSkin.labelRes(): Int = when (this) {
     AppSkin.LIULI -> R.string.appearance_palette_liuli
 }
 
-/** 玻璃透明度档 → 显示文案资源。 */
+/** 玻璃质感档 → 显示文案资源。 */
 internal fun GlassTier.labelRes(): Int = when (this) {
-    GlassTier.CLEAR -> R.string.appearance_glass_clear
-    GlassTier.TINTED -> R.string.appearance_glass_tinted
+    GlassTier.FROSTED -> R.string.appearance_glass_frosted
+    GlassTier.STANDARD -> R.string.appearance_glass_standard
+    GlassTier.SHEER -> R.string.appearance_glass_sheer
 }
 
 /** 深浅模式 → 显示文案资源（与 iOS `AppearanceMode.displayName` 对齐）。 */

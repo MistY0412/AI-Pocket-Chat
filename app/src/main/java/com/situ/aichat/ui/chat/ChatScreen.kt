@@ -526,8 +526,8 @@ fun ChatScreen(
         }
     }
 
-    // offline-1：用外层 Box 容纳全屏「见面回顾」覆盖层（盖住顶栏，避免误用聊天返回键）。
-    Box(Modifier.fillMaxSize()) {
+    // offline-1：外层框容纳全屏「见面回顾」覆盖层（盖住顶栏）；GlassFrame=壁纸玻璃切片参照框（行为同 Box·防预测性返回缩放错位）。
+    com.situ.aichat.ui.designsystem.GlassFrame(Modifier.fillMaxSize()) {
     // 壁纸全屏沉浸重构②（参照 RikkaHub）：NavHost 不再垫付 → 本屏已铺满整个 window，壁纸直接 fillMaxSize 自然
     // 铺到状态栏/导航栏后（不再需要 clawback 手术）。顶栏/输入托盘各自 statusBarsPadding/navigationBarsPadding 让位。
     // 全屏恒暗舞台（2026-07-06 拍板修订·契约 §4.2 修正）：见面态舞台层从内容区上移到窗口层——壁纸+幕布（或粒子/

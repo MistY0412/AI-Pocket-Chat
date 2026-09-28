@@ -11,11 +11,10 @@ import androidx.compose.ui.res.stringResource
 import com.situ.aichat.R
 import com.situ.aichat.data.local.entity.StoryChapterEntity
 import com.situ.aichat.data.local.entity.StoryEntity
-import com.situ.aichat.ui.designsystem.AppDialog
 
 // ── 阅读器屏级弹窗接线层 ──
 // 从 StoryReaderScreen 抽出（只搬不改·参数与原局部变量同名，弹窗体字节级不变）。
-// 弹窗「长相字典」（ReaderDialog 枚举 + ReaderDialogs 分发）在 StoryReaderDialogs.kt；本文件只管屏级接线。
+// 弹窗「长相字典」（ReaderDialog 枚举 + ReaderDialogs 分发）在 StoryReaderDialogs.kt；琉璃脸的长相字典在 ui/liuli/story/LiuliStoryReaderDialogs.kt（经 [StoryReaderSheetFace] 接入）；本文件只管屏级接线。
 
 /** VM 态直驱的两个提示弹窗：askNext（选择已存 → 问是否生成下一章）与 error（失败提示·retryable 给重试键）。 */
 @Composable
@@ -23,10 +22,11 @@ internal fun StoryReaderAlerts(
     askNext: Boolean,
     error: StoryReaderError?,
     viewModel: StoryReaderViewModel,
+    face: StoryReaderSheetFace = StoryReaderWarmSheetFace,
 ) {
     // 选择已存 → 问是否立刻生成下一章。
     if (askNext) {
-        AppDialog(
+        face.ReaderAlert(
             onDismissRequest = viewModel::dismissAskNext,
             title = stringResource(R.string.story_alert_next_title),
             body = stringResource(R.string.story_alert_next_msg),
@@ -39,7 +39,7 @@ internal fun StoryReaderAlerts(
 
     // 错误提示。生成失败（retryable）给重试键；操作类失败维持只有确认键。
     error?.let { err ->
-        AppDialog(
+        face.ReaderAlert(
             onDismissRequest = viewModel::dismissError,
             title = stringResource(R.string.story_alert_error_title),
             body = err.message,
@@ -71,6 +71,7 @@ internal fun StoryReaderDialogHost(
     chapters: List<StoryChapterEntity>,
     onGoToChoice: () -> Unit,
     viewModel: StoryReaderViewModel,
+    face: StoryReaderSheetFace = StoryReaderWarmSheetFace,
 ) {
     var dialog by dialogState
     var pendingGracefulFinale by pendingGracefulState
@@ -79,7 +80,7 @@ internal fun StoryReaderDialogHost(
     var pendingSkipForEnding by remember { mutableStateOf(false) }
 
     // 菜单触发的对话框。
-    ReaderDialogs(
+    face.Dialogs(
         dialog = dialog,
         currentHasPendingChoice = currentChapter?.let { it.hasChoice && it.userChoice == null } == true,
         storyTitle = story?.title,

@@ -14,10 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +23,8 @@ import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
 import com.situ.aichat.ui.designsystem.Palette
 import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
+import com.situ.aichat.ui.liuli.designsystem.liuliAccentFill
+import com.situ.aichat.ui.liuli.designsystem.liuliPressBrighten
 import com.situ.aichat.ui.liuli.designsystem.liuliPressable
 import com.situ.aichat.ui.liuli.page.liuliTouchHeight
 
@@ -37,7 +35,7 @@ import com.situ.aichat.ui.liuli.page.liuliTouchHeight
 
 /**
  * 卡内钮（对版稿 `.cbt`·高 34 · pill · `label` W600 归梯 640·§3.2）：
- * [prominent] = 钴蓝渐变实底 / 否则 = **浅染实底**（`accent.container` + `accent.onContainer`）自画——§3.2 明写
+ * [prominent] = 主色渐变实底（[liuliAccentFill]·卷三）/ 否则 = **浅染实底**（`accent.container` + `accent.onContainer`）自画——§3.2 明写
  * 「soft 是浅染实底不是玻璃」，内容层退染色的玻璃在纸卡上糊成一片。
  *
  * **触达 48 不占版**（复核 R1 🔴-1·REDLINES「a11y 48dp」）：版位仍是 34（钮行几何一像素不动），点击面经
@@ -54,46 +52,22 @@ internal fun RowScope.LiuliCardButton(
     softContainer: Color = AppTheme.colors.accent.container,
     softContent: Color = AppTheme.colors.accent.onContainer,
 ) {
-    val colors = AppTheme.colors
     val style = AppTypography.label.copy(fontWeight = BUTTON_WEIGHT)
     LiuliCardTouchSlot(slot = modifier.weight(1f), onClick = onClick) { interaction ->
         val face = Modifier
             .fillMaxWidth()
             .height(LiuliChatGeometry.cardButtonHeight)
-            .liuliPressable(interactionSource = interaction, enabled = true, brighten = true)
+            .liuliPressable(interactionSource = interaction, enabled = true)
         if (prominent) {
-            val gradientStart = colors.accent.gradientStart
-            val gradientEnd = colors.accent.gradientEnd
             Box(
-                modifier = face
-                    .shadow(
-                        elevation = PROMINENT_SHADOW_ELEVATION,
-                        shape = LiuliShapes.pill,
-                        clip = false,
-                        ambientColor = gradientEnd.copy(alpha = PROMINENT_SHADOW_ALPHA),
-                        spotColor = gradientEnd.copy(alpha = PROMINENT_SHADOW_ALPHA),
-                    )
-                    .clip(LiuliShapes.pill)
-                    .drawWithCache {
-                        // 135° 对角：起点左上、终点右下（同 LiuliButton.Prominent）。
-                        val brush = Brush.linearGradient(
-                            colors = listOf(gradientStart, gradientEnd),
-                            start = Offset.Zero,
-                            end = Offset(size.width, size.height),
-                        )
-                        onDrawBehind {
-                            drawRect(brush)
-                            // 顶沿迎光：1px 硬线（形状之外已被 clip 裁掉）。
-                            drawRect(Palette.White.copy(alpha = PROMINENT_SPECULAR_ALPHA), size = size.copy(height = 1f))
-                        }
-                    },
+                modifier = face.liuliAccentFill(LiuliShapes.pill).liuliPressBrighten(interaction, enabled = true),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(text, style = style, color = Palette.White)
             }
         } else {
             Box(
-                modifier = face.clip(LiuliShapes.pill).background(softContainer),
+                modifier = face.clip(LiuliShapes.pill).background(softContainer).liuliPressBrighten(interaction, enabled = true),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(text, style = style, color = softContent)
@@ -112,7 +86,7 @@ internal fun LiuliCardTextButton(text: String, onClick: () -> Unit, modifier: Mo
         Box(
             modifier = Modifier
                 .height(LiuliChatGeometry.cardButtonHeight)
-                .liuliPressable(interactionSource = interaction, enabled = true, brighten = false)
+                .liuliPressable(interactionSource = interaction, enabled = true)
                 .padding(horizontal = TEXT_BUTTON_SIDE),
             contentAlignment = Alignment.Center,
         ) {
@@ -152,7 +126,3 @@ private fun LiuliCardTouchSlot(
 /** 落值（§3.2 卡一节 + 对版稿 `.cbt`·孤值即打回）。 */
 private val TEXT_BUTTON_SIDE = 12.dp
 private val BUTTON_WEIGHT = FontWeight(640)
-/** 钴蓝实底配方（= `LiuliButton.Prominent` / `LiuliSendButton` 同值·三处同配方，改一处必同步）。 */
-private val PROMINENT_SHADOW_ELEVATION = 4.dp
-private const val PROMINENT_SHADOW_ALPHA = 0.35f
-private const val PROMINENT_SPECULAR_ALPHA = 0.35f

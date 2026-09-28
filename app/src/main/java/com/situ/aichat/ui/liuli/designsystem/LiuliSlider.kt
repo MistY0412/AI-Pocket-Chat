@@ -25,7 +25,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -34,21 +33,22 @@ import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.situ.aichat.ui.components.LocalAppHaptics
-import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.liuli.page.liuliTouchHeight
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import kotlin.math.roundToInt
 
 /** 滑杆几何（§3.2）：轨 4 高 · 拇指 20 白 · 触达 48 外溢不占版。 */
 private val TRACK_HEIGHT = 4.dp
 private val THUMB = 20.dp
-private const val TRACK_OFF_ALPHA = 0.15f
+/** 拇指影（琉璃 2.0 卷二 §4.6-1：1 → 2dp）。 */
+private val THUMB_SHADOW = 2.dp
 private const val DISABLED_ALPHA = 0.38f
 
 /**
  * 琉璃滑杆（图纸 2026-09-05 卷二C §4.11 · 落值 §3.2 · A-15 / A-20）。
  *
- * 自绘，**禁 M3 `Slider`**（§9 ⑤）：轨 4dp 全圆角（未过段 = 玻璃上主文字 15%），已过段 =
- * `accent` gradientStart→End 横向渐变；拇指 20dp 纯白正圆 + 1dp 影（与 [LiuliSwitch] 同一枚白圆）。
+ * 自绘，**禁 M3 `Slider`**（§9 ⑤）：轨 4dp 全圆角（未过段 = [LiuliMaterials.offTrack]），已过段 =
+ * 主色三段横向渐变 [LiuliMaterials.accentHorizontalBrush]；拇指 20dp 纯白正圆 + 2dp 影（与 [LiuliSwitch] 同一枚白圆·卷二 §4.6-1）。
  * A-20 明令 DIY 礼物的「花多少金币」保持滑杆，**不许改成档位 chip**（那是交互变化不是换皮）。
  *
  * 手势 = [draggable]（横向）；[steps] > 0 时逐格吸附并在跨格时 `haptics.selection()` 打一记「嗒」
@@ -68,7 +68,7 @@ fun LiuliSlider(
     enabled: Boolean = true,
     onValueChangeFinished: (() -> Unit)? = null,
 ) {
-    val colors = AppTheme.colors
+    val dark = LocalIsDarkTheme.current
     val haptics = LocalAppHaptics.current
     val density = LocalDensity.current
     val currentValue by rememberUpdatedState(value)
@@ -77,8 +77,8 @@ fun LiuliSlider(
     val fraction = ((value - valueRange.start) / span).coerceIn(0f, 1f)
     val thumbPx = with(density) { THUMB.toPx() }
     val travelPx = (widthPx - thumbPx).coerceAtLeast(1f)
-    val trackOff = LiuliTheme.onGlass.primary.copy(alpha = TRACK_OFF_ALPHA)
-    val gradient = Brush.horizontalGradient(listOf(colors.accent.gradientStart, colors.accent.gradientEnd))
+    val trackOff = LiuliMaterials.offTrack(dark)
+    val gradient = LiuliMaterials.accentHorizontalBrush
 
     /** 吸附到 [steps] 定义的格点（steps = 0 时连续）并钳进值域。 */
     fun snap(raw: Float): Float {
@@ -151,7 +151,7 @@ fun LiuliSlider(
         Box(
             Modifier
                 .offset { IntOffset((travelPx * fraction).roundToInt(), 0) }
-                .shadow(1.dp, CircleShape)
+                .shadow(THUMB_SHADOW, CircleShape)
                 .size(THUMB)
                 .background(Color.White, CircleShape),
         )

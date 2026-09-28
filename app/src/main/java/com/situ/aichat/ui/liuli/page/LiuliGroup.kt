@@ -3,7 +3,6 @@ package com.situ.aichat.ui.liuli.page
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,7 +24,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -39,13 +38,19 @@ import androidx.compose.ui.unit.sp
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
 import com.situ.aichat.ui.designsystem.Palette
+import com.situ.aichat.ui.liuli.designsystem.LiuliMaterials
 import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
+import com.situ.aichat.ui.liuli.designsystem.LiuliTileTone
+import com.situ.aichat.ui.liuli.designsystem.liuliCardMaterial
+import com.situ.aichat.ui.liuli.designsystem.liuliToneFill
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
 /**
  * 二级屏「iOS 内嵌圆角分组」三件套（契约 §6.5 · 用户 Q-S2 甲）：组壳 [LiuliGroup]、行基线 [LiuliRowBase]、
  * 图标砖 [LiuliGroupIconTile]。
  *
- * 组 = `surface.raised` 纸白 + 0.5 发丝描边 + 16 圆角，**无软影**（琉璃只有导航层是玻璃、内容层是纸）。
+ * 组 = 琉璃 2.0 半透明卡片 [liuliCardMaterial]（20 圆角 · 1dp 白边 · 顶沿高光 · 形状外柔影·卷二 §4.3）；
+ * 内容卡片是半透明卡片、不是真玻璃（玻璃仍只在导航层）。
  * 组内行间发丝从 56 起（有砖）/ 16 起（无砖），**首行不画**。
  *
  * 发丝为什么是**行自己画在顶边**而不是组壳按序插：组里常有 `AnimatedVisibility` 包着的高级门行——
@@ -60,22 +65,19 @@ fun LiuliGroup(
     footer: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val colors = AppTheme.colors
     Column(modifier.fillMaxWidth().padding(bottom = LiuliPageGeometry.groupGap)) {
         if (header != null) LiuliGroupHeader(header)
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(LiuliShapes.group)
-                .background(colors.surface.raised)
-                .border(0.5.dp, colors.surface.stroke, LiuliShapes.group),
+                .liuliCardMaterial(LiuliShapes.group, dark = LocalIsDarkTheme.current),
             content = content,
         )
         if (footer != null) LiuliGroupFooter(footer)
     }
 }
 
-/** 组标题：13/500 `text.tertiary` 字距 .06em · 左 16 · 下 8；挂 `heading()`（同暖陶 `SettingsGroupCard`）。 */
+/** 组标题：13/500 `text.secondary`（卷二 §4.3）字距 .06em · 左 16 · 下 8；挂 `heading()`（同暖陶 `SettingsGroupCard`）。 */
 @Composable
 fun LiuliGroupHeader(text: String, modifier: Modifier = Modifier) {
     Text(
@@ -85,7 +87,7 @@ fun LiuliGroupHeader(text: String, modifier: Modifier = Modifier) {
             fontWeight = FontWeight.W500,
             letterSpacing = 0.06.em,
         ),
-        color = AppTheme.colors.text.tertiary,
+        color = AppTheme.colors.text.secondary,
         modifier = modifier
             .fillMaxWidth()
             .padding(start = LiuliPageGeometry.groupPadH, bottom = LiuliPageGeometry.groupHeaderBottom)
@@ -93,13 +95,13 @@ fun LiuliGroupHeader(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** 组脚注：13/400 `text.tertiary` · 左 16 · 上 6 · 行高 1.4。 */
+/** 组脚注：13/400 `text.secondary`（卷二 §4.3） · 左 16 · 上 6 · 行高 1.4。 */
 @Composable
 fun LiuliGroupFooter(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
         style = AppTypography.secondary.copy(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.W400),
-        color = AppTheme.colors.text.tertiary,
+        color = AppTheme.colors.text.secondary,
         modifier = modifier
             .fillMaxWidth()
             .padding(start = LiuliPageGeometry.groupPadH, top = LiuliPageGeometry.groupFooterTop),
@@ -107,10 +109,11 @@ fun LiuliGroupFooter(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * 行基线（契约 §6.5「行基线」）：最小高 52（两行 64）· 左右内距 16 · 按压时行底染 `surface.sunken` 80ms。
+ * 行基线（契约 §6.5「行基线」）：最小高 52（两行 64）· 左右内距 16 · 按压时行底染 [LiuliMaterials.pressTint] 80ms
+ * （卷二 §4.3·= 分段轨色）；顶发丝 [LiuliMaterials.divider]。
  *
  * 按压反馈**不用** `liuliPressable`：那一枚是「缩 0.96 + 叠亮」的钮语汇，整行缩放不是 iOS 列表的长相；
- * 契约写的是「行底 surface.sunken 80ms」，故本件自画（§11 D-2）。
+ * 契约写的是「行底染色 80ms」，故本件自画（§11 D-2）。
  *
  * [divider] = 是否画顶发丝（组内第一行传 false）；[dividerInset] 有砖 56 / 无砖 16。
  */
@@ -131,12 +134,12 @@ fun LiuliRowBase(
     verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val colors = AppTheme.colors
+    val dark = LocalIsDarkTheme.current
     val own = remember { MutableInteractionSource() }
     val interaction = interactionSource ?: own
     val pressed by interaction.collectIsPressedAsState()
     val press by animateColorAsState(
-        targetValue = if (pressed && enabled && (onClick != null || interactionSource != null)) colors.surface.sunken else Color.Transparent,
+        targetValue = if (pressed && enabled && (onClick != null || interactionSource != null)) LiuliMaterials.pressTint(dark) else Color.Transparent,
         animationSpec = tween(ROW_PRESS_MS),
         label = "liuliRowPress",
     )
@@ -174,7 +177,7 @@ fun LiuliRowBase(
                         .testTag(LIULI_ROW_DIVIDER_TAG)
                         .fillMaxWidth()
                         .height(0.5.dp)
-                        .background(colors.surface.stroke),
+                        .background(LiuliMaterials.divider(dark)),
                 )
             }
         }
@@ -190,14 +193,16 @@ private const val ROW_PRESS_MS = 80
  */
 const val LIULI_ROW_DIVIDER_TAG = "liuliRowDivider"
 
-/** 图标砖：28×28 圆角 7 实色 + 白图标 16（契约 §6.5·色取 `LiuliPalette` 十砖色）。 */
+/**
+ * 图标砖（卷二 §4.2·用户 09-25 选乙）：28×28 圆角 8 · 底 = [LiuliTileTone] 135° 两色渐变 · 顶沿 1px 白 35%
+ * （画在内容之后）· 白图标 16。
+ */
 @Composable
-fun LiuliGroupIconTile(icon: ImageVector, color: Color, modifier: Modifier = Modifier) {
+fun LiuliGroupIconTile(icon: ImageVector, tone: LiuliTileTone, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(LiuliPageGeometry.tile)
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(LiuliPageGeometry.tileCorner))
-            .background(color),
+            .liuliToneFill(tone, RoundedCornerShape(LiuliPageGeometry.tileCorner)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = Palette.White, modifier = Modifier.size(TILE_ICON))

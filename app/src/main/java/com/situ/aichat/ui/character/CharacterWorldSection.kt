@@ -94,14 +94,7 @@ fun CharacterWorldSection(viewModel: CharacterWorldViewModel = hiltViewModel()) 
                         color = colors.text.primary,
                     )
                     Text(
-                        stringResource(
-                            when {
-                                wb -> R.string.char_world_join_sub_wb
-                                native -> R.string.char_world_join_sub_native
-                                joined -> R.string.char_world_join_sub_on
-                                else -> R.string.char_world_join_sub_off
-                            },
-                        ),
+                        stringResource(worldJoinSubtitleRes(worldbookBound = wb, nativeOrigin = native, joined = joined)),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.text.secondary,
                     )
@@ -123,11 +116,7 @@ fun CharacterWorldSection(viewModel: CharacterWorldViewModel = hiltViewModel()) 
             ) {
                 Column {
                     AppListDivider(startInset = 0.dp)
-                    val addrTail = when {
-                        native -> stringResource(R.string.char_world_addr_native)
-                        state.sameCityAsUser -> stringResource(R.string.char_world_addr_same_city)
-                        else -> stringResource(R.string.char_world_addr_remote)
-                    }
+                    val addrTail = stringResource(worldAddressTailRes(nativeOrigin = native, sameCityAsUser = state.sameCityAsUser))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -161,16 +150,7 @@ fun CharacterWorldSection(viewModel: CharacterWorldViewModel = hiltViewModel()) 
         }
     }
 
-    SectionFooter(
-        stringResource(
-            when {
-                wb -> R.string.char_world_foot_wb
-                native -> R.string.char_world_foot_native
-                joined -> R.string.char_world_foot_on
-                else -> R.string.char_world_foot_off
-            },
-        ),
-    )
+    SectionFooter(stringResource(worldFooterRes(worldbookBound = wb, nativeOrigin = native, joined = joined)))
 
     if (showLeaveDialog) {
         WorldLeaveDialog(

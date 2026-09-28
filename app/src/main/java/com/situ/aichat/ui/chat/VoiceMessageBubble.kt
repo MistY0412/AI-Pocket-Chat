@@ -54,7 +54,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
@@ -68,6 +67,7 @@ import com.situ.aichat.ui.components.rememberReduceMotion
 import com.situ.aichat.ui.designsystem.AppShapes
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
+import com.situ.aichat.ui.designsystem.userFill
 import com.situ.aichat.ui.offline.OfflineTheater
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -144,7 +144,7 @@ fun VoiceMessageBubble(
                         Modifier.background(OfflineTheater.scrimPill)
                     } else if (isUser) {
                         // 审计 P5：渐变按主题色 remember（同 ChatBubbles）。
-                        Modifier.background(remember(colors) { Brush.linearGradient(listOf(colors.bubble.userStart, colors.bubble.userEnd)) })
+                        Modifier.background(remember(colors) { colors.bubble.userFill() })
                     } else {
                         Modifier.background(colors.bubble.ai)
                     },

@@ -241,4 +241,20 @@ class ScheduleLivenessPromptSectionsTest {
             ScheduleLivenessPromptSections.openLoopsSection(listOf("用户下周面试")).last().contains("属于用户自己的事"),
         )
     }
+
+    // ── 四期·图纸一 §3.7 / M11：【TA自己说过的打算】（T1-9） ──
+
+    @Test
+    fun `打算段_三行格式锁定_空表缺席`() {
+        assertEquals(
+            listOf(
+                "【TA自己说过的打算】（TA之前在聊天里亲口说过、要在今天做的事）",
+                "- 进一批咖啡豆",
+                "- 15:30 看牙",
+                "这些是TA自己的安排，请排进今天的日程；原话里说了时间就按那个时间排。和【今天的约定】冲突时，以约定为准。",
+            ),
+            ScheduleLivenessPromptSections.ownPlansSection(listOf("进一批咖啡豆", "15:30 看牙")),
+        )
+        assertEquals(emptyList<String>(), ScheduleLivenessPromptSections.ownPlansSection(emptyList()))
+    }
 }

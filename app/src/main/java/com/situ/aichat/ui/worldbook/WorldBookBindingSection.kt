@@ -46,6 +46,8 @@ import com.situ.aichat.data.local.dao.WorldNativeDao
 import com.situ.aichat.data.local.entity.WorldBookEntity
 import com.situ.aichat.data.worldbook.WorldBookRepository
 import com.situ.aichat.ui.components.clickableScale
+import com.situ.aichat.ui.character.WorldBookCardState
+import com.situ.aichat.ui.character.worldBookCardState
 import com.situ.aichat.ui.designsystem.AppFeatureIcons
 import com.situ.aichat.ui.designsystem.AppListDivider
 import com.situ.aichat.ui.designsystem.AppRadio
@@ -184,40 +186,39 @@ fun WorldBookBindingSection(
                 Icon(AppFeatureIcons.Worldbook, contentDescription = null, tint = colors.accent.text, modifier = Modifier.size(22.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
-                when {
+                when (val card = worldBookCardState(nativeOrigin = nativeOrigin, joinedWorld = joinedWorld, bound = boundBooks)) {
                     // 副标优先级（复核 R1 🟡-2③）：原住民出身 → native_locked，其次已加入 → world_locked。
-                    nativeOrigin -> Text(
+                    WorldBookCardState.NativeLocked -> Text(
                         stringResource(R.string.wb_binding_native_locked),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.text.secondary,
                     )
-                    joinedWorld -> Text(
+                    WorldBookCardState.WorldLocked -> Text(
                         stringResource(R.string.wb_binding_world_locked),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.text.secondary,
                     )
-                    boundBooks.isEmpty() -> Text(
+                    WorldBookCardState.None -> Text(
                         stringResource(R.string.wb_binding_none),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.text.secondary,
                     )
-                    boundBooks.size == 1 -> {
-                        val summary = boundBooks.first()
+                    is WorldBookCardState.Single -> {
                         Text(
-                            summary.book.name,
+                            card.name,
                             style = MaterialTheme.typography.titleMedium,
                             color = colors.text.primary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            stringResource(R.string.wb_book_meta_unbound, summary.entryCount),
+                            stringResource(R.string.wb_book_meta_unbound, card.entryCount),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.text.secondary,
                         )
                     }
-                    else -> Text(
-                        stringResource(R.string.wb_binding_multi, boundBooks.first().book.name, boundBooks.size - 1),
+                    is WorldBookCardState.Multi -> Text(
+                        stringResource(R.string.wb_binding_multi, card.firstName, card.extra),
                         style = MaterialTheme.typography.titleMedium,
                         color = colors.text.primary,
                         maxLines = 1,

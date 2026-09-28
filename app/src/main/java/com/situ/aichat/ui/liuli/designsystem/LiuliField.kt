@@ -1,6 +1,6 @@
 package com.situ.aichat.ui.liuli.designsystem
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,6 +25,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
@@ -38,28 +42,31 @@ import com.situ.aichat.ui.components.AppMotion
 import com.situ.aichat.ui.components.rememberReduceMotion
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
-import com.situ.aichat.ui.liuli.glass.LiuliGlassSpec
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import androidx.compose.ui.draw.alpha
 
-/** 内衬框几何（§3.2）：常规 44 高 / [big] 56 高 · 圆角 14 · 底 = `surface.raised` 62%。 */
+/** 内衬框几何（§3.2）：常规 44 高 / [big] 56 高 · 圆角 14 · 底 = [LiuliMaterials.fieldFill]（琉璃 2.0 卷二 §4.6-3）。 */
 private val FIELD_HEIGHT = 44.dp
 private val FIELD_HEIGHT_BIG = 56.dp
 private val FIELD_SHAPE = RoundedCornerShape(14.dp)
-private const val FIELD_FILL_ALPHA = 0.62f
+/** 未聚焦白边 1dp / 聚焦主色边 1.5dp / 聚焦外环外扩 4dp、圆角 18（卷二 §4.6-3）。 */
+private val FIELD_RIM = 1.dp
+private val FIELD_FOCUS_BORDER = 1.5.dp
+private val FOCUS_RING_SPREAD = 4.dp
+private val FOCUS_RING_CORNER = 18.dp
 /** 禁用态透明度（与 [LiuliSwitch] / [LiuliButton] 同值）。 */
 private const val FIELD_DISABLED_ALPHA = 0.38f
 
 /**
  * 琉璃表单内衬框（图纸 2026-09-05 卷二C §4.11 · 落值 §3.2 · A-15）。
  *
- * 底座 = foundation [BasicTextField]（IME / 光标 / 选择 / 编辑语义由它保证·只重定义视觉），皮 = 玻璃上的
- * 「内衬」：`surface.raised` 62% 半透明底 + 0.5dp 玻璃发丝（[LiuliGlassSpec] 同源·与玻璃片边缘同一句话）
- * + 聚焦 1dp `accent.text` 环。**禁 M3 `TextField`**（§9 ⑤）。
+ * 底座 = foundation [BasicTextField]（IME / 光标 / 选择 / 编辑语义由它保证·只重定义视觉），皮 = 琉璃 2.0 卷二 §4.6-3：
+ * [LiuliMaterials.fieldFill] 半透明底 + 1dp [LiuliMaterials.cardRim] 白边；聚焦 = 1.5dp `accent.primary` 边 + 外扩 4dp 的
+ * [LiuliMaterials.focusRing] 外环（画在裁切与底之前）。**禁 M3 `TextField`**（§9 ⑤）。
  *
  * [big] = 金额大字档（红包 composer）：56 高 + `titleMedium` + tnum 等宽数字。
  * [isError] 时 label / supporting 转 `status.onError`（环仍走聚焦色——错误提示已在下方那行说清）。
- * 聚焦环走效果轴 [AppMotion].effectMediumSpring 淡入，[rememberReduceMotion] 时瞬时落位。
+ * 聚焦边与外环按同一「聚焦度」走效果轴 [AppMotion].effectMediumSpring 淡入，[rememberReduceMotion] 时瞬时落位。
  * a11y：[label] 非空时同时作节点的 `contentDescription`（读屏先报「这一格是什么」再报内容）。
  */
 @Composable
@@ -105,12 +112,11 @@ fun LiuliField(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val reduceMotion = rememberReduceMotion()
-    val ringColor by animateColorAsState(
-        targetValue = if (isFocused) colors.accent.text else Color.Transparent,
+    val focus by animateFloatAsState(
+        targetValue = if (isFocused) 1f else 0f,
         animationSpec = if (reduceMotion) snap() else AppMotion.effectMediumSpring(),
         label = "liuliFieldRing",
     )
-    val hairline = if (dark) LiuliGlassSpec.hairlineDark else LiuliGlassSpec.hairlineLight
     val supportColor = if (isError) colors.status.onError else onGlass.secondary
     val resolvedTextStyle = when {
         textStyle != null -> textStyle.copy(color = onGlass.primary)
@@ -147,10 +153,7 @@ fun LiuliField(
                 Row(
                     modifier = Modifier
                         .heightIn(min = minHeight ?: if (big) FIELD_HEIGHT_BIG else FIELD_HEIGHT)
-                        .clip(FIELD_SHAPE)
-                        .background(colors.surface.raised.copy(alpha = FIELD_FILL_ALPHA))
-                        .border(LiuliGlassSpec.hairlineWidth, hairline, FIELD_SHAPE)
-                        .border(1.dp, ringColor, FIELD_SHAPE)
+                        .liuliFieldSkin(dark, focus, colors.accent.primary)
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top,
                 ) {
@@ -211,12 +214,11 @@ fun LiuliField(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val reduceMotion = rememberReduceMotion()
-    val ringColor by animateColorAsState(
-        targetValue = if (isFocused) colors.accent.text else Color.Transparent,
+    val focus by animateFloatAsState(
+        targetValue = if (isFocused) 1f else 0f,
         animationSpec = if (reduceMotion) snap() else AppMotion.effectMediumSpring(),
         label = "liuliFieldRingTfv",
     )
-    val hairline = if (dark) LiuliGlassSpec.hairlineDark else LiuliGlassSpec.hairlineLight
     val supportColor = if (isError) colors.status.onError else onGlass.secondary
     val resolvedTextStyle = (textStyle ?: AppTypography.listPreview).copy(color = onGlass.primary)
 
@@ -246,10 +248,7 @@ fun LiuliField(
                 Row(
                     modifier = Modifier
                         .heightIn(min = minHeight ?: FIELD_HEIGHT)
-                        .clip(FIELD_SHAPE)
-                        .background(colors.surface.raised.copy(alpha = FIELD_FILL_ALPHA))
-                        .border(LiuliGlassSpec.hairlineWidth, hairline, FIELD_SHAPE)
-                        .border(1.dp, ringColor, FIELD_SHAPE)
+                        .liuliFieldSkin(dark, focus, colors.accent.primary)
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top,
                 ) {
@@ -271,4 +270,29 @@ fun LiuliField(
             )
         }
     }
+}
+
+/**
+ * 两枚 [LiuliField] 共用的内衬框皮（琉璃 2.0 卷二 §4.6-3）：聚焦外环（外扩 [FOCUS_RING_SPREAD]·圆角
+ * [FOCUS_RING_CORNER]·**排在裁切与底之前**才画得到框外）→ 裁形 → [LiuliMaterials.fieldFill] 底 → 1dp 白边 →
+ * 1.5dp 主色边（按 [focus] 淡入，满值时盖住白边）。
+ */
+private fun Modifier.liuliFieldSkin(dark: Boolean, focus: Float, focusBorder: Color): Modifier {
+    val ring = LiuliMaterials.focusRing(dark)
+    return this
+        .drawBehind {
+            if (focus > 0f) {
+                val spread = FOCUS_RING_SPREAD.toPx()
+                drawRoundRect(
+                    color = ring.copy(alpha = ring.alpha * focus),
+                    topLeft = Offset(-spread, -spread),
+                    size = Size(size.width + spread * 2f, size.height + spread * 2f),
+                    cornerRadius = CornerRadius(FOCUS_RING_CORNER.toPx()),
+                )
+            }
+        }
+        .clip(FIELD_SHAPE)
+        .background(LiuliMaterials.fieldFill(dark))
+        .border(FIELD_RIM, LiuliMaterials.cardRim(dark), FIELD_SHAPE)
+        .border(FIELD_FOCUS_BORDER, focusBorder.copy(alpha = focusBorder.alpha * focus), FIELD_SHAPE)
 }

@@ -6,6 +6,7 @@ import androidx.room.Query
 import androidx.room.Update
 import androidx.room.Upsert
 import com.situ.aichat.data.local.entity.MessageEntity
+import com.situ.aichat.diagnostics.LogMessageBrief
 import kotlinx.coroutines.flow.Flow
 
 /** 补账投影：角色 uuid + 该角色最早一条「非空内容」消息时间戳（谓词与 [MessageDao.nonEmptyTimestampsForCharacter] 同源 = 资料页「初次相识」）。 */
@@ -517,4 +518,12 @@ interface MessageDao {
             "WHERE messageUUID = :uuid LIMIT 1",
     )
     suspend fun mediaPathsForMessage(uuid: String): ConversationMediaPaths?
+
+    /** 日志页（四期·图纸四 §3.10）：按 uuid 取消息轻投影（锚点 / 图片理解定位）。 */
+    @Query("SELECT messageUUID, conversationUuid, roleRaw, content, timestamp, imageRelativePath, isVoiceMessage, messageKindRaw FROM messages WHERE messageUUID IN (:uuids)")
+    suspend fun logBriefsByUuids(uuids: List<String>): List<LogMessageBrief>
+
+    /** 日志页（同上）：某会话 [fromMillis]..[toMillis]（闭区间）的消息轻投影，时间升序。 */
+    @Query("SELECT messageUUID, conversationUuid, roleRaw, content, timestamp, imageRelativePath, isVoiceMessage, messageKindRaw FROM messages WHERE conversationUuid = :conversationUuid AND timestamp BETWEEN :fromMillis AND :toMillis ORDER BY timestamp ASC")
+    suspend fun logBriefsInRange(conversationUuid: String, fromMillis: Long, toMillis: Long): List<LogMessageBrief>
 }

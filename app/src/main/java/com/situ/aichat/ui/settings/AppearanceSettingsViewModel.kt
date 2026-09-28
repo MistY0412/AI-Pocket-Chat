@@ -25,13 +25,13 @@ class AppearanceSettingsViewModel @Inject constructor(
     val mode: StateFlow<AppearanceMode> = settings.appearanceMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppearanceMode.SYSTEM)
 
-    /** 界面「脸」（暖陶 / 琉璃·与深浅正交）。默认暖陶，用户切换即时落 DataStore、根部主题即时换。 */
+    /** 界面「脸」（暖陶 / 琉璃·与深浅正交）。默认琉璃（[AppSkin.DEFAULT]），用户切换即时落 DataStore、根部主题即时换。 */
     val skin: StateFlow<AppSkin> = settings.appSkin
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSkin.CLAY)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSkin.DEFAULT)
 
-    /** 琉璃玻璃「透明度」档（清透 / 着色）。默认清透；只在琉璃 + 有实时模糊能力时给选。 */
+    /** 琉璃玻璃「质感」档（毛玻璃 / 标准 / 通透）。默认通透；外观页按安卓版本决定能否选。 */
     val glassTier: StateFlow<GlassTier> = settings.glassTier
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GlassTier.CLEAR)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GlassTier.SHEER)
 
     val useDynamicColor: StateFlow<Boolean> = settings.useDynamicColor
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)

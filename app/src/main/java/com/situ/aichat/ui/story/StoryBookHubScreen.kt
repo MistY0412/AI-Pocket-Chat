@@ -2,8 +2,6 @@
 
 package com.situ.aichat.ui.story
 
-import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,7 +20,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -32,7 +29,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -40,7 +36,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.situ.aichat.R
 import com.situ.aichat.data.local.entity.StoryEntity
 import com.situ.aichat.story.StoryArcPlanning
-import com.situ.aichat.story.StoryGlobalCraftValues
 import com.situ.aichat.ui.designsystem.AppButton
 import com.situ.aichat.ui.designsystem.AppButtonStyle
 import com.situ.aichat.ui.designsystem.AppDialog
@@ -96,22 +91,11 @@ fun StoryBookHubScreen(
     val templateCount by viewModel.userTemplateCount.collectAsStateWithLifecycle()
     val regenerating by viewModel.regenerating.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        viewModel.toastEvents.collect { resId -> Toast.makeText(context, resId, Toast.LENGTH_SHORT).show() }
-    }
     val scope = rememberCoroutineScope()
-    // 归档成功 / 删除成功 → 这本书在书页里已经没得看了，弹回书架（= 创建流的既有回法）。
-    LaunchedEffect(Unit) { viewModel.exitEvents.collect { onStoryGone() } }
-    // 兜底：进过屏之后 story 变 null（别处把它删了）→ 安全退出，不停在空屏上（E8）。
-    var loadedOnce by remember { mutableStateOf(false) }
-    LaunchedEffect(story) {
-        if (story != null) loadedOnce = true else if (loadedOnce) onStoryGone()
-    }
+    StoryBookHubEffects(viewModel, story, onStoryGone)
 
     // 关闭：落库草稿后返回（在屏幕协程内 await，避免 VM scope 被 pop 取消截断写入）；保存失败不返回。
-    fun close() = scope.launch { if (viewModel.persist()) onBack() }
-    BackHandler { close() }
+    val close = rememberStoryHubClose(viewModel, scope, onBack)
 
     var tabIndex by rememberSaveable { mutableIntStateOf(0) }
     var beatsDialog by remember { mutableStateOf(false) }
@@ -129,15 +113,17 @@ fun StoryBookHubScreen(
         val s = story ?: return@Scaffold
         val d = draft
         Column(Modifier.fillMaxSize().padding(padding)) {
-            BookHeader(s) {
-                scope.launch { viewModel.latestChapterId()?.let(onOpenChapter) }
+            StoryHubBookHeader(s) {
+                AppButton(onClick = { scope.launch { viewModel.latestChapterId()?.let(onOpenChapter) } }, style = AppButtonStyle.Primary) {
+                    Text(stringResource(R.string.story_hub_continue))
+                }
             }
             AppSegmentedControl(
                 options = listOf(0, 1),
                 selected = tabIndex,
                 onSelect = { tabIndex = it },
                 modifier = Modifier.padding(horizontal = AppSpacing.screenGutter), // 屏 gutter 恒 20（设计语言 §2.5 军规）
-                label = { stringResource(if (it == 0) R.string.story_hub_tab_archive else R.string.story_hub_tab_settings) },
+                label = { stringResource(storyHubTabLabelRes(it)) },
             )
             LazyColumn(
                 state = listState,
@@ -160,31 +146,11 @@ fun StoryBookHubScreen(
                         story = s,
                         draft = d,
                         roles = roles,
-                        globals = StoryGlobalCraftValues(
-                            sceneBeats = settings.storySceneBeats,
-                            tasteProfile = settings.storyTasteProfile,
-                            bannedExpressions = settings.storyBannedExpressions,
-                        ),
+                        globals = storyHubGlobals(settings),
                         hasWorldBooks = hasWorldBooks,
                         reminderEnabled = reminderEnabled,
                         templateCount = templateCount,
-                        callbacks = StoryHubSettingsCallbacks(
-                            onOpenField = { field -> onOpenField(field.key) },
-                            onOpenGlobalSettings = onOpenGlobalSettings,
-                            onUpdateDraft = viewModel::updateDraft,
-                            onSaveRole = viewModel::saveRole,
-                            onDeleteRole = viewModel::deleteRole,
-                            onDraftPersona = if (hasCreationConfig) viewModel::draftPersona else null,
-                            onChapterChoicesChange = viewModel::setChapterChoicesEnabled,
-                            onSceneSnapshotChange = viewModel::setSceneSnapshotEnabled,
-                            onWorldInfoChange = viewModel::setWorldInfoEnabled,
-                            onReminderChange = viewModel::setReminderEnabled,
-                            onSaveTemplate = viewModel::saveAsTemplate,
-                            onArchive = viewModel::archiveStory,
-                            onDelete = viewModel::deleteStory,
-                            onContinue = { scope.launch { viewModel.persist(); viewModel.continueOrResume(); onBack() } },
-                            onRestart = { scope.launch { viewModel.persist(); viewModel.restartStory(); onBack() } },
-                        ),
+                        callbacks = storyHubSettingsCallbacks(viewModel, scope, hasCreationConfig, onOpenField, onOpenGlobalSettings, onBack),
                     )
                 }
             }
@@ -208,15 +174,16 @@ fun StoryBookHubScreen(
 
 /** 头部：封面缩略 + 书名 + 状态/进度副行 + 「继续阅读」（空书不给这个钮）。 */
 @Composable
-private fun BookHeader(story: StoryEntity, onContinue: () -> Unit) {
+internal fun StoryHubBookHeader(
+    story: StoryEntity,
+    // 屏 gutter 恒 20（设计语言 §2.5 军规）
+    modifier: Modifier = Modifier.fillMaxWidth().padding(start = AppSpacing.screenGutter, end = AppSpacing.screenGutter, top = 4.dp, bottom = 12.dp),
+    continueButton: @Composable () -> Unit,
+) {
     val c = AppTheme.colors
-    val progress = storyHubProgress(story)
-    var line = stringResource(storyStatusDisplayNameRes(story.status))
-    progress.chapterNumber?.let { line = stringResource(R.string.story_hub_progress_chapter, line, it) }
-    progress.arcIndex?.let { line = stringResource(R.string.story_hub_progress_arc, line, it) }
+    val line = storyHubStatusLine(story)
     Row(
-        // 屏 gutter 恒 20（设计语言 §2.5 军规）
-        Modifier.fillMaxWidth().padding(start = AppSpacing.screenGutter, end = AppSpacing.screenGutter, top = 4.dp, bottom = 12.dp),
+        modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
@@ -231,11 +198,7 @@ private fun BookHeader(story: StoryEntity, onContinue: () -> Unit) {
             Text(story.title, style = AppTheme.typography.titleMedium, color = c.text.primary)
             Text(line, style = AppTheme.typography.secondary, color = c.text.secondary)
         }
-        if (storyHubShowContinue(story)) {
-            AppButton(onClick = onContinue, style = AppButtonStyle.Primary) {
-                Text(stringResource(R.string.story_hub_continue))
-            }
-        }
+        if (storyHubShowContinue(story)) continueButton()
     }
 }
 

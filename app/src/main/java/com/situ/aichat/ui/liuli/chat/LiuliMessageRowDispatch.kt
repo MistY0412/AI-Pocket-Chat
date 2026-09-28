@@ -28,8 +28,16 @@ import com.situ.aichat.data.model.RedPacketStatus
 import com.situ.aichat.gift.FestivalCalendar
 import com.situ.aichat.gift.GiftCatalog
 import com.situ.aichat.sticker.StickerTagParser
+import com.situ.aichat.ui.chat.AssistantTextBubble
+import com.situ.aichat.ui.chat.Bubble
+import com.situ.aichat.ui.chat.ChatImageBubble
 import com.situ.aichat.ui.chat.MessageRowActions
 import com.situ.aichat.ui.chat.StickerImage
+import com.situ.aichat.ui.chat.StickerStack
+import com.situ.aichat.ui.chat.VoiceMessageBubble
+import com.situ.aichat.ui.designsystem.AppShapes
+import com.situ.aichat.ui.designsystem.AppTheme
+import com.situ.aichat.ui.designsystem.AppTypography
 
 /** 五张卡的解析产物（只搬 `when` 用·避免分派函数参数表爆炸）。 */
 @Immutable
@@ -67,8 +75,6 @@ internal fun LiuliMessageContent(
     voiceProgress: () -> Float,
     voiceCascadePlay: Boolean,
     actions: MessageRowActions,
-    deliveryRead: Boolean?,
-    tail: Boolean,
     bubbleMaxWidth: Dp,
     bubbleSentence: String?,
     openMenu: () -> Unit,
@@ -76,19 +82,18 @@ internal fun LiuliMessageContent(
     fold: LiuliFoldState,
 ) {
     when {
-        message.isVoiceMessage -> LiuliVoiceBubble(
+        message.isVoiceMessage -> VoiceMessageBubble(
             message = message,
             isUser = isUser,
             isPlaying = isVoicePlaying,
             progress = voiceProgress,
             customStickers = customStickers,
-            tail = tail,
             onToggle = { actions.onVoiceToggle(message) },
             onLongClick = openMenu,
             a11yDescription = bubbleSentence,
+            shape = AppShapes.bubble,
             cascadePlay = voiceCascadePlay,
             onCascadePlayed = { actions.onVoiceCascadePlayed(message) },
-            deliveryRead = deliveryRead,
         )
         parsed.redPacket != null -> {
             val packet = parsed.redPacket
@@ -154,24 +159,19 @@ internal fun LiuliMessageContent(
         )
         // 图片（照 iOS 口径 = PLAIN_TEXT + 侧车 imageRelativePath）：排在贴纸 / 脏消息之前——它的正文
         // 恒是哨兵 `[图片]`，不该再走那些文本判定（F4 ⑥ 照抄）。
-        message.imageRelativePath != null -> LiuliImageBubble(
+        message.imageRelativePath != null -> ChatImageBubble(
             imagePath = message.imageRelativePath,
             thumbnailPath = message.imageThumbnailRelativePath,
-            isUser = isUser,
+            shape = AppShapes.bubble,
             maxWidth = bubbleMaxWidth,
-            timestampMs = message.timestamp,
-            deliveryRead = deliveryRead,
             onClick = { actions.onOpenImage(message.imageRelativePath) },
             onLongClick = openMenu,
             a11yDescription = bubbleSentence,
         )
         parsed.isScheduleCard -> LiuliScheduleCard(content = message.content, onLongClick = openMenu)
-        stickerState.isStickerOnly -> LiuliStickerStack(
+        stickerState.isStickerOnly -> StickerStack(
             content = message.content,
             customStickers = customStickers,
-            isUser = isUser,
-            timestampMs = message.timestamp,
-            deliveryRead = deliveryRead,
             onLongClick = openMenu,
             a11yDescription = bubbleSentence,
         )
@@ -181,24 +181,22 @@ internal fun LiuliMessageContent(
         ) {
             val textPart = StickerTagParser.stripStickerTags(message.content)
             if (textPart.isNotEmpty()) {
-                LiuliBubble(message, textPart, isUser, deliveryRead, tail, bubbleMaxWidth, characterName, openMenu, onDoubleReact, bubbleSentence, fold)
+                LiuliBubble(message, textPart, isUser, bubbleMaxWidth, characterName, openMenu, onDoubleReact, bubbleSentence, fold)
             }
             StickerTagParser.extractStickerIds(message.content).forEach { id ->
-                StickerImage(stickerId = id, customStickers = customStickers, size = LiuliChatGeometry.stickerSize)
+                StickerImage(stickerId = id, customStickers = customStickers, size = MixedStickerSize)
             }
         }
-        else -> LiuliBubble(message, message.content, isUser, deliveryRead, tail, bubbleMaxWidth, characterName, openMenu, onDoubleReact, bubbleSentence, fold)
+        else -> LiuliBubble(message, message.content, isUser, bubbleMaxWidth, characterName, openMenu, onDoubleReact, bubbleSentence, fold)
     }
 }
 
-/** 用户 / AI 两支的收口（引用块的发送者标签口径照抄暖陶：user → 「你」，否则角色名）。 */
+/** 用户 / AI 两支的收口（引用块的发送者标签口径照抄暖陶：user → 「你」，否则角色名）。卷三：叶子 = 暖陶 [Bubble] / [AssistantTextBubble]。 */
 @Composable
 private fun LiuliBubble(
     message: MessageEntity,
     text: String,
     isUser: Boolean,
-    deliveryRead: Boolean?,
-    tail: Boolean,
     maxWidth: Dp,
     characterName: String,
     onLongClick: () -> Unit,
@@ -208,34 +206,46 @@ private fun LiuliBubble(
 ) {
     val quotedSender = message.quotedSenderRole?.let { if (it == "user") "你" else characterName }
     if (isUser) {
-        LiuliUserBubble(
+        Bubble(
+            isUser = true,
             text = text,
             quotedContent = message.quotedContent,
             quotedSender = quotedSender,
-            timestampMs = message.timestamp,
-            deliveryRead = deliveryRead,
-            tail = tail,
+            shape = AppShapes.bubble,
             maxWidth = maxWidth,
             onLongClick = onLongClick,
             a11yDescription = a11yDescription,
         )
     } else {
-        LiuliAssistantBubble(
+        val colors = AppTheme.colors
+        AssistantTextBubble(
             revealed = message.isContentRevealed,
             text = text,
             quotedContent = message.quotedContent,
             quotedSender = quotedSender,
-            timestampMs = message.timestamp,
-            tail = tail,
+            shape = AppShapes.bubble,
             maxWidth = maxWidth,
             onLongClick = onLongClick,
-            onDoubleClick = onDoubleClick,
             a11yDescription = a11yDescription,
-            messageUuid = message.messageUUID,
-            fold = fold,
+            onDoubleClick = onDoubleClick,
+            body = {
+                LiuliFoldableText(
+                    text = text,
+                    style = AppTypography.body,
+                    color = colors.text.primary,
+                    revealed = message.isContentRevealed,
+                    isUser = false,
+                    expanded = fold.isExpanded(message.messageUUID),
+                    onExpand = { fold.expand(message.messageUUID) },
+                    fadeColor = colors.bubble.ai,
+                )
+            },
         )
     }
 }
 
-/** 混合贴纸行内的行距（照抄暖陶 `MessageRow` 的 6dp；贴纸尺寸走琉璃档 110·A-7）。 */
+/** 混合贴纸行内的行距（照抄暖陶 `MessageRow` 的 6dp）。 */
 private val MixedStickerGap = 6.dp
+
+/** 混合贴纸尺寸 = 暖陶 MessageRow:411（卷三起琉璃照暖陶）。 */
+private val MixedStickerSize = 120.dp // = 暖陶 MessageRow:411

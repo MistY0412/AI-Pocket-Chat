@@ -26,10 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,9 +41,7 @@ import com.situ.aichat.data.local.entity.DiaryEntryWithComments
 import com.situ.aichat.ui.designsystem.AppSpacing
 import com.situ.aichat.ui.designsystem.AppTheme
 import java.time.DayOfWeek
-import java.time.Instant
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
@@ -66,141 +61,16 @@ fun DiaryCalendarSection(
     onLongPress: (String) -> Unit,
 ) {
     val zone = remember { ZoneId.systemDefault() }
-    val today = remember { LocalDate.now(zone) }
-    var displayedMonth by remember { mutableStateOf(YearMonth.now(zone)) }
-    var selectedDate by remember { mutableStateOf(today) }
-
-    val entriesByDay = remember(entries) {
-        entries.groupBy { Instant.ofEpochMilli(it.entry.timestamp).atZone(zone).toLocalDate() }
-    }
-    // 每日代表心情 = 该日最新一条带心情的**用户**日记（entries 按时间降序；R4：TA 的信不抢格子染色）。
-    val moodByDay = remember(entriesByDay) {
-        entriesByDay.mapValues { (_, list) ->
-            list.firstNotNullOfOrNull { ewc ->
-                ewc.entry.takeIf { it.authorCharacterUuid == null }?.moodEmoji?.takeIf(String::isNotEmpty)
-            }
-        }
-    }
-    val selectedEntries = entriesByDay[selectedDate].orEmpty()
-
-    // 周日起的 7 个星期标签 + 当月日期格（前导空白补 null）。
-    val weekdayLabels = remember {
-        val order = listOf(
-            DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-            DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY,
-        )
-        order.map { it.getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
-    }
-    val weeks = remember(displayedMonth) {
-        val firstDay = displayedMonth.atDay(1)
-        val leadingBlanks = firstDay.dayOfWeek.value % 7 // 周日=0、周一=1…
-        val cells = buildList<LocalDate?> {
-            repeat(leadingBlanks) { add(null) }
-            for (d in 1..displayedMonth.lengthOfMonth()) add(displayedMonth.atDay(d))
-            while (size % 7 != 0) add(null)
-        }
-        cells.chunked(7)
-    }
-    val monthTitleMillis = remember(displayedMonth) {
-        displayedMonth.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
-    }
-    // 本月心情分布（emoji 计数·降序）。
-    val monthMoodCounts = remember(moodByDay, displayedMonth) {
-        moodByDay.entries
-            .filter { YearMonth.from(it.key) == displayedMonth && it.value != null }
-            .groupingBy { it.value!! }
-            .eachCount()
-            .entries.sortedByDescending { it.value }
-    }
+    val calendar = rememberDiaryCalendarState(zone)
+    val data = remember(entries) { diaryCalendarData(entries, zone) }
+    val selectedEntries = data.entriesByDay[calendar.selectedDate].orEmpty()
 
     // 屏 gutter 恒 20（设计语言 §2.5 军规）
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = AppSpacing.screenGutter, vertical = 16.dp)) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { displayedMonth = displayedMonth.minusMonths(1L) }) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                        contentDescription = stringResource(R.string.a11y_diary_prev_month),
-                        tint = AppTheme.colors.accent.text,
-                    )
-                }
-                Text(
-                    formatDiaryDate(monthTitleMillis, stringResource(R.string.diary_fmt_month_title), zone),
-                    style = AppTheme.typography.nameTopBar,
-                    color = AppTheme.colors.text.primary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = { displayedMonth = displayedMonth.plusMonths(1L) }) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = stringResource(R.string.a11y_diary_next_month),
-                        tint = AppTheme.colors.accent.text,
-                    )
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth()) {
-                weekdayLabels.forEach { label ->
-                    Text(
-                        label,
-                        style = AppTheme.typography.caption,
-                        color = AppTheme.colors.text.secondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                weeks.forEach { week ->
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        week.forEach { date ->
-                            DayCell(
-                                modifier = Modifier.weight(1f),
-                                date = date,
-                                isSelected = date != null && date == selectedDate,
-                                isToday = date != null && date == today,
-                                hasEntry = date != null && entriesByDay.containsKey(date),
-                                moodEmoji = date?.let { moodByDay[it] },
-                                onClick = { date?.let { selectedDate = it } },
-                            )
-                        }
-                    }
-                }
-            }
-            if (monthMoodCounts.isNotEmpty()) {
-                Spacer(Modifier.height(14.dp))
-                MonthMoodBar(monthMoodCounts)
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                formatDiaryDate(
-                    selectedDate.atStartOfDay(zone).toInstant().toEpochMilli(),
-                    stringResource(R.string.diary_fmt_day_title),
-                    zone,
-                ),
-                style = AppTheme.typography.label,
-                color = AppTheme.colors.text.primary,
-            )
-            Spacer(Modifier.height(8.dp))
-            if (selectedEntries.isEmpty()) {
-                Text(
-                    stringResource(R.string.diary_no_entries_day),
-                    style = AppTheme.typography.secondary,
-                    color = AppTheme.colors.text.secondary,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
+        item { DiaryCalendarMonth(calendar, data, zone) }
         items(selectedEntries, key = { it.entry.uuid }) { ewc ->
             // U3：活角色取活名，已删取快照名 + 「故友的信」淡标（§6.3 O1/O2）。
-            val authorDisplay = diaryAuthorDisplay(
-                ewc.entry.authorCharacterUuid,
-                ewc.entry.authorNameSnapshot,
-                ewc.entry.authorCharacterUuid?.let { charactersByUuid[it]?.name },
-            )
+            val authorDisplay = diaryAuthorDisplayOf(ewc.entry, charactersByUuid)
             DiaryEntryCard(
                 entry = ewc.entry,
                 commentCount = ewc.comments.size,
@@ -217,6 +87,105 @@ fun DiaryCalendarSection(
                         onLongClickLabel = stringResource(R.string.a11y_diary_delete),
                         onLongClick = { onLongPress(ewc.entry.uuid) },
                     ),
+            )
+        }
+    }
+}
+
+/**
+ * 心情日历的月历块（琉璃 2.0 卷六·一：自 [DiaryCalendarSection] 的首个 item 只搬不改·两张脸共用）：
+ * 翻月标题 + 星期行 + 日期格 + 本月心情分布 + 选中日标题 /「这天没有日记」。
+ */
+@Composable
+internal fun DiaryCalendarMonth(state: DiaryCalendarState, data: DiaryCalendarData, zone: ZoneId, modifier: Modifier = Modifier) {
+    // 周日起的 7 个星期标签 + 当月日期格（前导空白补 null）。
+    val weekdayLabels = remember {
+        val order = listOf(
+            DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+            DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY,
+        )
+        order.map { it.getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
+    }
+    val weeks = remember(state.displayedMonth) { diaryCalendarWeeks(state.displayedMonth) }
+    val monthTitleMillis = remember(state.displayedMonth) { diaryMonthStartMillis(state.displayedMonth, zone) }
+    // 本月心情分布（emoji 计数·降序）。
+    val monthMoodCounts = remember(data.moodByDay, state.displayedMonth) { diaryMonthMoodCounts(data.moodByDay, state.displayedMonth) }
+    Column(modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { state.displayedMonth = state.displayedMonth.minusMonths(1L) }) {
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = stringResource(R.string.a11y_diary_prev_month),
+                    tint = AppTheme.colors.accent.text,
+                )
+            }
+            Text(
+                formatDiaryDate(monthTitleMillis, stringResource(R.string.diary_fmt_month_title), zone),
+                style = AppTheme.typography.nameTopBar,
+                color = AppTheme.colors.text.primary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = { state.displayedMonth = state.displayedMonth.plusMonths(1L) }) {
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.a11y_diary_next_month),
+                    tint = AppTheme.colors.accent.text,
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            weekdayLabels.forEach { label ->
+                Text(
+                    label,
+                    style = AppTheme.typography.caption,
+                    color = AppTheme.colors.text.secondary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            weeks.forEach { week ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    week.forEach { date ->
+                        DayCell(
+                            modifier = Modifier.weight(1f),
+                            date = date,
+                            isSelected = date != null && date == state.selectedDate,
+                            isToday = date != null && date == state.today,
+                            hasEntry = date != null && data.entriesByDay.containsKey(date),
+                            moodEmoji = date?.let { data.moodByDay[it] },
+                            onClick = { date?.let { state.selectedDate = it } },
+                        )
+                    }
+                }
+            }
+        }
+        if (monthMoodCounts.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            MonthMoodBar(monthMoodCounts)
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            formatDiaryDate(
+                state.selectedDate.atStartOfDay(zone).toInstant().toEpochMilli(),
+                stringResource(R.string.diary_fmt_day_title),
+                zone,
+            ),
+            style = AppTheme.typography.label,
+            color = AppTheme.colors.text.primary,
+        )
+        Spacer(Modifier.height(8.dp))
+        if (data.entriesByDay[state.selectedDate].orEmpty().isEmpty()) {
+            Text(
+                stringResource(R.string.diary_no_entries_day),
+                style = AppTheme.typography.secondary,
+                color = AppTheme.colors.text.secondary,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                textAlign = TextAlign.Center,
             )
         }
     }

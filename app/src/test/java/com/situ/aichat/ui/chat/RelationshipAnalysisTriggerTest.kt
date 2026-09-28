@@ -11,12 +11,14 @@ import com.situ.aichat.data.remote.llm.ApiConfigValues
 import com.situ.aichat.data.repository.ApiConfigRepository
 import com.situ.aichat.data.repository.CharacterRepository
 import com.situ.aichat.data.repository.CharacterWriteLock
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.prompt.growth.AffectKernel
 import com.situ.aichat.prompt.growth.GrowthAnalysisCoordinator
 import com.situ.aichat.prompt.growth.GrowthAnalysisError
 import com.situ.aichat.prompt.growth.GrowthAnalysisResult
 import com.situ.aichat.prompt.growth.IntentKernel
 import com.situ.aichat.prompt.growth.RelationshipAnalysisCoordinator
+import com.situ.aichat.prompt.growth.RelationshipAnalysisError
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -27,9 +29,11 @@ import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -402,5 +406,51 @@ class RelationshipAnalysisTriggerTest {
         coEvery { characterRepo.get("c1") } returns charWithGrowth(rounds = 24, totalCount = 2, lastAnalysis = twoHoursAgo) // 24→25 <30
         trigger.incrementGrowthRoundAndCheck("c1", config, defaultGrowthSettings(), "用户")
         coVerify(exactly = 0) { growthCoordinator.analyzeAndPersist(any(), any(), any(), any()) }
+    }
+
+    // ---- 时间感知四期·图纸三 T2-5（E9 / E10）：带 trace 调触发器 → 下游分析在 trace 上下文里跑 ----
+    // 假件停在 coordinator（contextLog 再往下，同一条协程·图纸 §0.1）；读调用方上下文用 currentCoroutineContext()。
+
+    private val logTrace = LogTrace("conv-1", "c1", "turn-1", "msg-1")
+
+    private fun relationChangeResult() = GrowthAnalysisResult(
+        personalityChanges = emptyMap(), relationshipChanges = emptyMap(), newInterests = emptyList(), interestHeatChanges = emptyMap(),
+        events = listOf(GrowthAnalysisResult.GrowthEvent(GrowthEventType.RELATIONSHIP_CHANGE, "关系升温")), narrative = "",
+    )
+
+    @Test
+    fun 图纸三_成长带trace_成长分析与链式关系评估都带到() {
+        coEvery { characterRepo.get("c1") } returns CharacterEntity(uuid = "c1", name = "测试", creationDate = 0L).copy(relationshipMessageCount = 30)
+        var growthSeen: LogTrace? = null
+        var relationSeen: LogTrace? = null
+        coEvery { growthCoordinator.analyzeAndPersist(any(), any(), any(), any()) } coAnswers { growthSeen = currentCoroutineContext()[LogTrace]; relationChangeResult() }
+        coEvery { relationshipCoordinator.analyzeAndPersist(any(), any(), any(), any()) } coAnswers {
+            relationSeen = currentCoroutineContext()[LogTrace]
+            throw RelationshipAnalysisError.NoMessages
+        }
+        trigger.incrementGrowthRoundAndCheck("c1", config, AppSettings(growthSystemEnabled = true, growthAnalysisInterval = 1), "用户", trace = logTrace)
+        assertSame(logTrace, growthSeen)
+        assertSame("链式关系评估在类 scope 上重新 launch，也要带到（E10）", logTrace, relationSeen)
+    }
+
+    @Test
+    fun 图纸三_关系兜底带trace_评估在trace上下文里跑() {
+        coEvery { characterRepo.get("c1") } returns CharacterEntity(uuid = "c1", name = "测试", creationDate = 0L)
+        var seen: LogTrace? = null
+        coEvery { relationshipCoordinator.analyzeAndPersist(any(), any(), any(), any()) } coAnswers {
+            seen = currentCoroutineContext()[LogTrace]
+            throw RelationshipAnalysisError.NoMessages
+        }
+        trigger.incrementRelationshipRoundAndCheck("c1", AppSettings(relationshipAutoAdvanceEnabled = true), "用户", trace = logTrace)
+        assertSame(logTrace, seen)
+    }
+
+    @Test
+    fun 图纸三_成长不带trace_下游无trace() {
+        coEvery { characterRepo.get("c1") } returns CharacterEntity(uuid = "c1", name = "测试", creationDate = 0L)
+        var seen: LogTrace? = LogTrace(null, null, "sentinel", null)
+        coEvery { growthCoordinator.analyzeAndPersist(any(), any(), any(), any()) } coAnswers { seen = currentCoroutineContext()[LogTrace]; relationChangeResult() }
+        trigger.incrementGrowthRoundAndCheck("c1", config, AppSettings(growthSystemEnabled = true, growthAnalysisInterval = 1), "用户")
+        assertEquals(null, seen)
     }
 }

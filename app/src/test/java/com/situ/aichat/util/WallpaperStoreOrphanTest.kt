@@ -34,4 +34,25 @@ class WallpaperStoreOrphanTest {
         val files = listOf("/w/a.jpg")
         assertEquals(emptyList<String>(), WallpaperStore.findOrphans(files, setOf("/w/a.jpg", "/w/gone.jpg")))
     }
+
+    // ── 卷四复核 R1（装机 O-7）：只清放满一天的孤儿——编辑中裁好、未保存的新壁纸还没有引用，不能被回前台维护删掉 ──
+
+    private val day = WallpaperStore.ORPHAN_MIN_AGE_MS
+
+    @Test fun `fresh unreferenced file is not a stale orphan`() {
+        val now = 10 * day
+        val files = mapOf("/w/new.jpg" to now - 60_000L, "/w/old.jpg" to now - day - 1)
+        assertEquals(listOf("/w/old.jpg"), WallpaperStore.findStaleOrphans(files, emptySet(), now))
+    }
+
+    @Test fun `exactly one day old counts as stale`() {
+        val now = 10 * day
+        assertEquals(listOf("/w/a.jpg"), WallpaperStore.findStaleOrphans(mapOf("/w/a.jpg" to now - day), emptySet(), now))
+    }
+
+    @Test fun `old referenced file is never a stale orphan`() {
+        val now = 10 * day
+        val files = mapOf("/w/a.jpg" to 0L, "/w/b.jpg" to 0L)
+        assertEquals(listOf("/w/b.jpg"), WallpaperStore.findStaleOrphans(files, setOf("/w/a.jpg"), now))
+    }
 }

@@ -1,10 +1,8 @@
 package com.situ.aichat.ui.contextlog
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.situ.aichat.data.local.dao.LogDao
-import com.situ.aichat.data.local.entity.LogEntryEntity
 import com.situ.aichat.data.model.AppSettings
 import com.situ.aichat.data.repository.SettingsRepository
 import com.situ.aichat.diagnostics.CallLogRecord
@@ -13,18 +11,13 @@ import com.situ.aichat.diagnostics.FailureRateAlert
 import com.situ.aichat.diagnostics.FailureRateAudit
 import com.situ.aichat.diagnostics.LogCategory
 import com.situ.aichat.diagnostics.LogListRow
-import com.situ.aichat.diagnostics.LogToolInfo
-import com.situ.aichat.prompt.ContextSegment
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
@@ -93,7 +86,7 @@ class ContextLogViewModel @Inject constructor(
 
     fun setCategory(c: LogCategory) { category.value = c }
 
-    fun clearAll() = viewModelScope.launch { logDao.deleteAll() }
+    fun clearAll() = viewModelScope.launch { contextLog.clearAll() }
 
     // 走完整入口（SQL 三列 + 工具遥测参数预览重消毒·复核 R1），不再直调 DAO 的 SQL 步。
     fun purgeFullText() = viewModelScope.launch { contextLog.purgeSensitiveText() }
@@ -166,36 +159,4 @@ internal fun buildContextLogUiState(
         cacheSummary = cacheSummaryOf(filtered),
         alerts = alerts,
     )
-}
-
-/**
- * 日志详情 / 分段 / 全文页共用 ViewModel（批 D·D-3）。route 带 id → [SavedStateHandle] 取，按 id 取单条；
- * 分段从 `contextSegmentsJson` 现解（容错空表）。
- */
-@HiltViewModel
-class ContextLogDetailViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
-    logDao: LogDao,
-    private val json: Json,
-) : ViewModel() {
-
-    private val entryId: Long = savedStateHandle.get<String>(ARG_ID)?.toLongOrNull() ?: -1L
-
-    val entry: StateFlow<LogEntryEntity?> = flow { emit(logDao.getById(entryId)) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    /** 解码结构化分段（空串/损坏 → 空表，绝不崩）。 */
-    fun decodeSegments(jsonStr: String): List<ContextSegment> {
-        if (jsonStr.isEmpty()) return emptyList()
-        return runCatching {
-            json.decodeFromString(ListSerializer(ContextSegment.serializer()), jsonStr)
-        }.getOrDefault(emptyList())
-    }
-
-    /** 解码工具遥测（空串=旧行/非聊天来源、损坏 → null，详情页整节隐藏，绝不崩）。 */
-    fun decodeToolInfo(jsonStr: String): LogToolInfo? = LogToolInfo.decode(json, jsonStr)
-
-    companion object {
-        const val ARG_ID = "id"
-    }
 }

@@ -34,10 +34,9 @@ import androidx.compose.ui.unit.dp
 import com.situ.aichat.R
 import com.situ.aichat.ui.components.AppMotion
 import com.situ.aichat.ui.designsystem.AppTheme
-import com.situ.aichat.ui.liuli.glass.LiuliGlassStyle
-import com.situ.aichat.ui.liuli.glass.liuliGlass
+import com.situ.aichat.ui.designsystem.Palette
+import com.situ.aichat.ui.liuli.designsystem.liuliAccentFill
 import com.situ.aichat.ui.liuli.page.liuliFootprint
-import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlinx.coroutines.withTimeoutOrNull
@@ -47,7 +46,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * **手势块逐字搬自暖陶 `VoiceRecordButton`**（`pointerInput(Unit)` 只建一次 + 六个 `rememberUpdatedState`）——
  * REDLINES §7「录音手势 owner 跨态不卸载」与「捕获过期」两条都由这个结构保证，一个字不许改；
- * 换的只有视觉：44dp 玻璃圆 + 麦克风图标，录音中外扩 8dp 钴蓝光晕 + 呼吸缩放。
+ * 换的只有视觉：44dp 主色渐变圆 + 白麦克风图标，录音中外扩 8dp 钴蓝光晕 + 呼吸缩放。
  */
 @Composable
 internal fun LiuliMicButton(
@@ -72,7 +71,6 @@ internal fun LiuliMicButton(
     val drag by rememberUpdatedState(onDrag)
     val finish by rememberUpdatedState(onFinish)
     val colors = AppTheme.colors
-    val dark = LocalIsDarkTheme.current
     val pressScale by animateFloatAsState(
         targetValue = if (recording && !reduceMotion) VOICE_PRESS_SCALE else 1f,
         animationSpec = if (reduceMotion) snap() else AppMotion.gentleSpring(),
@@ -144,14 +142,14 @@ internal fun LiuliMicButton(
                         )
                     }
                 }
-                // 圆钮甲（用户 09-06）：按钮档玻璃 + 钴蓝图标，与顶栏圆钮同族。
-                .liuliGlass(CircleShape, dark = dark, style = LiuliGlassStyle.Button),
+                // 琉璃 2.0 卷三：主色渐变圆（过审稿 `.orb`·取代 09-06 圆钮甲）。
+                .liuliAccentFill(CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 Icons.Filled.Mic,
                 contentDescription = stringResource(R.string.voice_message_hold_to_record),
-                tint = AppTheme.colors.accent.text,
+                tint = Palette.White,
                 modifier = Modifier.size(22.dp),
             )
         }

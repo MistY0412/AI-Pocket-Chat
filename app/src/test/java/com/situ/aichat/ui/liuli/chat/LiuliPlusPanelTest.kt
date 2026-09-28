@@ -32,6 +32,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.math.abs
 
 /**
  * T2-4 琉璃「+」变形面板（图纸 2026-09-05 卷二B §7）：六入口的显隐规则（见面态 / vision 门）、
@@ -134,17 +135,64 @@ class LiuliPlusPanelTest {
         assertEquals("面板照样收起", false, panelOpen())
     }
 
-    @Test fun panelBox_isRegionMinusPanelTop_andSitsPanelBottomAboveTheNavBar() {
-        // 复核 R1 🟡-3（图纸 §3.2 公式勘误 / §4.4「面板顶 = 三片行底 + 6」）：托盘自带 inputBottom 离屏底，
-        // 面板高必须是 regionPx − panelTop（= regionPx − 6dp），旧式 regionPx − (6 + 12) 会让面板顶离三片行 18dp。
-        // Robolectric 无导航栏、1px = 1dp：面板底 = 根底 − panelBottom；首格顶 = 面板顶 + 16（§3.2 内 padding top）。
+    /**
+     * 复核 R1 🟡-3（图纸 §3.2 公式勘误）+ 卷四 §4.7（两排上下居中）：面板盒高 = regionPx − panelTop，底 = 根底 − panelBottom
+     * （Robolectric 无导航栏、1px = 1dp）。卷四起去掉内距顶 16、两排居中 ⇒ 首排顶到盒顶 = 末排底到盒底（±1dp）。
+     * 盒子公式错多少，两段留白就差多少（原「首格顶 = 盒顶 + 16」随居中改写）。
+     */
+    @Test fun panelBox_isRegionMinusPanelTop_andRowsAreCenteredInIt() {
         setPanel()
         val root = compose.onRoot().getUnclippedBoundsInRoot()
-        val firstTile = compose.onNodeWithText("送礼").getUnclippedBoundsInRoot()
-        val panelBottom = root.bottom - LiuliChatGeometry.panelBottom
-        val expectedHeight = FALLBACK_PANEL_PX.dp - LiuliChatGeometry.panelTop
-        val expectedTileTop = panelBottom - expectedHeight + 16.dp
-        assertEquals("首格顶 = 根底 − 12 − (regionPx − 6) + 16", expectedTileTop.value, firstTile.top.value, 0.5f)
+        val boxBottom = (root.bottom - LiuliChatGeometry.panelBottom).value
+        val boxTop = boxBottom - (FALLBACK_PANEL_PX.dp - LiuliChatGeometry.panelTop).value
+        val firstRowTop = compose.onNodeWithText("照片").getUnclippedBoundsInRoot().top.value
+        val lastRowBottom = compose.onNodeWithText("见面").getUnclippedBoundsInRoot().bottom.value
+        val topGap = firstRowTop - boxTop
+        val bottomGap = boxBottom - lastRowBottom
+        assertTrue("首排顶留白 $topGap 与末排底留白 $bottomGap 应相等（±1dp）", abs(topGap - bottomGap) <= 1f)
+        assertTrue("两排都在盒内", topGap > 0f && bottomGap > 0f)
+    }
+
+    /** 卷四 §4.7：按 (行, 列) 读出的入口顺序。 */
+    private fun orderOf(labels: List<String>): List<List<String>> {
+        val pos = labels.map { it to compose.onNodeWithText(it).getUnclippedBoundsInRoot() }
+        return pos.groupBy { it.second.top.value.toInt() }.toSortedMap().values
+            .map { row -> row.sortedBy { it.second.left.value }.map { it.first } }
+    }
+
+    @Test fun order_withVision_fourThenTwo() {
+        setPanel()
+        assertEquals(
+            listOf(listOf("照片", "表情", "红包", "送礼"), listOf("见面", "约见面")),
+            orderOf(listOf("送礼", "红包", "表情", "照片", "见面", "约见面")),
+        )
+        // 第二排左起：见面与首排照片同列。
+        assertEquals(
+            compose.onNodeWithText("照片").getUnclippedBoundsInRoot().left.value,
+            compose.onNodeWithText("见面").getUnclippedBoundsInRoot().left.value,
+            0.5f,
+        )
+    }
+
+    @Test fun order_withoutVision_stickerFirst() {
+        setPanel(chatModelHasVision = false)
+        assertEquals(
+            listOf(listOf("表情", "红包", "送礼", "见面"), listOf("约见面")),
+            orderOf(listOf("送礼", "红包", "表情", "见面", "约见面")),
+        )
+    }
+
+    @Test fun order_offline_photoThenStickerOneRow() {
+        setPanel(isOfflineMode = true)
+        assertEquals(listOf(listOf("照片", "表情")), orderOf(listOf("照片", "表情")))
+    }
+
+    /** 格子 60：未合并树里标签文字顶 − 整格顶 = 方块 60 + 标签间距 8。 */
+    @Test fun tile_is60dp() {
+        setPanel()
+        val cell = compose.onNodeWithText("表情").getUnclippedBoundsInRoot()
+        val label = compose.onNodeWithText("表情", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(60f + 8f, (label.top - cell.top).value, 0.5f)
     }
 
     @Test fun tappingGift_opensGiftSheet_notOthers() {

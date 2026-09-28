@@ -40,11 +40,16 @@ object ReplyParser {
 
     /**
      * 历史时间分割线 echo：LLM 偶尔会模仿上下文里 [HistoryTimeDivider] 注入的 `【时间 · …】` 系统分割线，
-     * 整行剥除以防穿帮进气泡 / 入库 / 污染记忆。只命中「整行就是 `【时间 · …】`」的形状（行首 `【时间 ·` +
-     * 行尾 `】`），不误伤把【…】用在句中、或其它【标签】、或【时间·…】后还有正文的正常内容。
+     * 剥除以防穿帮进气泡 / 入库 / 污染记忆。命中「行首的 `【时间 · …】` 标记」（四期·图纸一 §3.4 放宽：去掉行尾锚）——
+     * 整行标记剥成空行（同旧），标记黏在句首、后面还有正文时只剥标记、保留正文；行首连着几个标记一并剥（复核 R1）；
+     * 不误伤句中的【…】或其它【标签】。
      */
     private val historyTimeDividerEchoRegex =
-        Regex("""(?m)^[ \t]*【时间 ·[^】\n]*】[ \t]*$""")
+        Regex("""(?m)^[ \t]*(?:【时间 ·[^】\n]*】[ \t]*)+""")
+
+    /** 与 [com.situ.aichat.data.remote.llm.ProviderMessageAdapter.NOTE_OPEN]/[NOTE_CLOSE] 字面互指（锁测试钉）。 */
+    internal val systemNoteBlockRegex = Regex("""【系统说明】[\s\S]*?【/系统说明】""")
+    private val systemNoteTagRegex = Regex("""【/?系统说明】""")
 
     /** 思考模型标签（无条件、不区分大小写；用 (?:闭合|\z) 兜底未闭合）。 */
     private val thinkingTagRegexes: List<Regex> = listOf(
@@ -188,6 +193,8 @@ object ReplyParser {
         result = dsmlBlockRegex.replace(result, "")
         for (regex in internalTagRegexes) result = regex.replace(result, "")
         result = historyTimeDividerEchoRegex.replace(result, "")
+        result = systemNoteBlockRegex.replace(result, "")
+        result = systemNoteTagRegex.replace(result, "")
         if (!preserveOfflineTags) {
             for (regex in offlineNarrativeTagRegexes) result = regex.replace(result, "")
         }
@@ -281,8 +288,10 @@ object ReplyParser {
         val withoutLegacyHeader = legacyPathATimestampHeaderRegex.replace(content, "")
         // A8：历史里若有 AI 早先模仿吐出的 `【时间 · …】` echo（入库前 sanitize 漏网的旧残留），再喂回时一并剥除。
         val withoutDividerEcho = historyTimeDividerEchoRegex.replace(withoutLegacyHeader, "")
+        // 四期·图纸一 §3.4：非白名单服务商的【系统说明】框回声（整块 → 孤立标签）一并剥除。
+        val withoutSystemNote = systemNoteTagRegex.replace(systemNoteBlockRegex.replace(withoutDividerEcho, ""), "")
 
-        val lines = withoutDividerEcho.split("\n")
+        val lines = withoutSystemNote.split("\n")
         val cleaned = lines.filter { !isSystemDirectiveLine(it) }
         return cleaned.joinToString("\n")
             .replace("\n\n\n", "\n\n")

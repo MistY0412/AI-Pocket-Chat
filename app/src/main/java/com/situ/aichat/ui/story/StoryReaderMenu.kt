@@ -48,6 +48,17 @@ import androidx.compose.ui.unit.sp
 import com.situ.aichat.R
 import com.situ.aichat.ui.designsystem.AppSwitch
 
+/** ⋮ 菜单宽（两张脸同值）。 */
+internal val STORY_READER_MENU_WIDTH = 240.dp
+
+/** 字号四档标签（两张脸同序）。 */
+internal val storyReaderFontSizeLabels: List<Int> = listOf(
+    R.string.story_reader_font_size_small,
+    R.string.story_reader_font_size_standard,
+    R.string.story_reader_font_size_large,
+    R.string.story_reader_font_size_xlarge,
+)
+
 /**
  * 阅读器 ⋮ 弹出菜单（玻璃质感·随深浅换肤·过审 mockup `story_reader_menu_glass_mockup`）。
  *
@@ -108,7 +119,7 @@ internal fun StoryReaderMenu(
             tonalElevation = 0.dp,
             shadowElevation = 8.dp,
             border = BorderStroke(0.75.dp, borderColor),
-            modifier = Modifier.width(240.dp),
+            modifier = Modifier.width(STORY_READER_MENU_WIDTH),
         ) {
             // 卷三 §4.6（D-13 菜单瘦身）：六条动作行全部迁走——继续写 / 请求结局与推进区重复（删）、
             // 换一版 / 看上一版 / 编辑本章小结去了章末「本章操作」浮层、查看角色现状去了书页·档案。
@@ -207,7 +218,7 @@ private fun MenuToggleRow(
 
 /** 发丝分隔线（0.5dp·左右 12dp 内缩）。 */
 @Composable
-private fun MenuHairline(color: Color) {
+internal fun MenuHairline(color: Color) {
     Box(
         Modifier
             .fillMaxWidth()
@@ -226,12 +237,7 @@ private fun MenuFontSizeTiers(
     accent: Color,
     onSelect: (Int) -> Unit,
 ) {
-    val labels = listOf(
-        R.string.story_reader_font_size_small,
-        R.string.story_reader_font_size_standard,
-        R.string.story_reader_font_size_large,
-        R.string.story_reader_font_size_xlarge,
-    )
+    val labels = storyReaderFontSizeLabels
     Row(
         Modifier
             .fillMaxWidth()

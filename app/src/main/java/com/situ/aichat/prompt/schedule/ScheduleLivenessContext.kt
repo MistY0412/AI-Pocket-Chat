@@ -18,6 +18,8 @@ data class ScheduleLivenessContext(
     val recentMeetingAfterglow: AfterglowLine? = null,
     /** 最近几天粗摘要（D-2..D-5·近在前·每日 ≤3 项非睡眠活动）——反撞车 + 跨日小事件线。 */
     val recentDaysDigest: List<String> = emptyList(),
+    /** 她自己说过、落在目标日的打算（open_loops·plan_char）——【TA自己说过的打算】。 */
+    val ownPlans: List<String> = emptyList(),
 ) {
     /** 一条今日见面约定：[timeText]=精确 HH:mm 或模型原话（rawWhenText 空时为空串——渲染模板自带「今天」前缀·图纸 D-1）。 */
     data class MeetingLine(val timeText: String, val location: String, val activity: String)

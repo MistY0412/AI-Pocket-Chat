@@ -101,6 +101,7 @@ class SettingsRepository @Inject constructor(
             emotionAnimationEnabled = p[KEY_EMOTION_ANIMATION] ?: true,
             // 自然短句口吻（活人感一期 P1）——PromptBuilder 回复风格块消费；缺值 → 默认开。
             textingToneEnabled = p[KEY_TEXTING_TONE] ?: true,
+            cacheSaverEnabled = p[KEY_CACHE_SAVER] ?: false,
             // 主动消息通知（P6.1c）——这两项需真正持久化并被调度器读取，故在此显式映射。
             notificationsEnabled = p[KEY_NOTIFICATIONS_ENABLED] ?: true,
             // 角色经济动态通知三档（P1-40）——维护循环读取；缺值 → 默认简要 brief。
@@ -274,6 +275,7 @@ class SettingsRepository @Inject constructor(
             p[KEY_RELATIONSHIP_AUTO_ADVANCE] = s.relationshipAutoAdvanceEnabled
             p[KEY_EMOTION_ANIMATION] = s.emotionAnimationEnabled
             p[KEY_TEXTING_TONE] = s.textingToneEnabled
+            p[KEY_CACHE_SAVER] = s.cacheSaverEnabled
             p[KEY_NOTIFICATIONS_ENABLED] = s.notificationsEnabled
             p[KEY_ECONOMY_NOTIFICATION_TIER] = s.economyNotificationTier
             p[KEY_MILESTONE_NOTIF_ENABLED] = s.milestoneNotificationEnabled
@@ -677,6 +679,9 @@ class SettingsRepository @Inject constructor(
     suspend fun setTextingToneEnabled(enabled: Boolean) =
         dataStore.edit { it[KEY_TEXTING_TONE] = enabled }
 
+    /** 省钱模式开关（时间感知四期·图纸二）。 */
+    suspend fun setCacheSaverEnabled(enabled: Boolean) = dataStore.edit { it[KEY_CACHE_SAVER] = enabled }
+
     // MARK: - 忙碌时延迟回复设置（P6.2）
 
     // 忙碌延迟回复 setter 已随功能删除（2026-07-11）；读路径/KEY 保留 = DataStore/备份线格式兼容。
@@ -927,6 +932,7 @@ class SettingsRepository @Inject constructor(
         val KEY_NOTIF_QUIET_HOURS_END = intPreferencesKey("notif_quiet_hours_end")
         val KEY_EMOTION_ANIMATION = booleanPreferencesKey("emotion_animation_enabled")
         val KEY_TEXTING_TONE = booleanPreferencesKey("texting_tone_enabled")
+        val KEY_CACHE_SAVER = booleanPreferencesKey("cache_saver_enabled")
         val KEY_NOTIF_DISABLED_CHARS = stringSetPreferencesKey("notif_disabled_char_ids")
         val KEY_BUSY_MODE_ENABLED = booleanPreferencesKey("busy_mode_enabled")
         val KEY_BUSY_MODE_MAX_MINUTES = intPreferencesKey("busy_mode_max_minutes")

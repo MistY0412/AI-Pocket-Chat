@@ -47,9 +47,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.situ.aichat.R
-import com.situ.aichat.data.local.entity.CharacterEntity
-import com.situ.aichat.data.local.entity.MomentPostEntity
-import com.situ.aichat.data.model.MomentAuthorType
 import com.situ.aichat.ui.components.CharacterAvatar
 import com.situ.aichat.ui.components.clickableScale
 import com.situ.aichat.ui.components.contentMaxWidth
@@ -238,8 +235,8 @@ private fun CircleStripPreview(state: MomentsHubState) {
     }
     val meLabel = stringResource(R.string.moment_author_me)
     val aiLabel = stringResource(R.string.moment_author_ai)
-    val author = previewAuthor(post, state.charactersByUuid, meLabel, aiLabel)
-    val body = post.content.take(30).replace("\n", " ")
+    val author = momentsHubPreviewAuthor(post, state.charactersByUuid, meLabel, aiLabel)
+    val body = momentsHubPostPreview(post.content)
     val annotated = buildAnnotatedString {
         withStyle(SpanStyle(color = colors.accent.primary, fontWeight = FontWeight.SemiBold)) { append("$author：") }
         withStyle(SpanStyle(color = colors.text.secondary)) { append(body) }
@@ -263,7 +260,7 @@ private fun RowScope.DiaryCard(state: MomentsHubState, onClick: () -> Unit, modi
         tileColor = colors.emotion.calm.copy(alpha = EmotionTileAlpha),
         iconColor = colors.emotion.calmInk,
         title = stringResource(R.string.moment_hub_diary),
-        body = diaryPreviewText(state),
+        body = momentsHubDiaryPreviewText(state),
         badgeText = if (state.diaryUnreadCount > 0) {
             stringResource(R.string.diary_unread_badge, state.diaryUnreadCount)
         } else {
@@ -283,7 +280,7 @@ private fun RowScope.StoryCard(state: MomentsHubState, onClick: () -> Unit, modi
         tileColor = colors.emotion.sad.copy(alpha = EmotionTileAlpha),
         iconColor = colors.emotion.sadInk,
         title = stringResource(R.string.moment_hub_story),
-        body = storyPreviewText(state),
+        body = momentsHubStoryPreviewText(state),
         badgeText = null,
         onClick = onClick,
     )
@@ -348,33 +345,4 @@ private fun IconTile(icon: ImageVector, tileColor: Color, iconColor: Color) {
     ) {
         Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(22.dp))
     }
-}
-
-/** 故事卡 body：连载进度（第N章·标题 / 尚未生成 / 无故事兜底）。 */
-@Composable
-private fun storyPreviewText(state: MomentsHubState): String = when (val s = storyHubStatus(state.latestStory)) {
-    is StoryHubStatus.Chapter -> stringResource(R.string.story_hub_chapter, s.number, s.title)
-    StoryHubStatus.NoChapter -> stringResource(R.string.story_hub_no_chapter)
-    StoryHubStatus.None -> stringResource(R.string.moment_hub_story_desc)
-}
-
-/** 动态条预览作者名（本地化「我」/角色名/「AI」回落·取法同旧 Hero 预览·§4.5）。 */
-private fun previewAuthor(
-    post: MomentPostEntity,
-    charactersByUuid: Map<String, CharacterEntity>,
-    meLabel: String,
-    aiLabel: String,
-): String = when (MomentAuthorType.fromRaw(post.authorTypeRaw)) {
-    MomentAuthorType.USER -> meLabel
-    MomentAuthorType.CHARACTER -> post.characterUuid?.let { charactersByUuid[it]?.name } ?: aiLabel
-}
-
-/** 日记卡 body：最新一篇非草稿日记的「心情 emoji + 正文前30」；无则默认描述。 */
-@Composable
-private fun diaryPreviewText(state: MomentsHubState): String {
-    val entry = state.latestDiary ?: return stringResource(R.string.moment_hub_diary_desc)
-    val body = entry.content.take(30).replace("\n", " ")
-    if (body.isBlank()) return stringResource(R.string.moment_hub_diary_desc)
-    val emoji = entry.moodEmoji
-    return if (!emoji.isNullOrEmpty()) "$emoji $body" else body
 }

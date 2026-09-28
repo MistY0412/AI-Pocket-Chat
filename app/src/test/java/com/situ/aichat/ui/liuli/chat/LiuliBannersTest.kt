@@ -12,6 +12,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import com.situ.aichat.data.local.entity.MeetingAppointmentEntity
 import com.situ.aichat.meeting.MeetingDisplayFormatter
 import com.situ.aichat.data.model.MeetingTimeGranularity
@@ -140,6 +141,7 @@ class LiuliBannersTest {
                     text = "已删除日程",
                     isDelete = true,
                     reduceMotion = true,
+                    topPadding = 8.dp, // 卷四：顶距成形参（本例只测两档与触达，沿用旧的 8dp 顶距）
                     onDismiss = { dismissed++ },
                 )
             }

@@ -100,6 +100,14 @@ fun StoryArchiveSection(
     onMenuDismiss: () -> Unit,
     onDeleteRequest: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** 档案小卡的长按菜单（琉璃 2.0 卷六·三「槽外给」：默认 = 暖陶玻璃菜单，琉璃传 LiuliPopupMenu）。 */
+    menu: @Composable (story: StoryEntity) -> Unit = { story ->
+        StoryArchivedCardMenu(
+            expanded = menuStoryId == story.id,
+            onDismiss = onMenuDismiss,
+            onDelete = { onDeleteRequest(story.id) },
+        )
+    },
 ) {
     val c = AppTheme.colors
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -122,11 +130,7 @@ fun StoryArchiveSection(
                 // 包 Box 当菜单锚（ST10-1 锚定修复同款思路）：菜单贴本卡展开，不飘到分区边缘。
                 Box {
                     ArchiveCard(story, onClick = { onOpen(story.id) }, onLongPress = { onCardLongPress(story.id) })
-                    StoryArchivedCardMenu(
-                        expanded = menuStoryId == story.id,
-                        onDismiss = onMenuDismiss,
-                        onDelete = { onDeleteRequest(story.id) },
-                    )
+                    menu(story)
                 }
             }
         }

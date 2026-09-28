@@ -37,13 +37,8 @@ class LiuliCardShellTest {
         assertEquals(34.dp, LiuliChatGeometry.cardIconBlock)
         assertEquals(11.dp, LiuliChatGeometry.cardIconCorner)
         assertEquals(34.dp, LiuliChatGeometry.cardButtonHeight)
-        assertEquals(110.dp, LiuliChatGeometry.stickerSize)
-        assertEquals(24.dp, LiuliChatGeometry.stickerCorner)
-        assertEquals(200.dp, LiuliChatGeometry.imageMaxWidth)
         assertEquals(36.dp, LiuliChatGeometry.foldFade)
-        assertEquals(30.dp, LiuliChatGeometry.voicePlay)
         assertEquals(3.dp, LiuliChatGeometry.voiceBarWidth)
         assertEquals(2.dp, LiuliChatGeometry.voiceBarGap)
-        assertEquals(22.dp, LiuliChatGeometry.voiceBarHeight)
     }
 }

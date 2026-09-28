@@ -11,7 +11,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
-    // alias(libs.plugins.baselineprofile)  // 暂停：1.4.1 不兼容 AGP 9.2.1·1.5.0 仅 alpha（见 settings.gradle.kts）
+    alias(libs.plugins.baselineprofile)
 }
 
 // 正式 release 签名：本机存在 keystore.properties(gitignored) 时启用真签名，
@@ -141,6 +141,25 @@ android {
         generateLocaleConfig = true
     }
 
+    // 稳定性防线 C（2026-09-28 用户拍板）：Android Lint 严格模式 + 基线。新出现的问题（含警告）一律判失败；
+    // 2026-09-28 首次全量扫描的存量（30 错 / 415 警 / 25 提示）冻结在 lint-baseline.xml，只拦新增、修不修由用户定。
+    // 全量约 8 分钟 → 不进每个 chunk 的门禁，只在阶段收尾 / tools/stability/check_all.sh / 发版时跑 :app:lintDebug。
+    // 存量修掉一批后重新冻结：./gradlew :app:updateLintBaseline（会把已修掉的条目从基线里删掉）。
+    lint {
+        abortOnError = true
+        warningsAsErrors = true
+        baseline = file("lint-baseline.xml")
+        // 关掉的检查（逐条有理由，别无脑加回）：
+        //  - 「依赖 / Gradle / 插件 / targetSdk 有新版本了」：结果随 Google 发版而变，开着「警告即错误」会让构建某天
+        //    无故变红（首扫就报了 Gradle 9.7.1→9.8.0）；升级节奏走依赖升级卷，不靠 lint 催。
+        //  - Google Play 商店政策 / Play Core 分包类：本项目 GitHub 侧载、不上商店（CLAUDE.md 铁律 #6），
+        //    免电池优化等是有意为之（铁律 #5）。
+        disable += setOf(
+            "GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion", "OldTargetApi",
+            "BatteryLife", "AppBundleLocaleChanges",
+        )
+    }
+
     // 把导出的 Room schema 快照作为 androidTest 资产，供 MigrationTest 的 MigrationTestHelper 按版本读取校验（P12.2）。
     // Gradle/AGP 9：assets.srcDir(Any) 弃用 → assets.directories。⚠️新 DSL 下显式列目录会「覆盖」约定默认，
     // 故必须同时显式补回 androidTest 默认 assets 目录（含 STT 设备测的 stt_test/ WAV）+ 导出的 Room schema 目录。
@@ -150,11 +169,14 @@ android {
 
 kotlin {
     // Kotlin 2.2 起 android.kotlinOptions{} 弃用 → 顶层 compilerOptions{}（jvmTarget 仍 17·见 JVM 决策）。
-    // KT-73255：注解默认 use-site target 从 param 迁向 param+property；显式 param-property 消除迁移警告，
-    // 并锁定前向兼容落点（Hilt/Room/serialization 注解位置不变·全量单测验证）。
+    // KT-73255：Kotlin 2.4 起注解默认 use-site target 新规则（param+property）已是默认行为，等同原先显式的
+    // -Xannotation-default-target=param-property，故该参数于 2026-09-24 依赖升级轮三移除（编译器报 REDUNDANT_CLI_ARG）。
     compilerOptions {
         jvmTarget = JvmTarget.JVM_17
-        freeCompilerArgs.add("-Xannotation-default-target=param-property")
+        // 稳定性防线 A（2026-09-28 用户拍板）：任何 Kotlin 警告直接判编译失败——主代码 / 单测 / 仪器测试 / release
+        // 全部编译单元一视同仁，取代「--rerun 后人工 grep -c '^w:'」的手数门禁（PITFALLS §1e/§1g 记有两次假绿）。
+        // 应急临时关掉（不改文件）：命令行加 -PkotlinWarningsAsErrors=false。
+        allWarningsAsErrors = providers.gradleProperty("kotlinWarningsAsErrors").orNull != "false"
     }
 }
 
@@ -169,9 +191,8 @@ dependencies {
     implementation(libs.androidx.exifinterface)
     // P1-3 Baseline Profile：旁加载分发无 Play 云 profile，profileinstaller 是包内 baseline.prof → ART 的唯一安装通道。
     implementation(libs.androidx.profileinstaller)
-    // 暂停（M3·依赖升级）：baselineprofile 1.4.1 不兼容 AGP 9.2.1、1.5.0 仅 alpha → 按只用稳定版拍板暂停。
-    // 待稳定版 1.5 后恢复：取消本行注释 + settings.gradle.kts 的 include(":baselineprofile") + 顶部 baselineprofile 插件。
-    // "baselineProfile"(project(":baselineprofile"))
+    // Baseline Profile 生成器（依赖升级轮三 2026-09-24 恢复·benchmark 1.5.0 正式版支持 AGP 9.x·见 settings.gradle.kts）。
+    "baselineProfile"(project(":baselineprofile"))
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -186,6 +207,10 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
+    // 琉璃玻璃引擎 Haze 2.0.0（铁律#1 唯一例外·用户 2026-09-24 拍板·微图纸 docs/handoff/2026-09-24-Compose升级与Haze接入.md）：
+    // 纯渲染库，零权限 / 零联网 / 零原生库 / 无 GMS；只许在 ui/liuli/glass/ 内调用。版本钉死 + 校验和锁在 gradle/verification-metadata.xml。
+    implementation(libs.haze)
+    implementation(libs.haze.glass)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

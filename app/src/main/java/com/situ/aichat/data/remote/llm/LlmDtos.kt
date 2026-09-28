@@ -184,7 +184,13 @@ data class UsageDto(
     @SerialName("prompt_cache_hit_tokens") val promptCacheHitTokens: Int? = null,
     @SerialName("prompt_cache_miss_tokens") val promptCacheMissTokens: Int? = null,
     @SerialName("completion_tokens_details") val completionTokensDetails: CompletionTokensDetailsDto? = null,
+    // 标准缓存报法（四期·图纸二 §3.3）：OpenAI / GLM / Grok / OpenRouter 用前者，Kimi 用顶层后者；归一见 UsageCacheTokens。
+    @SerialName("prompt_tokens_details") val promptTokensDetails: PromptTokensDetailsDto? = null,
+    @SerialName("cached_tokens") val cachedTokens: Int? = null,
 )
+
+@Serializable
+data class PromptTokensDetailsDto(@SerialName("cached_tokens") val cachedTokens: Int? = null)
 
 @Serializable
 data class CompletionTokensDetailsDto(

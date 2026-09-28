@@ -401,6 +401,8 @@ data class MomentPostExport(
     val relatedGiftId: String? = null,
     /** 多图：每张图在 zip 内的相对键（含媒体时）。 */
     val imageArchiveKeys: List<String>? = null,
+    /** 「提醒谁看」的角色 uuid（null = 没提醒 / 老备份）。朋友圈是全局段，角色 uuid 不重映射（同 [characterUuid]）。 */
+    val mentionedCharacterUuids: List<String>? = null,
 )
 
 @Serializable

@@ -2,6 +2,7 @@ package com.situ.aichat.data.remote.llm.modelcatalog
 
 import com.situ.aichat.data.model.APIModelOption
 import com.situ.aichat.data.model.ApiProviderType
+import com.situ.aichat.data.remote.LazyOkHttpClient
 import com.situ.aichat.data.remote.llm.ApiConfigValues
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -38,11 +39,11 @@ object ModelCatalogProviderFactory {
 
 /** Injectable wrapper (provided in NetworkModule) so VMs can fetch without touching OkHttp directly. */
 class ModelCatalogService(
-    private val client: OkHttpClient,
+    private val http: LazyOkHttpClient,
     private val json: Json,
 ) {
     suspend fun fetchModels(config: ApiConfigValues): List<APIModelOption> =
-        ModelCatalogProviderFactory.make(config.providerType).fetchModels(config, client, json)
+        ModelCatalogProviderFactory.make(config.providerType).fetchModels(config, http.get(), json)
 }
 
 /** User-facing catalog errors (messages mirror iOS APIModelCatalogError; shown in the picker status). */

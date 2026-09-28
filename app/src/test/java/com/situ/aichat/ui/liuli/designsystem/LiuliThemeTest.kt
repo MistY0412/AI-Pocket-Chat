@@ -28,6 +28,23 @@ class LiuliThemeTest {
         assertEquals(18f, corner(LiuliShapes.bubble.topStart), 0.001f)
         assertEquals(20f, corner(LiuliShapes.overlay.topStart), 0.001f)
         assertEquals(5.dp, LiuliShapes.bubbleTailCorner)
+        // 琉璃 2.0 卷二图纸 2026-09-25 表 A：组 16 → 20；新增对话框 24 · 菜单 18 · 收起态胶囊 22。
+        assertEquals(20f, corner(LiuliShapes.group.topStart), 0.001f)
+        assertEquals(20f, corner(LiuliShapes.group.bottomEnd), 0.001f)
+        assertEquals(24f, corner(LiuliShapes.dialog.topStart), 0.001f)
+        assertEquals(24f, corner(LiuliShapes.dialog.bottomEnd), 0.001f)
+        assertEquals(18f, corner(LiuliShapes.menu.topStart), 0.001f)
+        assertEquals(18f, corner(LiuliShapes.menu.bottomEnd), 0.001f)
+        assertEquals(22f, corner(LiuliShapes.compactPill.topStart), 0.001f)
+        assertEquals(22f, corner(LiuliShapes.compactPill.bottomEnd), 0.001f)
+    }
+
+    @Test fun sheetFloatingShape_is38TopAnd32Bottom() {
+        // 卷二 §4.7-1：悬浮底部面板四周留 8dp，顶 38 / 底 32。
+        assertEquals(38f, corner(LiuliShapes.sheetFloating.topStart), 0.001f)
+        assertEquals(38f, corner(LiuliShapes.sheetFloating.topEnd), 0.001f)
+        assertEquals(32f, corner(LiuliShapes.sheetFloating.bottomStart), 0.001f)
+        assertEquals(32f, corner(LiuliShapes.sheetFloating.bottomEnd), 0.001f)
     }
 
     @Test fun sheetShape_is38TopAnd0Bottom() {
@@ -43,9 +60,10 @@ class LiuliThemeTest {
     }
 
     @Test fun onGlassColors_matchContract() {
-        assertEquals(Color(0xFF111318), LiuliOnGlassLight.primary)
-        assertEquals(Color(0xFF5F6470), LiuliOnGlassLight.secondary)
-        assertEquals(Color(0xFFF2F4F8), LiuliOnGlassDark.primary)
-        assertEquals(Color(0xFFA3A9B5), LiuliOnGlassDark.secondary)
+        // 琉璃 2.0 卷一图纸 2026-09-25 §4.1：DawnInk / DuskInk；次要字按卷二 §0.2-3 压深并与 text.secondary 合并、卷三 §0.2-5 再调（字面量重打）。
+        assertEquals(Color(0xFF2A2440), LiuliOnGlassLight.primary)
+        assertEquals(Color(0xFF544E70), LiuliOnGlassLight.secondary)
+        assertEquals(Color(0xFFF3EFFF), LiuliOnGlassDark.primary)
+        assertEquals(Color(0xFFC7C3DF), LiuliOnGlassDark.secondary)
     }
 }

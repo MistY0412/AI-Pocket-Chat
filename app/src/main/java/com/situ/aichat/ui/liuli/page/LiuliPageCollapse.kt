@@ -51,8 +51,8 @@ fun rememberScrollCollapsed(scrollState: ScrollState): Boolean {
 /**
  * 详情页（T3）的头图收起判据（A-8）：头图是 item 0，它滚到只剩「收起顶栏那么高」时切成玻璃顶栏 + 小标题。
  *
- * @param heroPx 头图实高（px）——[LiuliPageGeometry.hero] 换算后传入。
- * @param barPx 收起顶栏总高（px）= 状态栏 + 收起顶栏；名义值见 [LiuliPageGeometry.heroCollapseTail]。
+ * @param heroPx 头部实高（px）——头部实高 = 真状态栏 + [LiuliPageGeometry.profileHead]，换算后传入（卷四）。
+ * @param barPx 收起顶栏总高（px）= 真状态栏 + 收起顶栏 [LiuliPageGeometry.compactBar]。
  */
 @Composable
 fun rememberHeroCollapsed(listState: LazyListState, heroPx: Int, barPx: Int): Boolean {

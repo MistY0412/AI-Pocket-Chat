@@ -125,6 +125,11 @@ internal fun diaryAuthorDisplay(
     orphanFallbackName = stringResource(R.string.diary_exchange_orphan_fallback_name),
 )
 
+/** 交换日记作者显示（活名 / 快照名 / 兜底名）的「按条目取」便捷版（两张脸三处共用）。 */
+@Composable
+internal fun diaryAuthorDisplayOf(entry: DiaryEntryEntity, charactersByUuid: Map<String, CharacterEntity>): DiaryAuthorDisplay? =
+    diaryAuthorDisplay(entry.authorCharacterUuid, entry.authorNameSnapshot, entry.authorCharacterUuid?.let { charactersByUuid[it]?.name })
+
 /**
  * ③ U2：正文按段落切分（详情页段落呼吸感）。以换行分段（兼容单 `\n` 与空行 `\n\n`）·trim 去空白段。
  * 纯逻辑·T1 可测。无换行=单段；全空白优雅回退单元素（调用方已 ifEmpty 兜底占位，不会真空）。
@@ -302,17 +307,7 @@ fun DiaryCommentRow(
                 Text(authorName, style = AppTheme.typography.label, color = colors.text.primary)
                 Text(content, style = AppTheme.typography.listPreview, color = colors.text.primary)
                 Text(
-                    // diary-2：评论时间用相对时间（刚刚/X分钟前/昨天…）。
-                    DateFormatters.relativeTimeString(
-                        timestampMillis,
-                        System.currentTimeMillis(),
-                        DateFormatters.RelativeTimeStrings(
-                            justNow = stringResource(R.string.relative_time_just_now),
-                            minutesAgo = stringResource(R.string.relative_time_minutes_ago),
-                            hoursAgo = stringResource(R.string.relative_time_hours_ago),
-                            yesterday = stringResource(R.string.relative_time_yesterday),
-                        ),
-                    ),
+                    diaryCommentRelativeTime(timestampMillis),
                     style = AppTheme.typography.caption,
                     color = colors.text.secondary,
                 )
@@ -339,3 +334,18 @@ fun DiaryCommentRow(
         )
     }
 }
+
+/** 评论相对时间（diary-2：刚刚 / X分钟前 / 昨天…·原 :306–315 逐字搬）。 */
+@Composable
+internal fun diaryCommentRelativeTime(timestampMillis: Long): String =
+    // diary-2：评论时间用相对时间（刚刚/X分钟前/昨天…）。
+    DateFormatters.relativeTimeString(
+        timestampMillis,
+        System.currentTimeMillis(),
+        DateFormatters.RelativeTimeStrings(
+            justNow = stringResource(R.string.relative_time_just_now),
+            minutesAgo = stringResource(R.string.relative_time_minutes_ago),
+            hoursAgo = stringResource(R.string.relative_time_hours_ago),
+            yesterday = stringResource(R.string.relative_time_yesterday),
+        ),
+    )

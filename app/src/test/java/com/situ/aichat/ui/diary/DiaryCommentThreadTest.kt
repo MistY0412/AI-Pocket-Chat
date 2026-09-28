@@ -1,5 +1,6 @@
 package com.situ.aichat.ui.diary
 
+import com.situ.aichat.data.local.entity.CharacterEntity
 import com.situ.aichat.data.local.entity.DiaryCommentEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -102,5 +103,19 @@ class DiaryCommentThreadTest {
             listOf(c("a1", 200, parent = "root")),
         )
         assertTrue(thread.canReply())
+    }
+
+    // ── 琉璃 2.0 卷六·一 §3.5：评论作者名（两张脸共用·T1-4） ──
+
+    @Test fun `diaryCommentAuthorName - user comment reads the me label`() {
+        val chars = mapOf("char1" to CharacterEntity(uuid = "char1", name = "小满", creationDate = 0L))
+        assertEquals("我", diaryCommentAuthorName(c("u", 1, characterUuid = null, fromUser = true), chars, "我", "AI"))
+    }
+
+    @Test fun `diaryCommentAuthorName - character present reads live name, missing or null uuid falls back to AI label`() {
+        val chars = mapOf("char1" to CharacterEntity(uuid = "char1", name = "小满", creationDate = 0L))
+        assertEquals("小满", diaryCommentAuthorName(c("a", 1, characterUuid = "char1"), chars, "我", "AI"))
+        assertEquals("角色已删 → AI 兜底", "AI", diaryCommentAuthorName(c("b", 1, characterUuid = "gone"), chars, "我", "AI"))
+        assertEquals("uuid 为空的非用户评论 → AI 兜底", "AI", diaryCommentAuthorName(c("n", 1, characterUuid = null), chars, "我", "AI"))
     }
 }

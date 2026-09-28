@@ -255,7 +255,7 @@ class AssistantTurnEngineTest {
         every { networkMonitor.isConnected } returns MutableStateFlow(false)
         engine.runAssistantTurn(config, character, settings, userProfile = null, userMessageForEmbed = null)
         assertEquals(RuntimeEnvironment.getApplication().getString(com.situ.aichat.R.string.chat_no_network), errorFlow.value)
-        verify(exactly = 0) { llmClient.streamChat(any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } // 复核 R1：全参 any()，不再被默认参 eq(null) 架空
         coVerify(exactly = 0) { replyDeliverer.deliverAssistantReply(any(), any(), any(), any(), any(), any(), any(), any(), any()) }
     }
 
@@ -264,7 +264,7 @@ class AssistantTurnEngineTest {
         coEvery { conversationRepo.get("conv-1") } returns null
         engine.runAssistantTurn(config, character, settings, userProfile = null, userMessageForEmbed = null)
         assertNull(errorFlow.value)
-        verify(exactly = 0) { llmClient.streamChat(any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } // 复核 R1：全参 any()，不再被默认参 eq(null) 架空
     }
 
     @Test
@@ -279,10 +279,10 @@ class AssistantTurnEngineTest {
         verify { replyDeliverer.openTypingSlot() }
         verify { replyDeliverer.closeTypingSlot() }
         // 逐回合维护（仅成功投递才跑）：记忆 / 成长 / 关系 / 通知 / 补帖。
-        coVerify { memoryAnalysisTrigger.checkAndTriggerMemorySummary("c1", any(), any(), any()) }
+        coVerify { memoryAnalysisTrigger.checkAndTriggerMemorySummary("c1", any(), any(), any(), any()) }
         // 卷四层 ①：引擎多传本轮 userText / replyText（图纸 §2.2 AssistantTurnEngine +1 行）；MockK 对省略的默认参按 eq("") 匹配会误红，故显式 any()。
-        coVerify { relationshipAnalysisTrigger.incrementGrowthRoundAndCheck("c1", any(), any(), any(), any()) }
-        coVerify { relationshipAnalysisTrigger.incrementRelationshipRoundAndCheck("c1", any(), any()) }
+        coVerify { relationshipAnalysisTrigger.incrementGrowthRoundAndCheck("c1", any(), any(), any(), any(), any()) }
+        coVerify { relationshipAnalysisTrigger.incrementRelationshipRoundAndCheck("c1", any(), any(), any()) }
         coVerify { notificationScheduler.schedule(character) }
         coVerify { momentGenerationService.triggerCatchUpPostIfNeeded("c1", any(), any()) } // now/zone 带默认 → any()
         // 前台保活 acquire/release 成对；终态旗标归位。
@@ -324,7 +324,7 @@ class AssistantTurnEngineTest {
     @Test
     fun 工具路_日历调用_解析并透传给投递() = runBlocking {
         // 模型流里吐一个 calendar_action 工具调用 + 一句正文 → 累积/解析/透传给 deliverAssistantReply.toolCalendarActions。
-        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any()) } returns flowOf<StreamToken>(
+        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), sessionKey = any()) } returns flowOf<StreamToken>(
             StreamToken.ToolCallDelta(
                 ToolCallChunk(
                     index = 0, id = "c1", functionName = "calendar_action",
@@ -354,7 +354,7 @@ class AssistantTurnEngineTest {
         // H5 解绑端到端：模型支持工具但关了日历 → 下发的 tools 里没有日历工具，线下/约见面工具仍在。
         val toolsSlot = slot<List<ToolDefinitionDto>?>()
         every {
-            llmClient.streamChat(any(), any(), any(), any(), any(), captureNullable(toolsSlot), any(), any())
+            llmClient.streamChat(any(), any(), any(), any(), any(), captureNullable(toolsSlot), any(), any(), sessionKey = any())
         } returns flowOf<StreamToken>(StreamToken.Content("嗯嗯"))
         coEvery {
             replyDeliverer.deliverAssistantReply(any(), any(), any(), any(), any(), any(), any(), any(), any())
@@ -381,7 +381,7 @@ class AssistantTurnEngineTest {
             ),
         )
         val fallback = flowOf<StreamToken>(StreamToken.Content("抱歉，我直接说哈~"))
-        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any()) } returnsMany listOf(badTool, fallback)
+        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), sessionKey = any()) } returnsMany listOf(badTool, fallback)
         val calSlot = slot<List<CalendarAction>>()
         coEvery {
             replyDeliverer.deliverAssistantReply(any(), any(), any(), any(), any(), any(), capture(calSlot), any(), any())
@@ -395,7 +395,9 @@ class AssistantTurnEngineTest {
         // 解析失败 → 不透传任何日历动作；且发生了第二次 streamChat（纯文本降级重发）。
         assertTrue(calSlot.isCaptured)
         assertTrue(calSlot.captured.isEmpty())
-        verify(exactly = 2) { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 2) { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), sessionKey = any()) }
+        // 复核 R1（四期·图纸一 §3.2b）：主回合与纯文本重发两次都带会话标识 = 本会话 uuid（删掉接线即红）。
+        verify(exactly = 2) { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), sessionKey = "conv-1") }
     }
 
     // ── 回喂（fetchToolCallFollowUp）端到端：堵 d2f2b55 盲点 + 钉死 f58d60d「绝不谎报已完成」红线 ──
@@ -405,7 +407,7 @@ class AssistantTurnEngineTest {
         // 模型只吐一个有效日历工具调用、无正文 → text 空 → 触发 fetchToolCallFollowUp；那次 completion 网络失败
         // → 兜底文案直接作为助手正文投递。红线：此刻动作尚未执行（执行在更后的 ChatReplyDeliverer），绝不能说
         // 「操作已执行」(f58d60d 家族·复核 F5/F6 揪出的漏网缝)。
-        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any()) } returns flowOf<StreamToken>(
+        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), sessionKey = any()) } returns flowOf<StreamToken>(
             StreamToken.ToolCallDelta(
                 ToolCallChunk(
                     index = 0, id = "c1", functionName = "calendar_action",
@@ -414,7 +416,7 @@ class AssistantTurnEngineTest {
             ),
             // 无 Content → text 空 → needsTextFollowUp 成立 → 进 fetchToolCallFollowUp。
         )
-        coEvery { llmClient.completion(any(), any(), any(), any(), any(), any()) } throws RuntimeException("network down")
+        coEvery { llmClient.completion(any(), any(), any(), any(), any(), any(), sessionKey = any()) } throws RuntimeException("network down")
         val rawSlot = slot<String>()
         coEvery {
             replyDeliverer.deliverAssistantReply(capture(rawSlot), any(), any(), any(), any(), any(), any(), any(), any())
@@ -436,7 +438,7 @@ class AssistantTurnEngineTest {
     fun 工具路_好坏日历加约见面混调无正文_回喂逐条据实不谎报() = runBlocking {
         // f58d60d P1 + 约见面同类的端到端钉子：好+坏日历 + 约见面 同轮、无正文 → follow-up 对每个 call 就地据实陈述：
         // 好日历=确认卡待确认（尚未执行）/ 坏日历=没能执行 / 约见面=待定提案；任何一条都绝不「操作已执行」。
-        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any()) } returns flowOf<StreamToken>(
+        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), sessionKey = any()) } returns flowOf<StreamToken>(
             StreamToken.ToolCallDelta(ToolCallChunk(index = 0, id = "good", functionName = "calendar_action",
                 argumentChunk = """{"action":"create_event","title":"开会","startDate":"2026-06-05T10:00:00"}""")),
             StreamToken.ToolCallDelta(ToolCallChunk(index = 1, id = "bad", functionName = "calendar_action",
@@ -445,7 +447,7 @@ class AssistantTurnEngineTest {
                 argumentChunk = """{"when_text":"周末","activity":"爬山"}""")),
         )
         val followUpSlot = slot<List<ChatMessageDto>>()
-        coEvery { llmClient.completion(capture(followUpSlot), any(), any(), any(), any(), any()) } returns "嗯，安排好啦~"
+        coEvery { llmClient.completion(capture(followUpSlot), any(), any(), any(), any(), any(), sessionKey = any()) } returns "嗯，安排好啦~"
         coEvery {
             replyDeliverer.deliverAssistantReply(any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns deliveredTurn(empty = false)
@@ -464,6 +466,8 @@ class AssistantTurnEngineTest {
         assertTrue("好日历=待确认尚未执行: $joined", toolContents.any { it.contains("尚未执行") || it.contains("确认卡") })
         assertTrue("坏日历=据实没能执行: $joined", toolContents.any { it.contains("没能执行") })
         assertTrue("约见面=待定提案: $joined", toolContents.any { it.contains("提案") || it.contains("尚未落定") })
+        // 复核 R1（四期·图纸一 §3.2b）：工具回喂那次非流式调用也带会话标识 = 本会话 uuid。
+        coVerify(exactly = 1) { llmClient.completion(any(), any(), any(), any(), any(), any(), any(), sessionKey = "conv-1") }
     }
 
     // ── 约定记账双轨端到端（图纸 2026-09-06 约定工具调用化·T2-5/6） ──
@@ -471,7 +475,7 @@ class AssistantTurnEngineTest {
     @Test
     fun 工具路_约定记账调用_合并两来源交给handler() = runBlocking {
         // 工具路一条 record_promise + 正文 → 引擎回合尾把动作交 handler（落库与闸门在 handler 自己的测试里）。
-        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any()) } returns flowOf<StreamToken>(
+        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), sessionKey = any()) } returns flowOf<StreamToken>(
             StreamToken.ToolCallDelta(
                 ToolCallChunk(
                     index = 0, id = "p1", functionName = "record_promise",
@@ -499,7 +503,7 @@ class AssistantTurnEngineTest {
     @Test
     fun 工具路_只回约定工具无正文_触发回喂且文案不谎报已记() = runBlocking {
         // needsTextFollowUp 扩展：只调了约定工具、正文空 → 去取一段正文（否则回合没有气泡）；回喂据实「尚未写入」。
-        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any()) } returns flowOf<StreamToken>(
+        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), sessionKey = any()) } returns flowOf<StreamToken>(
             StreamToken.ToolCallDelta(
                 ToolCallChunk(
                     index = 0, id = "p1", functionName = "record_promise",
@@ -508,7 +512,7 @@ class AssistantTurnEngineTest {
             ),
         )
         val followUpSlot = slot<List<ChatMessageDto>>()
-        coEvery { llmClient.completion(capture(followUpSlot), any(), any(), any(), any(), any()) } returns "嗯，记住啦~"
+        coEvery { llmClient.completion(capture(followUpSlot), any(), any(), any(), any(), any(), sessionKey = any()) } returns "嗯，记住啦~"
         coEvery {
             replyDeliverer.deliverAssistantReply(any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns deliveredTurn(empty = false)
@@ -529,7 +533,7 @@ class AssistantTurnEngineTest {
         val first = "[promise]{\"action\":\"record\",\"content\":\"第一次的约定\",\"evidence\":\"那就周六一起去看展吧\"}"
         val second = "好呀，说定啦~[promise]{\"action\":\"record\",\"content\":\"第二次的约定\",\"evidence\":\"那就周六一起去看展吧\"}"
         var call = 0
-        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any()) } answers {
+        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), sessionKey = any()) } answers {
             call++
             flowOf<StreamToken>(StreamToken.Content(if (call == 1) first else second))
         }
@@ -576,7 +580,7 @@ class AssistantTurnEngineTest {
             // 逐次记录每个 streamChat 调用下发的 tools（param index 5）；前两次失败（工具流 + 其内部纯文本兜底）逼出降级。
             val toolsPerCall = mutableListOf<List<ToolDefinitionDto>?>()
             var n = 0
-            every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any()) } answers {
+            every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), sessionKey = any()) } answers {
                 n++
                 toolsPerCall.add(arg<List<ToolDefinitionDto>?>(5))
                 if (n <= 2) throw RuntimeException("audio rejected $n") else flowOf<StreamToken>(StreamToken.Content("好的~"))
@@ -605,7 +609,7 @@ class AssistantTurnEngineTest {
     fun 工具路_线下见面调用_解析透传投递_遥测落库() = runBlocking {
         // 模型流里吐一个 suggest_offline_meeting 调用 + 一句正文 → 解析成线下动作透传投递（此前五段链路
         // 唯一无直测的一段），同时工具遥测（tool 轨 + 下发清单 + 实际调用 + 解析产出）随成功日志落库。
-        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any()) } returns flowOf<StreamToken>(
+        every { llmClient.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), sessionKey = any()) } returns flowOf<StreamToken>(
             StreamToken.ToolCallDelta(
                 ToolCallChunk(
                     index = 0, id = "c1", functionName = "suggest_offline_meeting",
@@ -635,7 +639,7 @@ class AssistantTurnEngineTest {
         assertEquals("公园", offSlot.captured[0].location)
         assertTrue("线下工具调用旗标应透传", flagSlot.captured)
         // 遥测：tool 轨 / 下发清单含线下工具 / 调用与解析产出如实记录 / 未降级。
-        verify { contextLog.recordSuccess(any(), any(), any(), any(), any(), any(), any(), any(), captureNullable(infoSlot)) }
+        verify { contextLog.recordSuccess(any(), any(), any(), any(), any(), any(), any(), any(), captureNullable(infoSlot), any(), any()) }
         val info = infoSlot.captured
         assertEquals(LogToolInfo.MODE_TOOL, info?.mode)
         assertTrue("下发清单应含 suggest_offline_meeting", info?.sentTools.orEmpty().contains("suggest_offline_meeting"))
@@ -654,7 +658,7 @@ class AssistantTurnEngineTest {
 
         engine.runAssistantTurn(config, character, settings, userProfile = null, userMessageForEmbed = null)
 
-        verify { contextLog.recordSuccess(any(), any(), any(), any(), any(), any(), any(), any(), captureNullable(infoSlot)) }
+        verify { contextLog.recordSuccess(any(), any(), any(), any(), any(), any(), any(), any(), captureNullable(infoSlot), any(), any()) }
         assertEquals(LogToolInfo.MODE_MARKER, infoSlot.captured?.mode)
         assertTrue("暗号轨不下发工具", infoSlot.captured?.sentTools.orEmpty().isEmpty())
     }
@@ -667,7 +671,7 @@ class AssistantTurnEngineTest {
         every { calendarHandler.consumePendingFailure(any(), any()) } returns
             PendingCalendarFailure(verb = "创建", title = "牙医预约", reason = "没认出你说的时间", recordedAtMillis = 0L)
         val msgSlot = slot<List<ChatMessageDto>>()
-        every { llmClient.streamChat(capture(msgSlot), any(), any(), any(), any(), any(), any(), any()) } returns
+        every { llmClient.streamChat(capture(msgSlot), any(), any(), any(), any(), any(), any(), any(), sessionKey = any()) } returns
             flowOf<StreamToken>(StreamToken.Content("嗯嗯"))
         coEvery {
             replyDeliverer.deliverAssistantReply(any(), any(), any(), any(), any(), any(), any(), any(), any())
@@ -692,10 +696,10 @@ class AssistantTurnEngineTest {
     @Test
     fun 回访_无到期_候选注入prompt_回合成功后标记revisited() = runBlocking {
         val revisit = revisitLoop()
-        coEvery { openLoopRepository.openLoopsForCharacter("c1") } returns emptyList() // 无到期 open 项
+        coEvery { openLoopRepository.openLoopsForChat("c1") } returns emptyList() // 无到期 open 项
         coEvery { openLoopRepository.revisitCandidates("c1", any()) } returns listOf(revisit)
         val msgSlot = slot<List<ChatMessageDto>>()
-        every { llmClient.streamChat(capture(msgSlot), any(), any(), any(), any(), any(), any(), any()) } returns
+        every { llmClient.streamChat(capture(msgSlot), any(), any(), any(), any(), any(), any(), any(), sessionKey = any()) } returns
             flowOf<StreamToken>(StreamToken.Content("嗯嗯"))
         coEvery {
             replyDeliverer.deliverAssistantReply(any(), any(), any(), any(), any(), any(), any(), any(), any())
@@ -718,7 +722,7 @@ class AssistantTurnEngineTest {
             uuid = "d1", conversationUuid = "conv-1", characterUuid = "c1", content = "今天到期的事",
             typeRaw = OpenLoopType.USER_EVENT, dueAt = 1L, statusRaw = OpenLoopStatus.OPEN, createdAt = 0L,
         )
-        coEvery { openLoopRepository.openLoopsForCharacter("c1") } returns listOf(dueOpen)
+        coEvery { openLoopRepository.openLoopsForChat("c1") } returns listOf(dueOpen)
         coEvery {
             replyDeliverer.deliverAssistantReply(any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns deliveredTurn(empty = false)
@@ -748,7 +752,7 @@ class AssistantTurnEngineTest {
     @Test
     fun 回访_回合空响应_取了候选但不标记() = runBlocking {
         // 门控全过、取到候选，但回合空响应（走不到成功后置块）→ 不标记，下回合重新候选（E6）。
-        coEvery { openLoopRepository.openLoopsForCharacter("c1") } returns emptyList()
+        coEvery { openLoopRepository.openLoopsForChat("c1") } returns emptyList()
         coEvery { openLoopRepository.revisitCandidates("c1", any()) } returns listOf(revisitLoop())
         coEvery {
             replyDeliverer.deliverAssistantReply(any(), any(), any(), any(), any(), any(), any(), any(), any())

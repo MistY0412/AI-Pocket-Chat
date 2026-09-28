@@ -5,6 +5,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.situ.aichat.sticker.StickerService
@@ -45,13 +46,26 @@ class LiuliStickerPickerSheetTest {
         onSelect: (String) -> Unit = {},
         onManage: () -> Unit = {},
         onDismiss: () -> Unit = {},
-    ) = show {
-        LiuliStickerPickerSheet(
-            customStickers = emptyList(),
-            onSelect = onSelect,
-            onManage = onManage,
-            onDismiss = onDismiss,
-        )
+    ) {
+        show {
+            LiuliStickerPickerSheet(
+                customStickers = emptyList(),
+                onSelect = onSelect,
+                onManage = onManage,
+                onDismiss = onDismiss,
+            )
+        }
+        awaitPrefsLoaded()
+    }
+
+    /**
+     * 两份 prefs 在 `Dispatchers.IO` 上读，compose 规则的 waitForIdle 等不到真线程（PITFALLS §1e）——
+     * 不等就断言 = 跟 IO 线程赛跑，全量满负载时偶发输（2026-09-25 实录「'开心' is not displayed」·
+     * 把 IO 读人为拖慢 1.5s 可稳定复现：除「管理表情包」外四例全挂）。就绪的独有证据 = 第 0 段空态文案：
+     * Robolectric 每例都是新 SharedPreferences → 最近使用必空，而骨架是纯 Spacer、一个字都没有。
+     */
+    private fun awaitPrefsLoaded() {
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("还没有使用过表情包").fetchSemanticsNodes().isNotEmpty() }
     }
 
     @Test fun 三段段名照抄且可切换() {

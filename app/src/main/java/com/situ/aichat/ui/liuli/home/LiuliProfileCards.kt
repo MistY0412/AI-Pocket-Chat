@@ -32,7 +32,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
-import com.situ.aichat.ui.liuli.designsystem.liuliCardSurface
+import com.situ.aichat.ui.liuli.designsystem.LiuliAvatarRing
+import com.situ.aichat.ui.liuli.designsystem.LiuliAvatarRingWidth
+import com.situ.aichat.ui.liuli.designsystem.LiuliTileTone
+import com.situ.aichat.ui.liuli.designsystem.liuliCardMaterial
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import com.situ.aichat.R
 import com.situ.aichat.ui.components.CharacterAvatar
 import com.situ.aichat.ui.designsystem.AppNavIcons
@@ -54,7 +58,7 @@ private const val HERO_ICON_RATIO = 0.46f // 空态头像里人形线稿占圆�
 /**
  * 「我」页身份卡（图纸 2026-09-06 卷三 A-11 / §3.2 · 契约 §6 D 甲）。
  *
- * 纸白 `liuliCardSurface(medium)` + **顶沿 70dp 微光**（`accent.primary@12% → 透明`·画在卡内、发丝之内）；
+ * 半透明卡片（卷三·`liuliCardMaterial(medium)`）+ **顶沿 70dp 微光**（`accent.primary@12% → 透明`·画在卡内、发丝之内）；
  * 暖陶那张的 `grainSurface` 颗粒与陶土染底都不用（A-11）。三列统计的数字 22/700 `accent.text` tnum，
  * 列间 0.5 竖发丝。
  */
@@ -88,7 +92,10 @@ fun LiuliHeroCard(
         },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            LiuliHeroAvatar(name = name, avatarPath = avatarPath, size = HERO_AVATAR)
+            // 渐变光环（卷三 §4.11）：头像仍 68，外径 72。
+            LiuliAvatarRing(HERO_AVATAR + LiuliAvatarRingWidth * 2) {
+                LiuliHeroAvatar(name = name, avatarPath = avatarPath, size = HERO_AVATAR)
+            }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -190,8 +197,7 @@ private fun LiuliStatDivider() {
 @Composable
 fun LiuliStatTile(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    tileTint: Color,
-    tileInk: Color,
+    tone: LiuliTileTone,
     title: String,
     value: Int,
     unit: String,
@@ -203,7 +209,7 @@ fun LiuliStatTile(
 ) {
     val colors = AppTheme.colors
     LiuliHubCard(onClick = onClick, onClickLabel = title, modifier = modifier) {
-        LiuliIconTile(icon, tileTint, tileInk)
+        LiuliIconTile(icon, tone)
         Spacer(Modifier.height(8.dp))
         Text(title, style = AppTypography.label, color = colors.text.primary)
         if (emptyText != null) {
@@ -228,7 +234,7 @@ fun LiuliGiftRow(shopSub: String, giftBoxSub: String, onOpenShop: () -> Unit, on
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .liuliCardSurface(LiuliShapes.medium)
+            .liuliCardMaterial(LiuliShapes.medium, LocalIsDarkTheme.current)
             .height(IntrinsicSize.Min),
     ) {
         LiuliGiftHalf(Modifier.weight(1f), AppProfileIcons.Shop, stringResource(R.string.profile_box_shop_title), shopSub, onOpenShop)
@@ -270,7 +276,7 @@ fun LiuliMomentsWideCard(count: Int, onClick: () -> Unit, modifier: Modifier = M
         "$count ${stringResource(R.string.profile_box_moments_unit)} · ${stringResource(R.string.profile_box_moments_hint)}"
     }
     LiuliHubRow(onClick = onClick, onClickLabel = title, modifier = modifier) {
-        LiuliIconTile(AppProfileIcons.Moments, colors.accent.container, colors.accent.onContainer)
+        LiuliIconTile(AppProfileIcons.Moments, LiuliTileTone.Rose)
         Column(Modifier.weight(1f)) {
             Text(title, style = AppTypography.label, color = colors.text.primary)
             Text(detail, style = AppTypography.captionNumeric, color = colors.text.secondary)
@@ -279,12 +285,12 @@ fun LiuliMomentsWideCard(count: Int, onClick: () -> Unit, modifier: Modifier = M
     }
 }
 
-/** 设置条（§4.6）：齿轮图标块走 `surface.sunken` + `text.secondary`。 */
+/** 设置条（§4.6）：齿轮图标块走天空色六色渐变（卷三 §4.11）。 */
 @Composable
 fun LiuliSettingsEntryBar(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = AppTheme.colors
     LiuliHubRow(onClick = onClick, onClickLabel = stringResource(R.string.settings_screen_title), modifier = modifier) {
-        LiuliIconTile(AppProfileIcons.Tune, colors.surface.sunken, colors.text.secondary)
+        LiuliIconTile(AppProfileIcons.Tune, LiuliTileTone.Sky)
         Column(Modifier.weight(1f)) {
             Text(stringResource(R.string.settings_screen_title), style = AppTypography.label, color = colors.text.primary)
             Text(

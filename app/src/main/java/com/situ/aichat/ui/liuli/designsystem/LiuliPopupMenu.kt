@@ -2,10 +2,9 @@ package com.situ.aichat.ui.liuli.designsystem
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.snap
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,14 +31,12 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import com.situ.aichat.data.model.GlassTier
 import com.situ.aichat.ui.components.AppMotion
 import com.situ.aichat.ui.components.LocalAppHaptics
 import com.situ.aichat.ui.components.rememberReduceMotion
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
-import com.situ.aichat.ui.liuli.glass.LiuliGlassSpec
-import com.situ.aichat.ui.liuli.glass.liuliGlass
+import com.situ.aichat.ui.liuli.glass.liuliWindowGlass
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import androidx.compose.ui.unit.Dp
 
@@ -74,15 +71,56 @@ data class LiuliMenuEntry(
 )
 
 /**
+ * 琉璃玻璃弹出层底座（琉璃 2.0 卷六·三·下甲·自 [LiuliPopupMenu] 只搬不改抽出）：`Popup` + [liuliWindowGlass] +
+ * 0.9 → 1 出场缩放；内容随调用方（[LiuliPopupMenu] 放文字行；阅读器菜单放开关与字号条）。
+ * 位置 / 宽 / 抢焦点语义同 [LiuliPopupMenu]。
+ */
+@Composable
+fun LiuliPopupSurface(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    offset: DpOffset = DpOffset.Zero,
+    alignment: Alignment = Alignment.TopEnd,
+    width: Dp = MENU_WIDTH,
+    focusable: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    if (!expanded) return
+    val dark = LocalIsDarkTheme.current
+    val reduceMotion = rememberReduceMotion()
+    val scale = remember { Animatable(if (reduceMotion) 1f else MENU_ENTER_SCALE) }
+    LaunchedEffect(Unit) {
+        scale.animateTo(1f, if (reduceMotion) snap() else AppMotion.gentleSpring())
+    }
+
+    Popup(
+        // 锚到父级**尾端**向左展开：`···` 贴在横幅右侧，用 TopStart 时 160dp 宽的卡会伸出屏右缘被裁
+        // （装机实证·`Popup` 不像 M3 `DropdownMenu` 会自动回弹）。
+        alignment = alignment,
+        offset = with(LocalDensity.current) { IntOffset(offset.x.roundToPx(), offset.y.roundToPx()) },
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = focusable),
+    ) {
+        Column(
+            modifier = modifier
+                .graphicsLayer { scaleX = scale.value; scaleY = scale.value }
+                .width(width)
+                .liuliWindowGlass(LiuliShapes.menu, dark),
+            content = content,
+        )
+    }
+}
+
+/**
  * 琉璃弹出菜单（图纸 2026-09-05 卷二C §4.11 · 落值 §3.2 · A-15）。
  *
- * 底座 = `androidx.compose.ui.window.Popup`（**不是** material3·§9 ⑤ 明说它不算 M3），皮 = 一片
- * [GlassTier].TINTED 玻璃卡 + [LiuliShapes].overlay 圆角。菜单同样住独立 window 拿不到 `LocalBackdrop`，
- * 故**卡底垫一层 `surface.raised` 纸面**再覆着色玻璃（R2 P-1·用户选①），身后聊天内容不再透字。
- * **禁 M3 `DropdownMenu`**。
+ * 底座 = `androidx.compose.ui.window.Popup`（**不是** material3·§9 ⑤ 明说它不算 M3），皮 = [liuliWindowGlass] +
+ * [LiuliShapes].menu 18 圆角（琉璃 2.0 卷二 §4.7-3）：菜单住独立 window——通透 / 标准档 = 跨窗口真玻璃（Haze 取宿主
+ * 内容·大面板加厚配方），毛玻璃档 / 安卓 13 以下 / 不在宿主里 = 不透明兜底。**禁 M3 `DropdownMenu`**。
  *
  * 出场 = 0.9 → 1 缩放（[AppMotion].gentleSpring·[rememberReduceMotion] 时直显）。行高恒 40 = 触达
- * （紧贴的兄弟行不外溢·见 [MENU_ROW_HEIGHT]）；行间一道 0.5dp 玻璃发丝。点击先 `haptics.light()`
+ * （紧贴的兄弟行不外溢·见 [MENU_ROW_HEIGHT]）；行间无分隔线（卷二 §4.7-3）。点击先 `haptics.light()`
  * 再回调、再关菜单。
  *
  * 位置：`Popup(alignment = TopEnd, offset)`——菜单**右上角**对齐锚点的右上角、向左展开；要让它落在
@@ -108,66 +146,33 @@ fun LiuliPopupMenu(
     if (!expanded) return
     val colors = AppTheme.colors
     val onGlass = LiuliTheme.onGlass
-    val dark = LocalIsDarkTheme.current
     val haptics = LocalAppHaptics.current
-    val reduceMotion = rememberReduceMotion()
-    val hairline = if (dark) LiuliGlassSpec.hairlineDark else LiuliGlassSpec.hairlineLight
-    val scale = remember { Animatable(if (reduceMotion) 1f else MENU_ENTER_SCALE) }
-    LaunchedEffect(Unit) {
-        scale.animateTo(1f, if (reduceMotion) snap() else AppMotion.gentleSpring())
-    }
-
-    Popup(
-        // 锚到父级**尾端**向左展开：`···` 贴在横幅右侧，用 TopStart 时 160dp 宽的卡会伸出屏右缘被裁
-        // （装机实证·`Popup` 不像 M3 `DropdownMenu` 会自动回弹）。
-        alignment = alignment,
-        offset = with(LocalDensity.current) { IntOffset(offset.x.roundToPx(), offset.y.roundToPx()) },
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = focusable),
-    ) {
-        Column(
-            modifier = modifier
-                .graphicsLayer { scaleX = scale.value; scaleY = scale.value }
-                .width(width)
-                .liuliGlass(LiuliShapes.overlay, dark = dark, tier = GlassTier.TINTED)
-                // 独立 window 无 backdrop → 玻璃层里面铺纸面（R2 P-1·用户 2026-09-05 选①·三壳同口径；
-                // 铺在层外面会让软影透过半透明层在卡中央留亮方块·装机 p1_04 实证）。
-                .background(colors.surface.raised),
-        ) {
-            items.forEachIndexed { index, entry ->
-                if (index > 0) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(LiuliGlassSpec.hairlineWidth)
-                            .background(hairline),
+    LiuliPopupSurface(expanded, onDismiss, modifier, offset, alignment, width, focusable) {
+        items.forEach { entry ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(MENU_ROW_HEIGHT)
+                    .clickable(role = Role.Button) { haptics.light(); entry.onClick(); onDismiss() }
+                    .padding(horizontal = MENU_ROW_PAD_H),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    entry.text,
+                    style = AppTypography.label,
+                    color = if (entry.danger) colors.status.onError else onGlass.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (entry.selected) {
+                    Spacer(Modifier.width(MENU_CHECK_GAP))
+                    Icon(
+                        Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = colors.accent.text,
+                        modifier = Modifier.size(MENU_CHECK),
                     )
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(MENU_ROW_HEIGHT)
-                        .clickable(role = Role.Button) { haptics.light(); entry.onClick(); onDismiss() }
-                        .padding(horizontal = MENU_ROW_PAD_H),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        entry.text,
-                        style = AppTypography.label,
-                        color = if (entry.danger) colors.status.onError else onGlass.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (entry.selected) {
-                        Spacer(Modifier.width(MENU_CHECK_GAP))
-                        Icon(
-                            Icons.Filled.Check,
-                            contentDescription = null,
-                            tint = colors.accent.text,
-                            modifier = Modifier.size(MENU_CHECK),
-                        )
-                    }
                 }
             }
         }

@@ -716,6 +716,14 @@ val MIGRATION_48_49 = object : Migration(48, 49) {
     }
 }
 
+/** v49→v50（朋友圈发布页重构·甲·图纸 docs/handoff/2026-09-27-朋友圈发布页-甲-底子.md §3.1）：
+ *  `moment_post` 加 `mentionedCharacterUuidsJson`（「提醒谁看」角色 uuid JSON 列表·老行默认 '' = 没提醒任何人）。 */
+val MIGRATION_49_50 = object : Migration(49, 50) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `moment_post` ADD COLUMN `mentionedCharacterUuidsJson` TEXT NOT NULL DEFAULT ''")
+    }
+}
+
 /** 全部迁移（按序），注入 Room.databaseBuilder().addMigrations(*ALL_MIGRATIONS)。 */
 val ALL_MIGRATIONS = arrayOf(
     MIGRATION_1_2,
@@ -766,4 +774,6 @@ val ALL_MIGRATIONS = arrayOf(
     MIGRATION_46_47,
     MIGRATION_47_48,
     MIGRATION_48_49,
+    MIGRATION_49_50,
+    MIGRATION_50_51,
 )

@@ -13,8 +13,13 @@ import com.situ.aichat.data.repository.ApiConfigRepository
 import com.situ.aichat.data.repository.CharacterRepository
 import com.situ.aichat.data.repository.MomentRepository
 import com.situ.aichat.data.repository.SettingsRepository
+import com.situ.aichat.moments.MomentCommentGenerator
+import com.situ.aichat.moments.MomentInteractionNotifications
 import com.situ.aichat.moments.MomentInteractionService
+import com.situ.aichat.moments.MomentMentionAvailability
+import com.situ.aichat.moments.MomentMentionInteractor
 import com.situ.aichat.moments.MomentNewPostNotifier
+import com.situ.aichat.moments.MomentPendingDrain
 import com.situ.aichat.moments.MomentPendingInteractionStore
 import com.situ.aichat.notification.Notifier
 import com.situ.aichat.prompt.schedule.CharacterSleepChecker
@@ -73,12 +78,26 @@ class MomentsMeetingGateTest {
         coEvery { characterRepo.get("c1") } returns CharacterEntity(uuid = "c1", name = "小雨", creationDate = 0L)
         val sleepChecker: CharacterSleepChecker = mockk(relaxed = true)
         coEvery { sleepChecker.isSleeping(any(), any(), any(), any()) } returns false
+        val commentGenerator = MomentCommentGenerator(
+            context = context, momentRepo = momentRepo, contextLog = mockk(relaxed = true),
+            userProfileDao = mockk(relaxed = true), scheduleDao = mockk(relaxed = true),
+        )
+        val notifications = MomentInteractionNotifications(context = context, momentRepo = momentRepo, characterRepo = characterRepo)
         interactionService = MomentInteractionService(
             context = context, momentRepo = momentRepo, characterRepo = characterRepo,
             apiConfigRepo = apiConfigRepo, settingsRepo = settingsRepo, sleepChecker = sleepChecker,
-            messageDao = messageDao, contextLog = mockk(relaxed = true),
-            llmSlot = mockk(relaxed = true), userProfileDao = mockk(relaxed = true),
-            scheduleDao = mockk(relaxed = true), conversationDao = conversationDao,
+            messageDao = messageDao, llmSlot = mockk(relaxed = true), conversationDao = conversationDao,
+            commentGenerator = commentGenerator, notifications = notifications,
+            pendingDrain = MomentPendingDrain(
+                context = context, momentRepo = momentRepo, characterRepo = characterRepo,
+                apiConfigRepo = apiConfigRepo, settingsRepo = settingsRepo, sleepChecker = sleepChecker,
+                conversationDao = conversationDao, commentGenerator = commentGenerator, notifications = notifications,
+            ),
+            mentionInteractor = MomentMentionInteractor(
+                context = context, momentRepo = momentRepo, characterRepo = characterRepo, apiConfigRepo = apiConfigRepo,
+                settingsRepo = settingsRepo, availability = MomentMentionAvailability(sleepChecker, conversationDao),
+                generator = commentGenerator, notifications = notifications, llmSlot = mockk(relaxed = true),
+            ),
         )
         MomentPendingInteractionStore.save(context, emptyList())
     }

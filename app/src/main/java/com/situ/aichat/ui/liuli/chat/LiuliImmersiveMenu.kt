@@ -55,7 +55,7 @@ import kotlin.math.roundToInt
  * 冻结快照 + scrim 0.2 + 被按泡按圆角裁清晰快照原位浮起、动作清单与文案单源。
  *
  * **A-1 有意保留 PixelCopy 冻结快照、只换壳**：冻结画面是 TELEGRAM_MOTION §3 的行为契约（菜单期间 AI 递送
- * 不扰动画面、收场与实况交叉淡化），且「被按泡原位清晰浮起」靠的就是那张快照——`BackdropHost` 的实时模糊
+ * 不扰动画面、收场与实况交叉淡化），且「被按泡原位清晰浮起」靠的就是那张快照——`LiuliGlassHost` 的实时模糊
  * 只录内容层、也冻不住。两种做法的可见结果相同（磨砂 + 压暗 + 玻璃卡）。
  *
  * 琉璃的分叉（§3.3 分叉 3）：卡换玻璃 + 顶行五个表情回应 + 泡形裁剪圆角 16 → 18 + 屏边距 6 → 12；
@@ -203,5 +203,5 @@ internal val MenuCloseRise = 5.dp
 internal val MenuItemHeight = 48.dp
 internal val MenuHairline = 0.75.dp
 
-/** 被按气泡的裁剪圆角：暖陶 16 → 琉璃泡 18（= `LiuliShapes.bubble`·图纸 A-1）。 */
-private val LiuliBubbleClipCorner = 18.dp
+/** 被按气泡的裁剪圆角 = `AppShapes.bubble` 16（卷三起琉璃泡用暖陶形位）。 */
+private val LiuliBubbleClipCorner = 16.dp

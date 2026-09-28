@@ -137,7 +137,7 @@ internal suspend fun resolveVoicePlan(
         providerType = config.providerType,
         modelName = config.modelName,
         characterHasRemoteVoice = profile.remoteVoiceID.trim().isNotEmpty(),
-        userToggleEnabled = MiniMaxVoiceTagsSettings.isEnabled(appContext),
+        userToggleEnabled = MiniMaxVoiceTagsSettings.loadEnabled(appContext),
         isVoiceMode = plan.isVoice,
         isOfflineMode = convo.isInOfflineMode, // 线下沉浸时跳过语气标签注入（1:1 iOS）
     )

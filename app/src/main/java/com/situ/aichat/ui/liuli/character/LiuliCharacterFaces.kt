@@ -2,7 +2,9 @@ package com.situ.aichat.ui.liuli.character
 
 import androidx.compose.runtime.Composable
 import com.situ.aichat.data.model.AppSkin
+import com.situ.aichat.ui.character.CharacterEditScreen
 import com.situ.aichat.ui.character.CharacterProfileScreen
+import com.situ.aichat.ui.liuli.character.edit.LiuliCharacterEditScreen
 import com.situ.aichat.ui.liuli.designsystem.LocalAppSkin
 
 /**
@@ -44,4 +46,21 @@ fun SkinnedCharacterProfileScreen(
         onOpenOurDays = onOpenOurDays,
         onEditMemory = onEditMemory,
     )
+}
+
+/** 角色编辑页选脸（卷五）：签名 = 暖陶 [CharacterEditScreen] 去掉 VM 默认形参（`LiuliSecondaryFacesTest` 钉）。 */
+@Composable
+fun SkinnedCharacterEditScreen(
+    onCancel: () -> Unit,
+    onSaved: (conversationUuid: String?) -> Unit,
+    onEditModules: (characterUuid: String) -> Unit = {},
+    onOpenOfflineMeetings: (characterUuid: String) -> Unit = {},
+    onOpenWorldBooks: () -> Unit = {},
+    focusVoiceSection: Boolean = false,
+) {
+    if (LocalAppSkin.current == AppSkin.LIULI) {
+        LiuliCharacterEditScreen(onCancel, onSaved, onEditModules, onOpenOfflineMeetings, onOpenWorldBooks, focusVoiceSection)
+        return
+    }
+    CharacterEditScreen(onCancel, onSaved, onEditModules, onOpenOfflineMeetings, onOpenWorldBooks, focusVoiceSection)
 }

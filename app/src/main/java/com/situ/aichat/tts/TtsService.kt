@@ -2,6 +2,7 @@ package com.situ.aichat.tts
 
 import android.content.Context
 import android.util.Log
+import com.situ.aichat.data.remote.LazyOkHttpClient
 import com.situ.aichat.tts.pricing.TtsCostEstimate
 import com.situ.aichat.tts.pricing.TtsCostEstimator
 import com.situ.aichat.tts.pricing.TtsUsageProvider
@@ -18,7 +19,6 @@ import com.situ.aichat.tts.provider.TtsRemoteProvider
 import com.situ.aichat.tts.provider.TtsRemoteVoiceOption
 import com.situ.aichat.tts.provider.TtsResolvedProvider
 import kotlinx.serialization.json.Json
-import okhttp3.OkHttpClient
 
 /**
  * TTS routing/resolution layer (1:1 iOS `TTSService` + `+RemoteTTS`). Resolves which provider/voice
@@ -30,7 +30,7 @@ import okhttp3.OkHttpClient
  * override / registry functions live in the companion so they're unit-testable without a Context.
  */
 class TtsService(
-    private val client: OkHttpClient,
+    private val http: LazyOkHttpClient,
     private val json: Json,
     private val appContext: Context,
     private val systemEngine: SystemTtsEngine,
@@ -80,7 +80,7 @@ class TtsService(
             return null
         }
         return try {
-            val data = provider.synthesize(text, voiceId, config, client, json)
+            val data = provider.synthesize(text, voiceId, config, http.get(), json)
             if (data.isEmpty()) return null
             if (config.providerType == TtsProviderType.MINIMAX) {
                 TtsUsageTracker.log(appContext, text.length, TtsUsageProvider.MINIMAX)
@@ -99,14 +99,14 @@ class TtsService(
     suspend fun fetchRemoteVoices(config: TtsRemoteConfigValues): List<TtsRemoteVoiceOption> {
         val provider = remoteProvider(config.providerType) ?: throw TtsRemoteException.InvalidUrl
         provider.builtInVoices(config.modelName)?.let { return it }
-        return provider.fetchVoices(config, client, json)
+        return provider.fetchVoices(config, http.get(), json)
     }
 
     /** Model list for the config UI: built-in list when available, else a live fetch. Throws on error. */
     suspend fun fetchRemoteModels(config: TtsRemoteConfigValues): List<TtsRemoteModelOption> {
         val provider = remoteProvider(config.providerType) ?: throw TtsRemoteException.InvalidUrl
         provider.builtInModels()?.let { return it }
-        return provider.fetchModels(config, client, json)
+        return provider.fetchModels(config, http.get(), json)
     }
 
     /** MiniMax usage + projected monthly cost snapshot (for the TTS settings screen). */

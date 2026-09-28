@@ -161,4 +161,57 @@ class LogContextFormatTest {
         assertTrue(out.contains("tool"))      // 未知角色用原始 role 串
         assertFalse(out.contains("系统提示"))
     }
+
+    // ── 四期·图纸四 T1-8：render → parseRendered 往返（改表头格式 = 改写前视图解析不出·REDLINES §1） ──
+
+    @Test
+    fun parseRendered_roundTrip_plainText_labelsAndBodies() {
+        val messages = listOf(
+            msg("system", "规则A\n第二行"),
+            msg("user", "你好"),
+            msg("assistant", ""),
+            msg("user", "结尾带换行\n"),
+            msg("tool", "工具输出"),
+        )
+        val parsed = LogContextFormat.parseRendered(LogContextFormat.render(messages))
+        assertEquals(
+            listOf(
+                LogContextFormat.RenderedMessage("系统提示", "规则A\n第二行"),
+                LogContextFormat.RenderedMessage("用户", "你好"),
+                LogContextFormat.RenderedMessage("角色", ""),
+                LogContextFormat.RenderedMessage("用户", "结尾带换行\n"),
+                LogContextFormat.RenderedMessage("tool", "工具输出"),
+            ),
+            parsed,
+        )
+    }
+
+    @Test
+    fun parseRendered_roundTrip_multimodalPlaceholder() {
+        val m = ChatMessageDto(
+            role = "user",
+            content = null,
+            contentParts = listOf(ChatContentPart.Text("这是我拍的"), ChatContentPart.ImageUrl("data:image/jpeg;base64,${"A".repeat(4_096)}")),
+        )
+        val parsed = LogContextFormat.parseRendered(LogContextFormat.render(listOf(msg("system", "S"), m)))
+        assertEquals(2, parsed.size)
+        assertEquals("用户", parsed[1].label)
+        assertEquals("这是我拍的\n[图片 · 约 3 KB]", parsed[1].body)
+    }
+
+    @Test
+    fun parseRendered_clippedLastMessage_bodyRunsToEndWithMarker() {
+        val rendered = LogContextFormat.render(listOf(msg("system", "S"), msg("user", "一".repeat(500))))
+        val cutAt = rendered.indexOf("一") + 100 // 截在末条正文中间
+        val parsed = LogContextFormat.parseRendered(LogContextFormat.clip(rendered, cutAt))
+        assertEquals(listOf("系统提示", "用户"), parsed.map { it.label })
+        assertEquals("S", parsed[0].body)
+        assertEquals("一".repeat(100) + "\n\n[日志内容已截断，共 ${rendered.length} 字]", parsed[1].body)
+    }
+
+    @Test
+    fun parseRendered_noHeader_empty() {
+        assertEquals(emptyList<LogContextFormat.RenderedMessage>(), LogContextFormat.parseRendered(""))
+        assertEquals(emptyList<LogContextFormat.RenderedMessage>(), LogContextFormat.parseRendered("随便一段文字\n没有表头"))
+    }
 }

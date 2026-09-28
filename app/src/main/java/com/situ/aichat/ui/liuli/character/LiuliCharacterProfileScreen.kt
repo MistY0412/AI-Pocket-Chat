@@ -219,8 +219,9 @@ internal fun LiuliCharacterProfileContent(
     statusBarTop: Dp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
 ) {
     val density = LocalDensity.current
-    val heroPx = with(density) { LiuliPageGeometry.hero.roundToPx() }
-    // 收起顶栏实高 = 真状态栏 + 44（契约「图底 − 88」的 88 是 44 状态栏时的名义值·`heroCollapseTail`）。
+    // 卷四 §4.9：头部实高 = 真状态栏 + profileHead（204）。
+    val heroPx = with(density) { (statusBarTop + LiuliPageGeometry.profileHead).roundToPx() }
+    // 收起顶栏实高 = 真状态栏 + 44。
     val barPx = with(density) { (statusBarTop + LiuliPageGeometry.compactBar).roundToPx() }
     val collapsed = rememberHeroCollapsed(listState, heroPx, barPx)
     val reduceMotion = rememberReduceMotion()
@@ -266,6 +267,7 @@ internal fun LiuliCharacterProfileContent(
                         avatarPath = character.avatarPath,
                         relationshipLabel = relationshipPillLabel(milestones),
                         subtitle = heroSubtitle(character, nowMillis),
+                        topInset = statusBarTop,
                         modifier = Modifier.graphicsLayer {
                             // 视差：图跟着滚一半（只在它自己还是首个可见项时才有意义·RM 直接不视差）。
                             translationY = if (reduceMotion || listState.firstVisibleItemIndex > 0) {

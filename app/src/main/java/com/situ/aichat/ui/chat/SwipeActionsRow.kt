@@ -29,6 +29,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
 import com.situ.aichat.ui.designsystem.AppTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -87,6 +89,11 @@ fun SwipeActionsRow(
      * 但**手势 / 吸附 / 触觉 / a11y customActions 机制完全共用**——所以只换这一枚面，不复制机制。
      */
     actionFace: (@Composable (action: SwipeAction, modifier: Modifier, onClick: () -> Unit) -> Unit)? = null,
+    /**
+     * 内容层透明（琉璃卷三 §0.2-11·**加法零回归**：false = 原样铺 `surface.base` 不透明底）。true 时内容层不铺底，
+     * 背后的动作面只画在「滑开露出的那一截」里——关着时一像素都不画，免得透过半透明卡片看见。
+     */
+    translucentContent: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -123,7 +130,7 @@ fun SwipeActionsRow(
 
     Box(modifier.fillMaxWidth()) {
         // 背景操作按钮层（被内容遮住，内容滑开后从对应一侧露出）。
-        Row(Modifier.matchParentSize()) {
+        Row(Modifier.matchParentSize().then(if (translucentContent) Modifier.revealedOnly { offsetX } else Modifier)) {
             // 行首（右滑露出）：置顶等。
             leadingActions.forEach { action ->
                 val faceModifier = Modifier.width(ACTION_WIDTH).fillMaxHeight()
@@ -149,7 +156,7 @@ fun SwipeActionsRow(
         Box(
             modifier = Modifier
                 .offset { IntOffset(offsetX.roundToInt(), 0) }
-                .background(AppTheme.colors.surface.base) // 审计 T2：经桥同值换 token
+                .then(if (translucentContent) Modifier else Modifier.background(AppTheme.colors.surface.base)) // 审计 T2：经桥同值换 token
                 // 无障碍（14.7e）：滑动露出的归档/置顶/删除按钮被内容层遮挡、仅手势可达 → TalkBack 用户根本够不着。
                 // 把每个 leading/trailing 动作挂成 CustomAccessibilityAction（动作菜单可达），并 mergeDescendants
                 // 让整行成一个焦点停（行内名字/时间/预览/未读数拼读一次），既补齐滑动动作、又顺带合并行语义。
@@ -219,5 +226,14 @@ private fun ActionButton(action: SwipeAction, modifier: Modifier, onClick: () ->
             maxLines = 1,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+/** 只画「内容滑开后露出的那一截」：右滑露出左侧 [0, x)、左滑露出右侧 [w + x, w)；关着（x = 0）什么都不画。 */
+private fun Modifier.revealedOnly(offset: () -> Float): Modifier = drawWithContent {
+    val x = offset().roundToInt().toFloat()
+    when {
+        x > 0f -> clipRect(right = x) { this@drawWithContent.drawContent() }
+        x < 0f -> clipRect(left = size.width + x) { this@drawWithContent.drawContent() }
     }
 }

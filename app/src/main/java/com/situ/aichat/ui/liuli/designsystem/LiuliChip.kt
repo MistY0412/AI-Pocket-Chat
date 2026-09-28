@@ -1,6 +1,7 @@
 package com.situ.aichat.ui.liuli.designsystem
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,25 +31,24 @@ import androidx.compose.ui.unit.dp
 import com.situ.aichat.ui.components.AppMotion
 import com.situ.aichat.ui.components.LocalAppHaptics
 import com.situ.aichat.ui.components.rememberReduceMotion
-import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
+import com.situ.aichat.ui.designsystem.Palette
 import com.situ.aichat.ui.liuli.page.liuliTouchHeight
-import com.situ.aichat.ui.liuli.glass.LiuliGlassSpec
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import androidx.compose.foundation.clickable
 
-/** 胶囊几何（§3.2）：32 高 · 左右 12 · 未选底 = `surface.raised` 40%。 */
+/** 胶囊几何（§3.2）：32 高 · 左右 12。 */
 private val CHIP_HEIGHT = 32.dp
-private const val CHIP_UNSELECTED_ALPHA = 0.40f
 private val CHIP_WEIGHT = FontWeight(520)
 private const val DISABLED_ALPHA = 0.45f
 
 /**
  * 琉璃选择标签（图纸 2026-09-05 卷二C §4.11 · 落值 §3.2 · A-15·签名对齐暖陶 `AppChoiceChip`）。
  *
- * 自绘，**禁 M3 `FilterChip`**（§9 ⑤）：选中 = `accent.container` 实底 + `accent.onContainer` 字；
- * 未选 = `surface.raised` 40% 半透底 + 0.5dp 玻璃发丝 + 玻璃上主文字色。两态同字号字重 → 切换无重排，
- * 纯靠底色 + 字色淡入（[AppMotion].effectMediumSpring 效果轴永不过冲·[rememberReduceMotion] 时瞬时）。
+ * 自绘，**禁 M3 `FilterChip`**（§9 ⑤）。琉璃 2.0 卷二 §4.5-1：选中 = 主色渐变 [LiuliMaterials.accentBrush] + 白字
+ * + 形状外柔影、无边；未选 = [LiuliMaterials.chipFill] + 1dp [LiuliMaterials.cardRim] 白边 + 玻璃上主文字色。
+ * 两态同字号字重 → 切换无重排；过渡由一个「选中度」驱动（渐变按它淡入、边按它淡出、柔影按它浓淡），字色同 spec
+ * 动画（[AppMotion].effectMediumSpring 效果轴永不过冲·[rememberReduceMotion] 时瞬时）。
  *
  * 触达 48：版位恒 32 高，`liuliTouchHeight` 把点击面上下各外溢 8dp（`clickable` 必须排在它之后）。
  * a11y：[selectable] + `selected` 语义 + [role]（默认 [Role].RadioButton 单选组；可开可关的独立开关传
@@ -70,27 +71,23 @@ fun LiuliChip(
     fillWidth: Boolean = false,
     leading: (@Composable () -> Unit)? = null,
 ) {
-    val colors = AppTheme.colors
     val dark = LocalIsDarkTheme.current
     val haptics = LocalAppHaptics.current
     val reduceMotion = rememberReduceMotion()
     val interaction = remember { MutableInteractionSource() }
     val spec = if (reduceMotion) snap() else AppMotion.effectMediumSpring<androidx.compose.ui.graphics.Color>()
-    val fill by animateColorAsState(
-        targetValue = if (selected) {
-            colors.accent.container
-        } else {
-            colors.surface.raised.copy(alpha = CHIP_UNSELECTED_ALPHA)
-        },
-        animationSpec = spec,
-        label = "liuliChipFill",
+    val selectedFraction by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = if (reduceMotion) snap() else AppMotion.effectMediumSpring(),
+        label = "liuliChipSelected",
     )
     val contentColor by animateColorAsState(
-        targetValue = if (selected) colors.accent.onContainer else LiuliTheme.onGlass.primary,
+        targetValue = if (selected) Palette.White else LiuliTheme.onGlass.primary,
         animationSpec = spec,
         label = "liuliChipContent",
     )
-    val hairline = if (dark) LiuliGlassSpec.hairlineDark else LiuliGlassSpec.hairlineLight
+    val rim = LiuliMaterials.cardRim(dark)
+    val shadow = LiuliMaterials.accentShadow
 
     Box(
         modifier = modifier
@@ -124,12 +121,19 @@ fun LiuliChip(
             modifier = Modifier
                 .height(CHIP_HEIGHT)
                 .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
-                .clip(LiuliShapes.pill)
-                .background(fill)
-                // 发丝只属未选态（选中是实底·别在陶土容器上留一圈灰边）。
-                .then(
-                    if (selected) Modifier else Modifier.border(LiuliGlassSpec.hairlineWidth, hairline, LiuliShapes.pill),
+                // 柔影画在形状外（半透明未选底不许透影·卷二 §0.2-2），浓淡随选中度。
+                .liuliSoftShadow(
+                    LiuliShapes.pill,
+                    shadow.copy(alpha = shadow.alpha * selectedFraction),
+                    LiuliMaterials.chipShadowOffsetY,
+                    LiuliMaterials.chipShadowBlur,
                 )
+                .clip(LiuliShapes.pill)
+                .background(LiuliMaterials.chipFill(dark))
+                // 渐变底按选中度叠在未选底之上。
+                .drawBehind { if (selectedFraction > 0f) drawRect(LiuliMaterials.accentBrush, alpha = selectedFraction) }
+                // 白边只属未选态，按选中度淡出（选中是渐变实底·无边）。
+                .border(1.dp, rim.copy(alpha = rim.alpha * (1f - selectedFraction)), LiuliShapes.pill)
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),

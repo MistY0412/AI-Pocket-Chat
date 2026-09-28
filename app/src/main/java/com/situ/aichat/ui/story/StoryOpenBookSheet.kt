@@ -23,10 +23,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,9 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.situ.aichat.R
 import com.situ.aichat.data.local.entity.CharacterEntity
 import com.situ.aichat.story.StoryCreationCatalog
-import com.situ.aichat.story.StoryCreationLogic
 import com.situ.aichat.story.StoryNarrativePerson
-import com.situ.aichat.story.StoryRoleType
 import com.situ.aichat.story.StoryTemplate
 import com.situ.aichat.ui.components.CharacterAvatar
 import com.situ.aichat.ui.components.clickableScale
@@ -70,23 +64,7 @@ fun StoryOpenBookSheet(
     val c = AppTheme.colors
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var leadId by remember { mutableStateOf<String?>(characters.firstOrNull()?.uuid) }
-    var supportingIds by remember { mutableStateOf(emptySet<String>()) }
-    var includeUserRole by remember { mutableStateOf(true) }
-    var showSupporting by remember { mutableStateOf(false) }
-
-    val selectedRoles: Map<String, String> = remember(leadId, supportingIds) {
-        buildMap {
-            leadId?.let { put(it, StoryRoleType.PROTAGONIST) }
-            supportingIds.forEach { put(it, StoryRoleType.SUPPORTING) }
-        }
-    }
-    val canStart = StoryCreationLogic.canCreateStory(
-        isCustomGenre = false,
-        customGenreName = "",
-        includeUserRole = includeUserRole,
-        selectedCharacterCount = selectedRoles.size,
-    )
+    val state = rememberStoryOpenBookState(characters)
 
     AppSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -133,20 +111,17 @@ fun StoryOpenBookSheet(
                     characters.forEach { ch ->
                         CastAvatar(
                             character = ch,
-                            selected = leadId == ch.uuid,
-                            onClick = {
-                                leadId = if (leadId == ch.uuid) null else ch.uuid
-                                supportingIds = supportingIds - ch.uuid
-                            },
+                            selected = state.leadId == ch.uuid,
+                            onClick = { state.toggleLead(ch.uuid) },
                         )
                     }
                 }
                 // 次级「加配角 ›」展开配角多选（复用 roleType SUPPORTING·契约 §3.1）
-                if (characters.size >= 2) {
+                if (storyOpenBookShowAddSupport(characters)) {
                     Row(
                         Modifier
                             .padding(top = 14.dp)
-                            .clickableScale { showSupporting = !showSupporting },
+                            .clickableScale { state.showSupporting = !state.showSupporting },
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
@@ -155,21 +130,19 @@ fun StoryOpenBookSheet(
                             Icons.Filled.KeyboardArrowDown,
                             contentDescription = null,
                             tint = c.accent.text,
-                            modifier = Modifier.size(18.dp).rotate(if (showSupporting) 180f else 0f),
+                            modifier = Modifier.size(18.dp).rotate(if (state.showSupporting) 180f else 0f),
                         )
                     }
-                    if (showSupporting) {
+                    if (state.showSupporting) {
                         Row(
                             Modifier.fillMaxWidth().padding(top = 8.dp).horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
-                            characters.filter { it.uuid != leadId }.forEach { ch ->
+                            state.supportingCandidates(characters).forEach { ch ->
                                 CastAvatar(
                                     character = ch,
-                                    selected = supportingIds.contains(ch.uuid),
-                                    onClick = {
-                                        supportingIds = if (supportingIds.contains(ch.uuid)) supportingIds - ch.uuid else supportingIds + ch.uuid
-                                    },
+                                    selected = state.supportingIds.contains(ch.uuid),
+                                    onClick = { state.toggleSupporting(ch.uuid) },
                                 )
                             }
                         }
@@ -188,14 +161,14 @@ fun StoryOpenBookSheet(
                     Text(stringResource(R.string.story_sheet_join_title), style = AppTheme.typography.label, color = c.text.primary)
                     Text(stringResource(R.string.story_sheet_join_subtitle), style = AppTheme.typography.caption, color = c.text.secondary)
                 }
-                AppSwitch(checked = includeUserRole, onCheckedChange = { includeUserRole = it })
+                AppSwitch(checked = state.includeUserRole, onCheckedChange = { state.includeUserRole = it })
             }
 
             // ── ③ 开始连载 + 改一改再开 ──
             AppButton(
-                onClick = { onStart(selectedRoles, includeUserRole) },
+                onClick = { onStart(state.selectedRoles, state.includeUserRole) },
                 style = AppButtonStyle.Primary,
-                enabled = canStart && !creating,
+                enabled = state.canStart && !creating,
                 modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
             ) { Text(stringResource(R.string.story_sheet_start)) }
             Spacer(Modifier.height(14.dp))
@@ -214,7 +187,18 @@ fun StoryOpenBookSheet(
 
 /** 选角头像：46dp 圆头 + 选中态陶土环 + 右下勾徽（照 mockup .role.sel）。 */
 @Composable
-private fun CastAvatar(character: CharacterEntity, selected: Boolean, onClick: () -> Unit) {
+internal fun CastAvatar(
+    character: CharacterEntity,
+    selected: Boolean,
+    onClick: () -> Unit,
+    /** 头像外框（琉璃 2.0 卷六·三：默认 = 暖陶「选中 2.5 陶环 + 3 内距 / 未选 3 内距」，琉璃传光环）。 */
+    avatarFrame: @Composable (selected: Boolean, avatar: @Composable () -> Unit) -> Unit = { selected, avatar ->
+        val c = AppTheme.colors
+        Box(
+            if (selected) Modifier.border(2.5.dp, c.accent.primary, CircleShape).padding(3.dp) else Modifier.padding(3.dp),
+        ) { avatar() }
+    },
+) {
     val c = AppTheme.colors
     Column(
         Modifier.width(60.dp).clickableScale(onClick = onClick),
@@ -222,12 +206,7 @@ private fun CastAvatar(character: CharacterEntity, selected: Boolean, onClick: (
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            val ring = if (selected) {
-                Modifier.border(2.5.dp, c.accent.primary, CircleShape).padding(3.dp)
-            } else {
-                Modifier.padding(3.dp)
-            }
-            Box(ring) { CharacterAvatar(name = character.name, avatarPath = character.avatarPath, size = 46.dp) }
+            avatarFrame(selected) { CharacterAvatar(name = character.name, avatarPath = character.avatarPath, size = 46.dp) }
             if (selected) {
                 Box(
                     Modifier
@@ -254,7 +233,7 @@ private fun CastAvatar(character: CharacterEntity, selected: Boolean, onClick: (
 
 /** 模板头视角回显：第二人称「以「你」的视角」/ 第一「以「我」」/ 第三「旁观」（描述模板固有人称·非当前 sheet 状态）。 */
 @Composable
-private fun narrativeViewLabel(person: String): String = stringResource(
+internal fun narrativeViewLabel(person: String): String = stringResource(
     when (person) {
         StoryNarrativePerson.FIRST -> R.string.story_sheet_view_first
         StoryNarrativePerson.THIRD -> R.string.story_sheet_view_third

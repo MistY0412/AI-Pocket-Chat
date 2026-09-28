@@ -86,13 +86,15 @@ object OpenLoopScanService {
         return "你在帮 AI 角色「$cName」维护一份\"心里惦记的事\"清单。读下面的对话，找出两类值得一个朋友之后主动问起的事：\n" +
             "1. $cName 答应过对方的事（说好要做、要发、要讲的）；\n" +
             "2. $uName 提到的、即将发生或还没有结果的事（面试、考试、看病、出差、搬家、在纠结的决定……）。\n" +
+            "另外还有第三类：\n" +
+            "3. $cName 自己说过的、之后要去做的打算（进货、看牙、回老家……），只收能确定具体日期的，type 用 plan_char；content 只写要做的事，不写「明天」「周末」这类日期词，日期放进 due。\n" +
             "\n" +
             "当前时间：$nowText\n" +
             "\n" +
             existingBlock +
             ledgerBlock +
             "只输出 JSON（不要代码块、不要解释）：\n" +
-            "{\"loops\":[{\"content\":\"一句话概括，不超过30字，第三人称\",\"type\":\"promise_char|user_event|open_topic\",\"due\":\"能从对话确定具体日期就输出 yyyy-MM-dd'T'HH:mm（只有日期没有时间就用 09:00），确定不了就 null\"}],\"resolved\":[\"已在清单上、但对话显示已经解决或已经过去的事的 uuid\"]}\n" +
+            "{\"loops\":[{\"content\":\"一句话概括，不超过30字，第三人称\",\"type\":\"promise_char|user_event|open_topic|plan_char\",\"due\":\"能从对话确定具体日期就输出 yyyy-MM-dd'T'HH:mm（只有日期没有时间就用 09:00），确定不了就 null\"}],\"resolved\":[\"已在清单上、但对话显示已经解决或已经过去的事的 uuid\"]}\n" +
             "\n" +
             "规则：一次最多提取 2 条新的；纯闲聊话题不算；拿不准的宁可不提取。\n" +
             "\n" +
@@ -110,7 +112,7 @@ object OpenLoopScanService {
 
     /**
      * 宽容解析：剥 ``` 围栏 + 取首 `{` 到末 `}`（[JSONExtractor]）→ 宽松反序列化 → 容错映射
-     * （未知 type→open_topic·坏 due→null·content 空白丢弃·loops 超 2 截断）。整体解析失败抛 [OpenLoopScanParseException]。
+     * （未知 type→open_topic·坏 due→null·content 空白丢弃·plan_char 无 due 丢弃·loops 超 2 截断）。整体解析失败抛 [OpenLoopScanParseException]。
      */
     fun parseScanResult(text: String, zone: ZoneId = ZoneId.systemDefault()): ScanResult {
         val jsonStr = JSONExtractor.extract(text)
@@ -120,11 +122,10 @@ object OpenLoopScanService {
             .mapNotNull { l ->
                 val content = l.content.trim()
                 if (content.isEmpty()) return@mapNotNull null // content 空白 → 丢弃
-                ParsedLoop(
-                    content = content,
-                    typeRaw = if (l.type in OpenLoopType.ALL) l.type else OpenLoopType.OPEN_TOPIC, // 未知 type → open_topic
-                    dueAt = parseDue(l.due, zone), // 坏 due → null
-                )
+                val typeRaw = if (l.type in OpenLoopType.ALL) l.type else OpenLoopType.OPEN_TOPIC // 未知 type → open_topic
+                val dueAt = parseDue(l.due, zone) // 坏 due → null
+                if (typeRaw == OpenLoopType.PLAN_CHAR && dueAt == null) return@mapNotNull null // 四期：她的打算只收有日期的
+                ParsedLoop(content = content, typeRaw = typeRaw, dueAt = dueAt)
             }
             .take(NEW_LOOP_CAP) // loops 超 2 条截前 2
         val resolvedUuids = dto.resolved.map { it.trim() }.filter { it.isNotEmpty() }

@@ -39,7 +39,7 @@ import com.situ.aichat.ui.liuli.page.liuliTouchHeight
 
 /**
  * 长文折叠（图纸 2026-09-05 卷二C §4.10 · A-1 · 契约 §5.3）：**只对 AI 泡 × 已显形**——排版行数超
- * [FOLD_LINE_LIMIT] 才折，折后露 [FOLD_VISIBLE_LINES] 行 + 底部渐隐带 + 下一行「展开全文」（与时间戳同行）。
+ * [FOLD_LINE_LIMIT] 才折，折后露 [FOLD_VISIBLE_LINES] 行 + 底部渐隐带 + 下一行「展开全文」。
  *
  * 展开**只在本会话内记住**（[LiuliFoldState] 是普通 `remember`·重建即忘 = 全部折回·§3.4），展开后不再提供
  * 收起（对版稿只画了展开）。折叠**只裁显示高度**：长按 / 右滑引用 / 双击回应 / 飞入上报 / 递送变身全部照旧。
@@ -61,7 +61,6 @@ internal fun LiuliFoldableText(
     onExpand: () -> Unit,
     /** 渐隐带的落色 = 泡底色（透明 → 泡色）。 */
     fadeColor: Color,
-    stamp: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val reduceMotion = rememberReduceMotion()
@@ -79,12 +78,7 @@ internal fun LiuliFoldableText(
             }
         }
         if (!liuliShouldFold(lineCount, revealed, isUser)) {
-            LiuliInlineStampLayout(
-                textString = text,
-                textStyle = style,
-                stamp = stamp,
-                text = { Text(text, style = style, color = color) },
-            )
+            Text(text, style = style, color = color)
             return@BoxWithConstraints
         }
         Column {
@@ -105,7 +99,7 @@ internal fun LiuliFoldableText(
                 )
             }
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-                // 复核 R1 🔴-1（REDLINES「a11y 48dp」）：文字链触达 48 居中外溢、版位仍一行字高（戳同行不变）；
+                // 复核 R1 🔴-1（REDLINES「a11y 48dp」）：文字链触达 48 居中外溢、版位仍一行字高；
                 // 外溢的上半截落在渐隐带、下半截落在泡内边距，都不是别人的触达面。48 框隐形，故不给 ripple。
                 Box(
                     modifier = Modifier
@@ -126,7 +120,6 @@ internal fun LiuliFoldableText(
                         color = AppTheme.colors.accent.text,
                     )
                 }
-                stamp()
             }
         }
     }

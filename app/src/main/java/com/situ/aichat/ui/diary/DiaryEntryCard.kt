@@ -55,6 +55,10 @@ fun DiaryEntryCard(
     authorName: String? = null,
     /** U3：孤儿信（作者角色已删·§6.3 O2）——true 时「{名}的日记」头后缀「· 故友的信」淡标。 */
     isOrphan: Boolean = false,
+    /** 卡面材质（琉璃 2.0 卷六·一「材质外给」：默认 = 暖陶承托，琉璃传半透明卡）。 */
+    surface: Modifier = Modifier.appCardSurface(),
+    /** 点击面（排在材质裁切之后 → ripple 不漏圆角）。暖陶把点击放在外层 [modifier] 里，不传本形参。 */
+    interaction: Modifier = Modifier,
 ) {
     val colors = AppTheme.colors
     val images = entry.imagePaths
@@ -63,7 +67,8 @@ fun DiaryEntryCard(
         modifier = modifier
             .semantics { contentDescription = cardCd }
             .fillMaxWidth()
-            .appCardSurface()
+            .then(surface)
+            .then(interaction)
             .height(IntrinsicSize.Min)
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),

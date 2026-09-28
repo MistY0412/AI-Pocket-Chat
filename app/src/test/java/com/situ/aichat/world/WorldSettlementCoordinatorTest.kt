@@ -57,11 +57,9 @@ class WorldSettlementCoordinatorTest {
         coEvery { repo.advanceSettledAt(any()) } answers {
             val at = firstArg<Long>()
             anchor.updateAndGet { cur -> maxOf(cur, at) } // MAX() 只进不退
-            Unit
         }
         coEvery { repo.recordEvent(any()) } answers {
             recorded.add(firstArg())
-            Unit
         }
     }
 

@@ -17,7 +17,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -32,6 +33,7 @@ import com.situ.aichat.ui.components.AppMotion
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
 import com.situ.aichat.ui.designsystem.OnGlass
+import com.situ.aichat.ui.designsystem.userFill
 import com.situ.aichat.util.DateFormatters
 import kotlin.math.roundToInt
 
@@ -50,6 +52,8 @@ import kotlin.math.roundToInt
  *
  * 流畅底线：逐帧读取（progress/targetBounds）全部压在 layout / drawBehind / graphicsLayer 相位——飞行全程
  * **零逐帧重组**。真实行同期由 ChatMessageList 抑制（alpha 0+入场动画停播），落地帧交还=像素级无缝。
+ *
+ * [glassSourceTextColor]（琉璃卷三·加法零回归）：非 null = 起点是玻璃输入胶囊（同有壁纸：不画 sunken 起点底），源文字用此色。
  */
 
 /** 输入胶囊内容内边距（= ChatInputField decorationBox 的 16/10）。 */
@@ -67,7 +71,7 @@ private val BubbleCorner = 16.dp
 private val TimestampGap = 4.dp
 
 @Composable
-internal fun ChatSendFlightOverlay(state: ChatSendFlightState, wallpaper: ChatWallpaper?) {
+internal fun ChatSendFlightOverlay(state: ChatSendFlightState, wallpaper: ChatWallpaper?, glassSourceTextColor: Color? = null) {
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
     // 起飞门：>10 行降级（Telegram TMET:128·需目标排版故在此判）。过闸即起飞；不过=静默走普通入场
@@ -98,11 +102,18 @@ internal fun ChatSendFlightOverlay(state: ChatSendFlightState, wallpaper: ChatWa
     }
 
     val colors = AppTheme.colors
+    // 卷四 §0.2-7：飞入时间戳与落地真行同色同描边（琉璃由外层提供；暖陶按壁纸自算）。
+    val stampTone = LocalBubbleStampTone.current ?: wallpaper?.let(::warmBubbleStampTone)
+    val stampStyle = if (stampTone == null) {
+        AppTypography.captionNumeric
+    } else {
+        AppTypography.captionNumeric.copy(shadow = Shadow(stampTone.halo, Offset.Zero, with(density) { STAMP_HALO_BLUR.toPx() }))
+    }
     // 审计 P5 同法：渐变按主题 remember 单实例——与真气泡 Bubble 的 Brush 同参数=落地像素一致。
-    val gradient = remember(colors) { Brush.linearGradient(listOf(colors.bubble.userStart, colors.bubble.userEnd)) }
+    val gradient = remember(colors) { colors.bubble.userFill() }
     val sunken = colors.surface.sunken
-    val hasWallpaper = wallpaper != null
-    val sourceTextColor = if (wallpaper != null) {
+    val hasWallpaper = wallpaper != null || glassSourceTextColor != null
+    val sourceTextColor = glassSourceTextColor ?: if (wallpaper != null) {
         if (wallpaper.bottomDark) OnGlass.PrimaryOnDark else OnGlass.PrimaryOnLight
     } else {
         colors.text.primary
@@ -173,8 +184,8 @@ internal fun ChatSendFlightOverlay(state: ChatSendFlightState, wallpaper: ChatWa
             // 内本就无勾故无需复制回执）。
             Text(
                 timestampText,
-                style = AppTypography.captionNumeric,
-                color = colors.text.secondary,
+                style = stampStyle,
+                color = stampTone?.color ?: colors.text.secondary,
                 modifier = Modifier.graphicsLayer { alpha = flightAlphaRamp(t()) },
             )
         },

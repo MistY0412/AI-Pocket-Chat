@@ -3,6 +3,7 @@ package com.situ.aichat.data.remote.llm
 import android.util.Log
 import com.situ.aichat.data.model.ApiProviderType
 import com.situ.aichat.data.model.ToolDetectionResult
+import com.situ.aichat.data.remote.LazyOkHttpClient
 import com.situ.aichat.data.remote.llm.tooldetection.ToolCallingDetectorFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -32,9 +33,11 @@ import kotlin.coroutines.coroutineContext
  * Tool-calling detection delegates to per-protocol detectors (see the `tooldetection` package).
  */
 class CapabilityDetector(
-    private val client: OkHttpClient,
+    private val http: LazyOkHttpClient,
     private val json: Json,
 ) {
+    /** 测试 / 已有现成客户端用；App 内由 NetworkModule 注入懒持有（启动主线程读盘清零 ①）。 */
+    constructor(client: OkHttpClient, json: Json) : this(LazyOkHttpClient(client), json)
 
     // MARK: - Thinking model detection
 
@@ -59,7 +62,7 @@ class CapabilityDetector(
                 maxTokens = 32,
             )
             val bodyJson = json.encodeToString(ChatRequestDto.serializer(), req)
-            val streamClient = client.newBuilder()
+            val streamClient = http.get().newBuilder()
                 .callTimeout(0, TimeUnit.SECONDS)
                 .readTimeout(20, TimeUnit.SECONDS)
                 .build()
@@ -284,7 +287,7 @@ class CapabilityDetector(
         isThinkingModel: Boolean,
     ): ToolDetectionResult {
         val detector = ToolCallingDetectorFactory.make(config.providerType)
-        return detector.detect(config, isThinkingModel, client, json)
+        return detector.detect(config, isThinkingModel, http.get(), json)
     }
 
     // MARK: - HTTP helpers
@@ -304,7 +307,7 @@ class CapabilityDetector(
         bodyJson: String,
         timeoutSec: Long,
     ): Pair<Int, String?> = withContext(Dispatchers.IO) {
-        val timedClient = client.newBuilder().callTimeout(timeoutSec, TimeUnit.SECONDS).build()
+        val timedClient = http.get().newBuilder().callTimeout(timeoutSec, TimeUnit.SECONDS).build()
         timedClient.newCall(postRequest(url, config, bodyJson)).execute().use { resp ->
             resp.code to runCatching { resp.body.string() }.getOrNull()
         }

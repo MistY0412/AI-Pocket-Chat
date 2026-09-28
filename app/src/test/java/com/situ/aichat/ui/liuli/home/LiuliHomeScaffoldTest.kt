@@ -8,6 +8,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -19,6 +20,7 @@ import com.situ.aichat.data.model.AppSkin
 import com.situ.aichat.ui.components.AppHaptics
 import com.situ.aichat.ui.components.LocalAppHaptics
 import com.situ.aichat.ui.liuli.designsystem.LiuliCircleButton
+import com.situ.aichat.ui.liuli.page.LIULI_NAV_BAND_TAG
 import com.situ.aichat.ui.liuli.page.LiuliLargeTitle
 import com.situ.aichat.ui.liuli.page.LiuliSectionHeader
 import com.situ.aichat.ui.theme.AIPocketChatTheme
@@ -98,6 +100,15 @@ class LiuliHomeScaffoldTest {
     @Test fun 无加号槽时不画钮() {
         show(collapsed = false, withPlus = false)
         compose.onNodeWithContentDescription("发起对话").assertDoesNotExist()
+    }
+
+    /** 琉璃 2.0 卷二 §4.8-3：收起态顶栏是悬浮胶囊，overlay 衬一条状态栏高的柔光底带；未收起不画。 */
+    @Test fun 状态栏衬带只在收起态出现() {
+        show(collapsed = false)
+        compose.onAllNodesWithTag(LIULI_NAV_BAND_TAG).assertCountEquals(0)
+        compose.runOnIdle { collapsedState.value = true }
+        compose.waitForIdle()
+        compose.onAllNodesWithTag(LIULI_NAV_BAND_TAG).assertCountEquals(1)
     }
 
     @Test fun 加号两态位置不动() {

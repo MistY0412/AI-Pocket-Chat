@@ -64,26 +64,26 @@ class AppearanceSettingsViewModelTest {
     }
 
     @Test
-    fun `选脸与玻璃档回显·琉璃 + 着色`() {
-        val (vm, _) = buildVm(AppSkin.LIULI, GlassTier.TINTED)
+    fun `选脸与玻璃档回显·琉璃 + 标准`() {
+        val (vm, _) = buildVm(AppSkin.LIULI, GlassTier.STANDARD)
         withSubscriptions(vm) {
             assertEquals(AppSkin.LIULI, vm.skin.value)
-            assertEquals(GlassTier.TINTED, vm.glassTier.value)
+            assertEquals(GlassTier.STANDARD, vm.glassTier.value)
         }
     }
 
     @Test
-    fun `选脸与玻璃档回显·暖陶 + 清透（反向值防对称写错）`() {
-        val (vm, _) = buildVm(AppSkin.CLAY, GlassTier.CLEAR)
+    fun `选脸与玻璃档回显·暖陶 + 毛玻璃（反向值防对称写错）`() {
+        val (vm, _) = buildVm(AppSkin.CLAY, GlassTier.FROSTED)
         withSubscriptions(vm) {
             assertEquals(AppSkin.CLAY, vm.skin.value)
-            assertEquals(GlassTier.CLEAR, vm.glassTier.value)
+            assertEquals(GlassTier.FROSTED, vm.glassTier.value)
         }
     }
 
     @Test
     fun `setSkin 写 DataStore 的 setAppSkin`() {
-        val (vm, prefs) = buildVm(AppSkin.CLAY, GlassTier.CLEAR)
+        val (vm, prefs) = buildVm(AppSkin.CLAY, GlassTier.FROSTED)
         vm.setSkin(AppSkin.LIULI)
         idle()
         coVerify(exactly = 1) { prefs.setAppSkin(AppSkin.LIULI) }
@@ -91,9 +91,9 @@ class AppearanceSettingsViewModelTest {
 
     @Test
     fun `setGlassTier 写 DataStore 的 setGlassTier`() {
-        val (vm, prefs) = buildVm(AppSkin.LIULI, GlassTier.CLEAR)
-        vm.setGlassTier(GlassTier.TINTED)
+        val (vm, prefs) = buildVm(AppSkin.LIULI, GlassTier.FROSTED)
+        vm.setGlassTier(GlassTier.STANDARD)
         idle()
-        coVerify(exactly = 1) { prefs.setGlassTier(GlassTier.TINTED) }
+        coVerify(exactly = 1) { prefs.setGlassTier(GlassTier.STANDARD) }
     }
 }

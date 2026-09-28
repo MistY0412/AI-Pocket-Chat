@@ -12,7 +12,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -35,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
@@ -49,11 +47,14 @@ import com.situ.aichat.ui.chat.ChatViewModel
 import com.situ.aichat.ui.chat.QuoteTextOnlyHintState
 import com.situ.aichat.ui.components.AppMotion
 import com.situ.aichat.ui.components.LocalAppHaptics
-import com.situ.aichat.ui.designsystem.AppPanelIcons
-import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
+import com.situ.aichat.ui.designsystem.Palette
+import com.situ.aichat.ui.liuli.designsystem.LiuliPanelIcons
 import com.situ.aichat.ui.liuli.designsystem.LiuliTheme
+import com.situ.aichat.ui.liuli.designsystem.LiuliTileTone
 import com.situ.aichat.ui.liuli.designsystem.liuliPressable
+import com.situ.aichat.ui.liuli.designsystem.liuliToneFill
+import com.situ.aichat.ui.liuli.glass.LiuliGlassRole
 import com.situ.aichat.ui.liuli.glass.liuliGlass
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
@@ -85,27 +86,14 @@ internal fun BoxScope.LiuliPlusPanel(
         ActivityResultContracts.PickMultipleVisualMedia(MAX_CHAT_IMAGES_PER_PICK),
     ) { uris -> if (uris.isNotEmpty()) viewModel.sendImages(uris) }
 
-    val items = buildList {
-        // 见面期隐藏 送礼 / 红包 / 见面 / 约见面（2026-06-21 用户拍板·照抄）。
-        if (!isOfflineMode) {
-            add(ChatPanelItem(AppPanelIcons.Gift, "送礼") { inputPanel.dismiss(reduceMotion); sheets.showGiftSheet = true })
-            add(ChatPanelItem(AppPanelIcons.RedPacket, "红包") { inputPanel.dismiss(reduceMotion); sheets.showRedPacketSheet = true })
-        }
-        add(
-            ChatPanelItem(AppPanelIcons.Sticker, "表情") {
-                inputPanel.dismiss(reduceMotion)
-                // 引用一期 E·拦截③：带引用时不开表情面板，只弹提示。
-                if (replyTarget != null) {
-                    quoteHint.trigger()
-                    return@ChatPanelItem
-                }
-                sheets.showPicker = true
-            },
-        )
+    // 卷三 §4.5-1：每个入口认一色六色渐变（按入口认色、不按格子位置——缺项时也不重复相邻）。
+    // 卷四 §4.7：顺序 照片 · 表情 · 红包 · 送礼 · 见面 · 约见面，色按意思（照片 Sky · 表情 Gold · 红包 Peach · 送礼 Rose ·
+    // 见面 Mint · 约见面 Lilac）；每个入口的构造、动作与显隐逐字不动。
+    val items = buildList<Pair<ChatPanelItem, LiuliTileTone>> {
         // 「照片」按**聊天对话模型的视觉能力**显隐（2026-08-29 用户拍板·照抄）。
         if (chatModelHasVision) {
             add(
-                ChatPanelItem(AppPanelIcons.Photo, "照片") {
+                ChatPanelItem(LiuliPanelIcons.Photo, "照片") {
                     inputPanel.dismiss(reduceMotion)
                     // 引用一期 E·拦截②：带引用时不拉起系统选图器，只弹提示。
                     if (replyTarget != null) {
@@ -113,12 +101,26 @@ internal fun BoxScope.LiuliPlusPanel(
                         return@ChatPanelItem
                     }
                     photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                },
+                } to LiuliTileTone.Sky,
             )
         }
+        add(
+            ChatPanelItem(LiuliPanelIcons.Sticker, "表情") {
+                inputPanel.dismiss(reduceMotion)
+                // 引用一期 E·拦截③：带引用时不开表情面板，只弹提示。
+                if (replyTarget != null) {
+                    quoteHint.trigger()
+                    return@ChatPanelItem
+                }
+                sheets.showPicker = true
+            } to LiuliTileTone.Gold,
+        )
+        // 见面期隐藏 红包 / 送礼 / 见面 / 约见面（2026-06-21 用户拍板·照抄）。
         if (!isOfflineMode) {
-            add(ChatPanelItem(AppPanelIcons.Meet, "见面") { inputPanel.dismiss(reduceMotion); sheets.showManualMeetingSheet = true })
-            add(ChatPanelItem(AppPanelIcons.FutureMeet, "约见面") { inputPanel.dismiss(reduceMotion); sheets.showFutureMeetingSheet = true })
+            add(ChatPanelItem(LiuliPanelIcons.RedPacket, "红包") { inputPanel.dismiss(reduceMotion); sheets.showRedPacketSheet = true } to LiuliTileTone.Peach)
+            add(ChatPanelItem(LiuliPanelIcons.Gift, "送礼") { inputPanel.dismiss(reduceMotion); sheets.showGiftSheet = true } to LiuliTileTone.Rose)
+            add(ChatPanelItem(LiuliPanelIcons.Meet, "见面") { inputPanel.dismiss(reduceMotion); sheets.showManualMeetingSheet = true } to LiuliTileTone.Mint)
+            add(ChatPanelItem(LiuliPanelIcons.FutureMeet, "约见面") { inputPanel.dismiss(reduceMotion); sheets.showFutureMeetingSheet = true } to LiuliTileTone.Lilac)
         }
     }
 
@@ -160,13 +162,14 @@ internal fun BoxScope.LiuliPlusPanel(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .liuliGlass(RoundedCornerShape(LiuliChatGeometry.panelCorner), dark = dark)
-                .padding(top = PANEL_CONTENT_TOP, start = PANEL_CONTENT_SIDE, end = PANEL_CONTENT_SIDE),
-            verticalArrangement = Arrangement.spacedBy(PANEL_ROW_GAP),
+                .liuliGlass(RoundedCornerShape(LiuliChatGeometry.panelCorner), dark = dark, role = LiuliGlassRole.Panel)
+                .padding(horizontal = PANEL_CONTENT_SIDE),
+            // 卷四 §4.7：两排（或一排）在面板里上下居中。
+            verticalArrangement = Arrangement.spacedBy(PANEL_ROW_GAP, Alignment.CenterVertically),
         ) {
             items.chunked(PANEL_COLUMNS).forEach { rowItems ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                    rowItems.forEach { LiuliPanelTile(it, Modifier.weight(1f)) }
+                    rowItems.forEach { (item, tone) -> LiuliPanelTile(item, tone, Modifier.weight(1f)) }
                     // 不足一排的格留在左侧，尾列等宽占位补齐（绝不拉伸 / 居中·照抄暖陶排布）。
                     repeat(PANEL_COLUMNS - rowItems.size) { Spacer(Modifier.weight(1f)) }
                 }
@@ -175,15 +178,15 @@ internal fun BoxScope.LiuliPlusPanel(
     }
 }
 
-/** 面板一格：44dp 圆角方底 + 22dp 图标 + 标签。禁用态只降透明**不改结构**（REDLINES §7）。 */
+/** 面板一格：60dp 圆角 18 方底（六色渐变）+ 30dp 白图标 + 标签（卷四）。禁用态只降透明**不改结构**（REDLINES §7）。 */
 @Composable
-private fun LiuliPanelTile(item: ChatPanelItem, modifier: Modifier = Modifier) {
+private fun LiuliPanelTile(item: ChatPanelItem, tone: LiuliTileTone, modifier: Modifier = Modifier) {
     val haptics = LocalAppHaptics.current
     val onGlass = LiuliTheme.onGlass
     val interaction = remember { MutableInteractionSource() }
     Column(
         modifier = modifier
-            .liuliPressable(interactionSource = interaction, enabled = item.enabled, brighten = false)
+            .liuliPressable(interactionSource = interaction, enabled = item.enabled)
             .clickable(
                 enabled = item.enabled,
                 interactionSource = interaction,
@@ -200,26 +203,23 @@ private fun LiuliPanelTile(item: ChatPanelItem, modifier: Modifier = Modifier) {
         Box(
             modifier = Modifier
                 .size(LiuliChatGeometry.panelTileSize)
-                .clip(RoundedCornerShape(LiuliChatGeometry.panelTileCorner))
-                .background(onGlass.primary.copy(alpha = TILE_FILL_ALPHA)),
+                .liuliToneFill(tone, RoundedCornerShape(LiuliChatGeometry.panelTileCorner)),
             contentAlignment = Alignment.Center,
         ) {
             // 标签即无障碍名（整格的语义由 clickable 的 Role.Button + 标签文字合成·照抄暖陶口径）。
-            Icon(item.icon, null, Modifier.size(TILE_ICON_SIZE), tint = AppTheme.colors.accent.text)
+            Icon(item.icon, null, Modifier.size(TILE_ICON_SIZE), tint = Palette.White)
         }
         Spacer(Modifier.height(TILE_LABEL_GAP))
         Text(item.label, style = AppTypography.caption, color = onGlass.secondary, textAlign = TextAlign.Center)
     }
 }
 
-// 落值（图纸 §3.2 面板一节 / §4.10 表·孤值即打回）。
-private const val PANEL_COLUMNS = 3
-private val PANEL_CONTENT_TOP = 16.dp
+// 落值（图纸 §3.2 面板一节 / §4.10 表·孤值即打回；卷四 §4.7 改四列 / 行距 20 / 图标 30）。
+private const val PANEL_COLUMNS = 4
 private val PANEL_CONTENT_SIDE = 12.dp
-private val PANEL_ROW_GAP = 14.dp
-private val TILE_ICON_SIZE = 22.dp
+private val PANEL_ROW_GAP = 20.dp
+private val TILE_ICON_SIZE = 30.dp
 private val TILE_LABEL_GAP = 8.dp
-private const val TILE_FILL_ALPHA = 0.06f
 private const val TILE_DISABLED_ALPHA = 0.38f
 private const val PANEL_FADE_IN_MS = 120
 private const val PANEL_FADE_OUT_MS = 160

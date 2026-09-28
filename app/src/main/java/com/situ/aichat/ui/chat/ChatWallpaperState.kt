@@ -19,6 +19,11 @@ internal data class ChatWallpaper(
     val frosted: ImageBitmap,
     val topDark: Boolean,
     val bottomDark: Boolean,
+    /** 琉璃卷三：顶 / 底条带的 Rec.601 平均亮度原值；暖陶只读上面两个布尔。 */
+    val topLuma: Float,
+    val bottomLuma: Float,
+    /** 卷四：中段 68% 条带（顶 / 底 16% 之间）的 Rec.601 平均亮度；泡下时间戳按它选色。 */
+    val midLuma: Float,
 )
 
 internal suspend fun loadChatWallpaper(path: String): ChatWallpaper? = withContext(Dispatchers.IO) {
@@ -39,13 +44,18 @@ internal fun peekChatWallpaper(path: String?): ChatWallpaper? {
 }
 
 /** 由清晰+磨砂位图组装 [ChatWallpaper]（含顶/底条带亮度）——[loadChatWallpaper] 与 [peekChatWallpaper] 共用。 */
-private fun assembleChatWallpaper(sharp: Bitmap, frosted: Bitmap): ChatWallpaper {
+internal fun assembleChatWallpaper(sharp: Bitmap, frosted: Bitmap): ChatWallpaper {
     val stripH = (sharp.height * 0.16f).toInt().coerceAtLeast(1)
     val topStrip = Bitmap.createBitmap(sharp, 0, 0, sharp.width, stripH)
     val bottomStrip = Bitmap.createBitmap(sharp, 0, sharp.height - stripH, sharp.width, stripH)
-    val topDark = WallpaperBlur.averageLuminance(topStrip) < WALLPAPER_DARK_THRESHOLD
-    val bottomDark = WallpaperBlur.averageLuminance(bottomStrip) < WALLPAPER_DARK_THRESHOLD
+    val midStrip = Bitmap.createBitmap(sharp, 0, stripH, sharp.width, (sharp.height - stripH * 2).coerceAtLeast(1))
+    val topLuma = WallpaperBlur.averageLuminance(topStrip)
+    val bottomLuma = WallpaperBlur.averageLuminance(bottomStrip)
+    val midLuma = WallpaperBlur.averageLuminance(midStrip)
+    val topDark = topLuma < WALLPAPER_DARK_THRESHOLD
+    val bottomDark = bottomLuma < WALLPAPER_DARK_THRESHOLD
     topStrip.recycle()
     bottomStrip.recycle()
-    return ChatWallpaper(sharp.asImageBitmap(), frosted.asImageBitmap(), topDark, bottomDark)
+    midStrip.recycle()
+    return ChatWallpaper(sharp.asImageBitmap(), frosted.asImageBitmap(), topDark, bottomDark, topLuma, bottomLuma, midLuma)
 }

@@ -94,88 +94,90 @@ internal fun brandDarkColorScheme(): ColorScheme = darkColorScheme(
 )
 
 /**
- * 琉璃主题（第二张脸·见 FABLE5_THEME_LIULI_PROPOSAL.md §4.2）M3 换装桥·昼档（冷灰瓷白 + 钴蓝）。
+ * 琉璃主题（第二张脸·琉璃 2.0 晨光·卷一图纸 §4.1 表 C）M3 换装桥·昼档（晨光）。
  * 让未迁移屏的 `MaterialTheme.*` 也变琉璃色（D-15 甲：琉璃色 + 暖陶器型）；已迁移组件直接读 [AppTheme].colors。
- * tonal 面阶为冷中性等感知步长（仅桥接用·不进 Palette/semantic）。
+ * tonal 面阶为紫中性等感知步长（仅桥接用·不进 Palette/semantic）。
  */
 internal fun brandLiuliLightColorScheme(): ColorScheme = lightColorScheme(
-    primary = Palette.Cobalt26,
-    onPrimary = Palette.White, // 白字 on 钴蓝填充（4.6·达标）
-    primaryContainer = Palette.Cobalt26Container,
-    onPrimaryContainer = Palette.Cobalt26OnContainer,
-    secondary = Palette.Cobalt26Text, // 钴蓝功能深档（白字达标·on 瓷白作文字达 4.5）
+    primary = Palette.DawnIris,
+    onPrimary = Palette.White, // 白字 on 鸢尾紫填充（4.9·达标）
+    primaryContainer = Palette.DawnIrisContainer,
+    onPrimaryContainer = Palette.DawnIrisOnContainer,
+    secondary = Palette.DawnIrisText, // 鸢尾紫功能深档（白字达标·on 晨光底作文字达 4.5）
     onSecondary = Palette.White,
-    secondaryContainer = Palette.GlassSunken,
-    onSecondaryContainer = Palette.InkCool,
+    secondaryContainer = Palette.DawnSunken,
+    onSecondaryContainer = Palette.DawnInk,
     tertiary = Palette.Gold,
     onTertiary = Palette.White,
     tertiaryContainer = Palette.WarnContainer,
     onTertiaryContainer = Palette.OnWarn,
-    background = Palette.GlassMist,
-    onBackground = Palette.InkCool,
-    // 沉浸决议：surface=background 同色（瓷白整屏一底·白色只留内容纸张走 AppTheme.colors.surface.raised）。
-    surface = Palette.GlassMist,
-    onSurface = Palette.InkCool,
-    surfaceVariant = Palette.GlassSunken,
-    onSurfaceVariant = Palette.InkCoolSoft,
-    surfaceTint = Palette.Cobalt26,
-    outline = Palette.InkCoolFaint,
-    outlineVariant = Color(0xFFD9DDE6),
+    background = Palette.DawnBase,
+    onBackground = Palette.DawnInk,
+    // 沉浸决议：surface=background 同色（晨光整屏一底·白色只留内容纸张走 AppTheme.colors.surface.raised）。
+    surface = Palette.DawnBase,
+    onSurface = Palette.DawnInk,
+    surfaceVariant = Palette.DawnSunken,
+    onSurfaceVariant = Palette.DawnInkSoft,
+    surfaceTint = Palette.DawnIris,
+    outline = Palette.DawnInkFaint,
+    outlineVariant = Palette.DawnStroke,
     error = Palette.OnError,
     onError = Palette.White,
     errorContainer = Palette.ErrorContainer,
     onErrorContainer = Palette.OnError,
-    inverseSurface = Palette.InkCool,
-    inverseOnSurface = Palette.GlassMist,
-    inversePrimary = Palette.Cobalt26GradStart,
+    inverseSurface = Palette.DawnInk,
+    inverseOnSurface = Palette.DawnBase,
+    inversePrimary = Palette.DuskIris,
     scrim = Palette.Scrim,
-    surfaceBright = Palette.GlassMist,
-    surfaceDim = Color(0xFFDDE0E8),
+    surfaceBright = Palette.DawnBase,
+    surfaceDim = Palette.DawnStroke,
     surfaceContainerLowest = Palette.White,
-    surfaceContainerLow = Color(0xFFF0F2F7),
-    surfaceContainer = Palette.GlassSunken,
-    surfaceContainerHigh = Color(0xFFE1E4EC),
-    surfaceContainerHighest = Color(0xFFD9DDE6),
+    surfaceContainerLow = Color(0xFFF2F0F6), // 墨 3% over 底
+    surfaceContainer = Palette.DawnSunken,
+    surfaceContainerHigh = Color(0xFFE8E5ED), // 墨 8% over 底
+    surfaceContainerHighest = Palette.DawnStroke,
 )
 
 /**
- * 琉璃主题 M3 换装桥·夜档（近黑非纯黑 D-9 + 提亮钴蓝）。
+ * 琉璃主题 M3 换装桥·夜档（晨光·夜：深紫近黑底 + 提亮鸢尾紫）。
  */
 internal fun brandLiuliDarkColorScheme(): ColorScheme = darkColorScheme(
-    primary = Palette.Cobalt26GradStart, // 渐变起点钴蓝配白字 4.6（M3 实底钮·Cobalt26Bright 留给 surfaceTint/装饰）
+    primary = Palette.DawnIris, // 渐变起点鸢尾紫配白字 4.9（M3 实底钮·DuskIris 留给 surfaceTint/装饰）
     onPrimary = Palette.White,
-    primaryContainer = Palette.Cobalt26ContainerDark,
-    onPrimaryContainer = Palette.Cobalt26OnContainerDark,
-    secondary = Palette.Cobalt26TextDark,
-    onSecondary = Palette.NightGlass,
-    secondaryContainer = Palette.NightGlassSunken,
-    onSecondaryContainer = Palette.MoonWhite,
+    primaryContainer = Palette.DuskIrisContainer,
+    onPrimaryContainer = Palette.DuskIrisOnContainer,
+    secondary = Palette.DuskIris,
+    onSecondary = Palette.DuskBase,
+    secondaryContainer = Palette.DuskSunken,
+    onSecondaryContainer = Palette.DuskInk,
     tertiary = Palette.GoldDark,
-    onTertiary = Palette.NightGlass,
+    // 深字配金 / 红实底：同角色的晨光夜底（卷一 §11 D-1·复核 R1 核准）。
+    onTertiary = Palette.DuskBase,
     tertiaryContainer = Palette.WarnContainerDark,
     onTertiaryContainer = Palette.OnWarnDark,
-    background = Palette.NightGlass,
-    onBackground = Palette.MoonWhite,
-    surface = Palette.NightGlass,
-    onSurface = Palette.MoonWhite,
-    surfaceVariant = Palette.NightGlassSunken,
-    onSurfaceVariant = Palette.MoonWhiteSoft,
-    surfaceTint = Palette.Cobalt26Bright,
-    outline = Palette.MoonWhiteFaint,
-    outlineVariant = Palette.NightGlassStroke,
+    background = Palette.DuskBase,
+    onBackground = Palette.DuskInk,
+    surface = Palette.DuskBase,
+    onSurface = Palette.DuskInk,
+    surfaceVariant = Palette.DuskSunken,
+    onSurfaceVariant = Palette.DuskInkSoft,
+    surfaceTint = Palette.DuskIris,
+    outline = Palette.DuskInkFaint,
+    outlineVariant = Palette.DuskStroke,
     error = Palette.OnErrorDark,
-    onError = Palette.NightGlass,
+    // 深字配金 / 红实底：同角色的晨光夜底（卷一 §11 D-1·复核 R1 核准）。
+    onError = Palette.DuskBase,
     errorContainer = Palette.ErrorContainerDark,
     onErrorContainer = Palette.OnErrorDark,
-    inverseSurface = Palette.MoonWhite,
-    inverseOnSurface = Palette.NightGlass,
-    inversePrimary = Palette.Cobalt26,
+    inverseSurface = Palette.DuskInk,
+    inverseOnSurface = Palette.DuskBase,
+    inversePrimary = Palette.DawnIris,
     scrim = Palette.Scrim,
-    surfaceBright = Color(0xFF2C3240),
-    surfaceDim = Palette.NightGlass,
-    surfaceContainerLowest = Color(0xFF07090D),
-    surfaceContainerLow = Palette.NightGlassRaised,
-    surfaceContainer = Color(0xFF1A1E26),
-    surfaceContainerHigh = Palette.NightGlassStroke,
-    surfaceContainerHighest = Color(0xFF343B48),
+    surfaceBright = Color(0xFF35333E), // 白 14% over 底
+    surfaceDim = Palette.DuskBase,
+    surfaceContainerLowest = Color(0xFF0E0D15), // 底向黑 30%
+    surfaceContainerLow = Palette.DuskRaised,
+    surfaceContainer = Color(0xFF201E29), // 白 5% over 底
+    surfaceContainerHigh = Palette.DuskStroke,
+    surfaceContainerHighest = Color(0xFF35333E), // 白 14% over 底
 )

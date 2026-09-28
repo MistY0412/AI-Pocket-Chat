@@ -26,7 +26,7 @@ import com.situ.aichat.ui.chat.ChatInputPanelState
  * 卷二B 起它只**占位**：面板本体搬到 overlay 层的 [LiuliPlusPanel]（一片玻璃·A-5），这里既不画底也不放格子
  * ——露出来的就是聊天背景本身（卷二A R1 🔵-6「面板区底露缝」随之消失，因为已经没有那块白底可露）。
  *
- * 它住在 [com.situ.aichat.ui.liuli.glass.BackdropHost] 的**内容层**（输入区 / 面板在 overlay 层按同一高度
+ * 它住在 [com.situ.aichat.ui.liuli.glass.LiuliGlassHost] 的**内容层**（输入区 / 面板在 overlay 层按同一高度
  * 向上偏移），故这里额外把绘制整体上移一个导航栏 inset：内容层 `Column` 没吃 navBar padding（列表底留白
  * 自带 navBar·图纸 §4.7），不移的话这块占位会比托盘底缘低一条导航栏。
  */

@@ -9,10 +9,12 @@ import com.situ.aichat.data.local.dao.UserProfileDao
 import com.situ.aichat.data.model.ApiFunction
 import com.situ.aichat.data.model.StructuredMemory
 import com.situ.aichat.data.remote.llm.LlmClient
+import com.situ.aichat.data.remote.llm.LlmRequestCapture
 import com.situ.aichat.data.remote.llm.StreamToken
 import com.situ.aichat.data.remote.llm.UsageDto
 import com.situ.aichat.diagnostics.ContextLogService
 import com.situ.aichat.diagnostics.LogSource
+import com.situ.aichat.diagnostics.LogTrace
 import com.situ.aichat.data.repository.ApiConfigRepository
 import com.situ.aichat.data.repository.CharacterRepository
 import com.situ.aichat.data.repository.ConversationRepository
@@ -42,6 +44,7 @@ import com.situ.aichat.tts.TtsConfigurationRepository
 import com.situ.aichat.tts.TtsService
 import com.situ.aichat.tts.TtsVoiceProfile
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
@@ -253,12 +256,14 @@ class VoiceCallTurnService @Inject constructor(
         // The collect runs in the caller's (main) context, so onContentToken hops to the pipeline on main.
         // 批 D 上下文日志：捕获末帧 usage + 计时，收流后落一条（source=VOICE_CALL）；失败原样重抛前先记。fire-and-forget。
         val full = StringBuilder()
+        val logTrace = LogTrace.newTurn(conversationUuid, characterUuid, anchorMessageUuid = null) // 四期·图纸三：通话一轮
+        val requestCapture = LlmRequestCapture()
         val turnStart = System.currentTimeMillis()
         var usage: UsageDto? = null
         try {
             // C3 通话响应预算：20s 无任何 SSE 行（keep-alive 注释行也算活性）才判死 → FirstStreamEventTimeout →
             // 下面的错误路径记日志、controller 走失败兜底——不再陪全局 60s readTimeout 干等。
-            VoiceCallTurnBudget.collectWithFirstEventBudget(
+            withContext(requestCapture) { VoiceCallTurnBudget.collectWithFirstEventBudget(
                 budgetMs = VoiceCallTurnBudget.FIRST_EVENT_BUDGET_MS,
                 streamFactory = { onLiveness ->
                     llmClient.streamChat(
@@ -267,6 +272,7 @@ class VoiceCallTurnService @Inject constructor(
                         temperature = settings.sanitizedLlmTemperature,
                         onUsage = { usage = it },
                         onSseLine = onLiveness,
+                        sessionKey = conversationUuid,
                     )
                 },
             ) { token ->
@@ -274,16 +280,16 @@ class VoiceCallTurnService @Inject constructor(
                     full.append(token.text)
                     onContentToken(token.text)
                 }
-            }
+            } }
         } catch (e: kotlin.coroutines.cancellation.CancellationException) {
             throw e
         } catch (e: Throwable) {
-            contextLog.recordError(LogSource.VOICE_CALL, character.name, config.modelName, messages, e, buildResult.segments)
+            contextLog.recordError(LogSource.VOICE_CALL, character.name, config.modelName, messages, e, buildResult.segments, trace = logTrace, capture = requestCapture)
             throw e
         }
         contextLog.recordSuccess(
             LogSource.VOICE_CALL, character.name, config.modelName, messages, full.toString(),
-            System.currentTimeMillis() - turnStart, usage, buildResult.segments,
+            System.currentTimeMillis() - turnStart, usage, buildResult.segments, trace = logTrace, capture = requestCapture,
         )
         return ReplyParser.sanitizeAssistantResponse(full.toString(), characterName = character.name)
     }

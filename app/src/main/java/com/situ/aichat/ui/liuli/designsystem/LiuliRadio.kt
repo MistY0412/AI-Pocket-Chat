@@ -17,17 +17,16 @@ import com.situ.aichat.ui.liuli.page.liuliFootprint
 
 /** 视觉直径 22（触达 48 由 [liuliFootprint] 居中外溢·只在本件自带点击时挂）。 */
 private val DIAMETER = 22.dp
-/** 未选环 1.5 `text.tertiary`；选中环 2 `accent.primary` + 10 实心点。 */
-private val RING_OFF = 1.5.dp
-private val RING_ON = 2.dp
-private val DOT = 10.dp
+/** 未选环 2 `text.tertiary`；选中环 6 `accent.primary`（中间留 10 空心·琉璃 2.0 卷二 §4.5-3·稿 `border: 6px`）。 */
+private val RING_OFF = 2.dp
+private val RING_ON = 6.dp
 /** 禁用态透明度（与 [LiuliSwitch] / [LiuliButton] 同值·结构恒定不提前 return）。 */
 private const val DISABLED_ALPHA = 0.38f
 
 /**
  * 琉璃单选圆（图纸 2026-09-06 卷四 §2.1 · 契约 §6.5「单选行」）。**禁 M3 `RadioButton`**（§9 ⑤）。
  *
- * 自绘：未选 = 1.5dp `text.tertiary` 环；选中 = 2dp `accent.primary` 环 + 10dp 同色实心点。
+ * 自绘：未选 = 2dp `text.tertiary` 环；选中 = 6dp `accent.primary` 粗环、中间 10dp 空心（不画实心点·卷二 §4.5-3）。
  * 版位恒 22×22、触达 48 由 `requiredSize` 居中外溢（PITFALLS §1d：`minimumInteractiveComponentSize`
  * 会把版位一起撑大，行内对齐就散了）。切换 `haptics.selection()`。
  *
@@ -79,7 +78,6 @@ fun LiuliRadio(
                         radius = (size.minDimension - stroke) / 2f,
                         style = Stroke(width = stroke),
                     )
-                    if (selected) drawCircle(color = ringOn, radius = DOT.toPx() / 2f)
                 },
         )
     }

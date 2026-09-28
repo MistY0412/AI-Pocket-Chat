@@ -1,5 +1,6 @@
 package com.situ.aichat.voice
 
+import com.situ.aichat.data.remote.llm.ProviderMessageAdapter
 import com.situ.aichat.prompt.ReplyParser
 import com.situ.aichat.sticker.StickerTagParser
 
@@ -44,6 +45,19 @@ internal object VoiceCallTtsLogic {
             if (sentence.isNotEmpty()) out.add(sentence)
         }
         return SplitResult(out, working)
+    }
+
+    /**
+     * [cutSentences] 之前先处理【系统说明】回声（时间感知四期·图纸一 复核 R1）：非白名单服务商的末尾块被框在
+     * 【系统说明】…【/系统说明】里，模型万一整块复述，逐句切会把多行块拆散、块里的文字被念出来（逐句清洗剥不掉跨句的块）。
+     * 已闭合的整块先剥掉；块还没闭合时只切块前面的部分，块留在缓冲里等后续 token 闭合。字面单源 = [ReplyParser.systemNoteBlockRegex]。
+     */
+    fun cutSentencesHoldingSystemNote(buffer: String): SplitResult {
+        val stripped = ReplyParser.systemNoteBlockRegex.replace(buffer, "")
+        val open = stripped.indexOf(ProviderMessageAdapter.NOTE_OPEN)
+        if (open < 0) return cutSentences(stripped)
+        val head = cutSentences(stripped.substring(0, open))
+        return SplitResult(head.sentences, head.remainder + stripped.substring(open))
     }
 
     /**

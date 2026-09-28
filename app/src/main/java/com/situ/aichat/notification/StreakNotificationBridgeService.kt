@@ -16,8 +16,10 @@ import com.situ.aichat.prompt.AssistantOutputGate
 import com.situ.aichat.prompt.MessageKindInference
 import com.situ.aichat.util.DateFormatters
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
@@ -146,9 +148,11 @@ class StreakNotificationBridgeService @Inject constructor(
      * 把发出时落下的「待物化标记」排干，回填投递时间。
      * 6.1e 起台账在**调度时**就建好（`recordScheduled`，state=scheduled / deliveredAt=null）——这里仅按
      * deliveryIdentifier 找到它、置 deliveredAt（已投递）。找不到（调度台账被清库/异常）则凭标记自愈建一条。
+     * 排干在 IO 线程做：标记存在 SharedPreferences 里、同步读写，而两个调用点（回前台 / 点击通知）都在主线程协程里
+     * （稳定性防线 B 冷启实测的主线程读盘·图纸 docs/handoff/2026-09-28-启动主线程读盘清零.md ③）。
      */
     private suspend fun drainMarkersToRecords() {
-        val markers = PendingDeliveryStore.drainAll(context)
+        val markers = withContext(Dispatchers.IO) { PendingDeliveryStore.drainAll(context) }
         if (markers.isEmpty()) return
         val zone = ZoneId.systemDefault()
         for (marker in markers) {

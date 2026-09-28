@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.situ.aichat.R
 import com.situ.aichat.data.local.entity.StoryCharacterRoleEntity
-import com.situ.aichat.story.StoryRoleType
 import com.situ.aichat.ui.designsystem.AppTheme
 
 /**
@@ -50,7 +49,6 @@ internal fun StoryRolesSection(
 ) {
     var editing by remember { mutableStateOf<StoryCharacterRoleEntity?>(null) }
     var adding by remember { mutableStateOf(false) }
-    val userSuffix = stringResource(R.string.story_settings_role_user_suffix)
 
     SettingsGroup(
         header = stringResource(R.string.story_settings_roles),
@@ -65,89 +63,16 @@ internal fun StoryRolesSection(
             )
         } else {
             roles.forEach { role ->
-                RoleRow(
-                    name = role.roleName + if (role.isUserRole) userSuffix else "",
-                    roleType = role.roleType,
-                    source = when {
-                        role.isUserRole -> null
-                        role.characterId != null -> stringResource(R.string.story_roles_source_chat)
-                        else -> stringResource(R.string.story_roles_source_custom)
-                    },
-                ) { editing = role }
+                RoleRow(name = storyRoleRowName(role), roleType = role.roleType, source = storyRoleSource(role)) { editing = role }
                 RowDivider()
             }
         }
         AddRoleRow(stringResource(R.string.story_roles_add)) { adding = true }
     }
 
-    editing?.let { role ->
-        StoryRoleEditorSheet(
-            initialName = role.roleName,
-            initialType = role.roleType,
-            initialDescription = role.roleDescription.orEmpty(),
-            initialPersona = role.intimatePersona.orEmpty(),
-            // 反差是女主侧设定，「我」这一行不给（图纸 §4.5）
-            showPersona = !role.isUserRole,
-            onDraftPersona = onDraftPersona?.let { draft -> { name, desc -> draft(role, name, desc) } },
-            isNew = false,
-            // 权限矩阵（图纸 §3.2）：名字归聊天角色本体管；「我」这一行只开描述
-            nameEditable = !role.isUserRole && role.characterId == null,
-            nameLockedHint = when {
-                role.isUserRole -> stringResource(R.string.story_role_editor_name_locked_user)
-                role.characterId != null -> stringResource(R.string.story_role_editor_name_locked)
-                else -> null
-            },
-            typeEditable = !role.isUserRole,
-            onRemove = if (role.isUserRole) null else ({ onDelete(role.id) }),
-            removeNeedsConfirm = true,
-            onSave = { name, type, description, persona ->
-                onSave(
-                    role.copy(
-                        roleName = name,
-                        roleType = type,
-                        roleDescription = description.ifBlank { null },
-                        // 「我」那一行没有反差栏，原值原样带过去，绝不被空草稿清掉
-                        intimatePersona = if (role.isUserRole) role.intimatePersona else persona.trim().ifBlank { null },
-                    ),
-                )
-            },
-            onDismiss = { editing = null },
-        )
-    }
+    editing?.let { role -> StoryRoleEditorSheet(storyRoleEditConfig(role, onDraftPersona, onSave, onDelete), onDismiss = { editing = null }) }
 
-    if (adding) {
-        StoryRoleEditorSheet(
-            initialName = "",
-            initialType = StoryRoleType.SUPPORTING,
-            initialDescription = "",
-            initialPersona = "",
-            showPersona = true,
-            // 新角色还没落库，起草只吃弹层里当前填的名字与人设（characterId 恒 null）
-            onDraftPersona = onDraftPersona?.let { draft ->
-                { name, desc -> draft(StoryCharacterRoleEntity(storyId = storyId), name, desc) }
-            },
-            isNew = true,
-            nameEditable = true,
-            nameLockedHint = null,
-            typeEditable = true,
-            onRemove = null,
-            removeNeedsConfirm = false,
-            onSave = { name, type, description, persona ->
-                onSave(
-                    StoryCharacterRoleEntity(
-                        storyId = storyId,
-                        roleName = name,
-                        roleType = type,
-                        roleDescription = description.ifBlank { null },
-                        isUserRole = false,
-                        characterId = null,
-                        intimatePersona = persona.trim().ifBlank { null },
-                    ),
-                )
-            },
-            onDismiss = { adding = false },
-        )
-    }
+    if (adding) StoryRoleEditorSheet(storyRoleAddConfig(storyId, onDraftPersona, onSave), onDismiss = { adding = false })
 }
 
 /** 创建屏「故事专属角色」块（开书前攒在表单里，删除无需确认——还没落库）。 */
@@ -176,44 +101,10 @@ internal fun StoryCustomRolesBlock(
     }
 
     customRoles.getOrNull(editingIndex)?.let { draft ->
-        val index = editingIndex
-        StoryRoleEditorSheet(
-            initialName = draft.name,
-            initialType = draft.type,
-            initialDescription = draft.description,
-            initialPersona = "",
-            // 创建屏不给反差栏与起草钮：角色还没落库、上下文太薄，这一栏留给书页（图纸 J5）
-            showPersona = false,
-            onDraftPersona = null,
-            isNew = false,
-            nameEditable = true,
-            nameLockedHint = null,
-            typeEditable = true,
-            onRemove = { onRemove(index) },
-            removeNeedsConfirm = false,
-            onSave = { name, type, description, _ -> onUpdate(index, CustomRoleDraft(name, type, description)) },
-            onDismiss = { editingIndex = -1 },
-        )
+        StoryRoleEditorSheet(storyCustomRoleEditConfig(draft, editingIndex, onUpdate, onRemove), onDismiss = { editingIndex = -1 })
     }
 
-    if (adding) {
-        StoryRoleEditorSheet(
-            initialName = "",
-            initialType = StoryRoleType.SUPPORTING,
-            initialDescription = "",
-            initialPersona = "",
-            showPersona = false,
-            onDraftPersona = null,
-            isNew = true,
-            nameEditable = true,
-            nameLockedHint = null,
-            typeEditable = true,
-            onRemove = null,
-            removeNeedsConfirm = false,
-            onSave = { name, type, description, _ -> onAdd(CustomRoleDraft(name, type, description)) },
-            onDismiss = { adding = false },
-        )
-    }
+    if (adding) StoryRoleEditorSheet(storyCustomRoleAddConfig(onAdd), onDismiss = { adding = false })
 }
 
 @Composable
@@ -240,7 +131,7 @@ private fun RoleRow(name: String, roleType: String, source: String?, onClick: ()
 
 /** 类型徽章（主角/配角/反派）——既有故事域 pill 造型：accent 容器底 + accent 字。 */
 @Composable
-private fun RoleTypeBadge(roleType: String) {
+internal fun RoleTypeBadge(roleType: String) {
     val c = AppTheme.colors
     Text(
         stringResource(roleTypeLabelRes(roleType)),

@@ -55,6 +55,10 @@ internal object MeetingSky {
     val Ink = Color(0xFF2E2925)
     val Haze = Color(0xFF221E28)
     val Moon = Color(0xFFEFE6CF)
+    /** 霞色（温暖×非白天的霞带）——见面回忆与发布页天色共用（朋友圈发布页·乙 §3.4.1·只搬不改）。 */
+    internal val GlowWarm = Color(0xFFF2B98A)
+    /** 暖阳色（温暖×白天的光晕）——同上共用。 */
+    internal val SunWarm = Color(0xFFF2C978)
 
     // ---- hero 底纱（契约 §2.1：纱 = 为保文字落点 ≥4.5:1 而设的装置）----
     // R1 🔴-1 返工落值（2026-07-10 review·代理点→带扫描勘误）：原「0.74 起线性 →0.5」在 meta 带
@@ -87,14 +91,17 @@ internal object MeetingSky {
     private val night = listOf(Color(0xFF2E3450), Color(0xFF4A4668), Color(0xFF7A5E74))
     private val late = listOf(Color(0xFF232A44), Color(0xFF2C3350), Color(0xFF4A4260))
 
+    /** 时段桶本色三停（不叠情绪色）——见面回忆与发布页天色共用（朋友圈发布页·乙 §3.4.1·只搬不改）。 */
+    internal fun baseStops(bucket: SkyBucket): List<Color> = when (bucket) {
+        SkyBucket.DAWN -> dawn
+        SkyBucket.DAY -> day
+        SkyBucket.DUSK -> dusk
+        SkyBucket.NIGHT -> night
+        SkyBucket.LATE_NIGHT -> late
+    }
+
     fun spec(bucket: SkyBucket, kind: OfflineMoodKind): SkySpec {
-        val base = when (bucket) {
-            SkyBucket.DAWN -> dawn
-            SkyBucket.DAY -> day
-            SkyBucket.DUSK -> dusk
-            SkyBucket.NIGHT -> night
-            SkyBucket.LATE_NIGHT -> late
-        }
+        val base = baseStops(bucket)
         val (tint, amount) = when (kind) {
             OfflineMoodKind.WARM -> Color(0xFFE08A3C) to 0.18f
             OfflineMoodKind.SWEET -> Color(0xFFD4537E) to 0.16f
@@ -125,7 +132,7 @@ internal object MeetingSky {
                 OfflineMoodKind.NEUTRAL -> SkyWeather.CLOUDS
             },
             weatherColor = when (kind) {
-                OfflineMoodKind.WARM -> if (light) Color(0xFFF2C978) else Color(0xFFF2B98A)
+                OfflineMoodKind.WARM -> if (light) SunWarm else GlowWarm
                 OfflineMoodKind.SWEET -> Color(0xFFEFA8B8)
                 else -> WarmWhite
             },

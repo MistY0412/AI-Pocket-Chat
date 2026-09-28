@@ -1,14 +1,27 @@
 package com.situ.aichat.ui.liuli.chat
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
+import com.situ.aichat.data.local.entity.MessageEntity
 import com.situ.aichat.ui.components.AppHaptics
 import com.situ.aichat.ui.components.LocalAppHaptics
+import com.situ.aichat.ui.designsystem.LiuliDarkAppColors
+import com.situ.aichat.ui.designsystem.LocalAppColors
+import com.situ.aichat.ui.theme.LocalIsDarkTheme
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -18,6 +31,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import android.graphics.Color as AndroidColor
 
 /**
  * T2-7 表情回应徽章（图纸 2026-09-05 卷二B §7 · A-8「纯瞬态」）。
@@ -41,10 +56,10 @@ class LiuliReactionBurstTest {
         compose.setContent {
             CompositionLocalProvider(LocalAppHaptics provides haptics) {
                 Box(Modifier.size(200.dp)) {
-                    LiuliReactionBurst(state.burst, "m1", reduceMotion, Modifier.matchParentSize())
+                    LiuliReactionBurst(state.burst, false, "m1", reduceMotion, Modifier.matchParentSize())
                 }
                 Box(Modifier.size(200.dp)) {
-                    LiuliReactionBurst(state.burst, "m2", reduceMotion, Modifier.matchParentSize())
+                    LiuliReactionBurst(state.burst, false, "m2", reduceMotion, Modifier.matchParentSize())
                 }
             }
         }
@@ -63,17 +78,6 @@ class LiuliReactionBurstTest {
         assertEquals("❤️", first.emoji)
         state.play("m1", "❤️")
         assertNotEquals("同泡同表情再来一次也要换 token（重启而非叠加）", first.token, state.burst?.token)
-    }
-
-    @Test fun badge_neverReachesTheInBubbleTimestamp() {
-        // 零重叠 ⑯（复核 R1 🔴-2）：徽章伸进泡内的部分 = 直径 − 横向外扩，不得超过泡的右内边距——
-        // 泡内时间戳的右缘就落在那条内边距上，超过即压戳（装机实拍：旧值 6 压住末位约 7dp）。
-        val intrusion = LiuliChatGeometry.reactionBadge - BADGE_OVERHANG_X
-        assertTrue(
-            "徽章伸进泡内 $intrusion 不得超过泡右内边距 $LiuliBubblePadEnd",
-            intrusion <= LiuliBubblePadEnd,
-        )
-        assertTrue("徽章仍要搭在泡角上（伸进量 > 0），不是飘在泡外", intrusion > 0.dp)
     }
 
     @Test fun heartOffsets_areTheFourTabledPairs_andClampOutOfRange() {
@@ -114,6 +118,91 @@ class LiuliReactionBurstTest {
         compose.waitUntil(BADGE_WAIT_MS) { burstNodes() == 0 }
         assertEquals(0, burstNodes())
     }
+
+    // ── 卷三 §4.3：徽章在泡外侧（NATIVE 量像素） ──────────────────────────────────
+
+    /**
+     * 整行真渲染（夜档：徽章无投影、恰是一枚实心圆，像素包围盒 = 徽章边界）压在纯红底上；泡的边界取自语义树，
+     * 泡下时间戳取自未合并树（[stampBoundsBelow]）；泡与时间戳之外的非红像素 = 徽章。
+     */
+    private fun measureBadge(isUser: Boolean): Triple<Rect, Rect, Rect> {
+        var view: View? = null
+        state.play("m1", "❤️")
+        compose.setContent {
+            view = LocalView.current
+            CompositionLocalProvider(
+                LocalAppHaptics provides haptics,
+                LocalIsDarkTheme provides true,
+                LocalAppColors provides LiuliDarkAppColors,
+            ) {
+                Box(Modifier.fillMaxSize().background(Color.Red)) {
+                    LiuliMessageRow(
+                        message = MessageEntity(
+                            messageUUID = "m1",
+                            conversationUuid = "c",
+                            roleRaw = if (isUser) "user" else "assistant",
+                            content = "嗨",
+                            timestamp = 1_756_000_000_000L,
+                            isContentRevealed = true,
+                        ),
+                        topPadding = 40.dp,
+                        characterName = "云野",
+                        avatarPath = null,
+                        userName = "我",
+                        userAvatarPath = null,
+                        customStickers = emptyList(),
+                        isVoicePlaying = false,
+                        voiceProgress = { 0f },
+                        actions = liuliNoopRowActions,
+                        canRegenerate = false,
+                        deliveryRead = null,
+                        flightTracking = false,
+                        reaction = state,
+                        reduceMotion = true,
+                        fold = LiuliFoldState(),
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        val bubble = compose.onNodeWithText("嗨").fetchSemanticsNode().boundsInRoot
+        val stamp = compose.stampBoundsBelow(bubble)
+        val v = checkNotNull(view)
+        val bmp = Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888)
+        v.draw(Canvas(bmp))
+        var l = Int.MAX_VALUE
+        var t = Int.MAX_VALUE
+        var r = Int.MIN_VALUE
+        var b = Int.MIN_VALUE
+        for (y in 0 until (stamp.bottom + 60).toInt().coerceAtMost(bmp.height)) {
+            for (x in 0 until bmp.width) {
+                val inBubble = x >= bubble.left - 1 && x < bubble.right + 1 && y >= bubble.top - 1 && y < bubble.bottom + 1
+                val inStamp = x >= stamp.left - 1 && x < stamp.right + 1 && y >= stamp.top - 1 && y < stamp.bottom + 1
+                if (inBubble || inStamp || bmp.getPixel(x, y) == AndroidColor.RED) continue
+                l = minOf(l, x); t = minOf(t, y); r = maxOf(r, x + 1); b = maxOf(b, y + 1)
+            }
+        }
+        assertTrue("应找到徽章像素", l != Int.MAX_VALUE)
+        return Triple(bubble, stamp, Rect(l.toFloat(), t.toFloat(), r.toFloat(), b.toFloat()))
+    }
+
+    private fun assertOutside(isUser: Boolean) {
+        val (bubble, stamp, badge) = measureBadge(isUser)
+        val density = compose.onRoot().fetchSemanticsNode().layoutInfo.density.density
+        val side = if (isUser) "用户泡" else "AI 泡"
+        assertTrue("$side：徽章 $badge 与泡 $bubble 不相交", !badge.overlaps(bubble))
+        assertTrue("$side：徽章 $badge 与泡下时间戳 $stamp 不相交", !badge.overlaps(stamp))
+        val gap = if (isUser) bubble.left - badge.right else badge.left - bubble.right
+        assertEquals("$side：徽章离泡外侧 4dp", 4f * density, gap, 0.5f)
+        assertEquals("$side：徽章底 = 泡底", bubble.bottom, badge.bottom, 0.5f)
+        assertEquals("$side：徽章直径 26dp", 26f * density, badge.width, 0.5f)
+    }
+
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Test fun aiBubble_badgeSitsOutsideOnTheRight() = assertOutside(isUser = false)
+
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Test fun userBubble_badgeSitsOutsideOnTheLeft() = assertOutside(isUser = true)
 
     private companion object {
         const val BADGE_WAIT_MS = 5_000L

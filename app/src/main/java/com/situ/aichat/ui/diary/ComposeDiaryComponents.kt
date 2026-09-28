@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -316,43 +317,82 @@ internal fun ComposeActionBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            // 左组（spacedBy 0·宽度预算锁死）：加图 / 麦克风（新）/ AI 重写（hasContent 态保留·D-J1）/ 可见性（去文字标签·D-J2）。
-            Row(horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
-                DiaryNavIcon(Icons.Filled.Add, stringResource(R.string.diary_compose_add_image), enabled = canAddImage, onClick = onAddImage)
-                DiaryMicButton(onStart = onStartVoice, onDrag = onVoiceDrag, onFinish = onFinishVoice)
-                if (hasContent && aiAssistAvailable) {
-                    DiaryNavIcon(Icons.Filled.Edit, stringResource(R.string.diary_compose_ai_assist), enabled = !isGenerating, onClick = onAiAssist)
-                }
-                val isOpen = visibility == DiaryVisibility.OPEN_TO_AI
-                DiaryNavIcon(
-                    if (isOpen) Icons.Filled.Person else Icons.Filled.Lock,
-                    stringResource(if (isOpen) R.string.diary_visibility_open else R.string.diary_visibility_private),
-                    onClick = onToggleVisibility,
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            if (canSave) {
-                Text(
-                    stringResource(R.string.diary_compose_save_draft_short),
-                    style = AppTheme.typography.secondary,
-                    color = colors.text.secondary,
-                    modifier = Modifier
-                        .clip(AppTheme.shapes.full)
-                        .clickable(onClickLabel = stringResource(R.string.diary_compose_save_draft_short)) { onSaveDraft() }
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                )
-            }
-            // R1 🟡-2：记下横向内边距 20→16（-8·contentPadding 覆写默认 Primary 20dp），字号不动。
-            AppButton(
-                onClick = onRecord,
-                style = AppButtonStyle.Primary,
-                enabled = canSave,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                Text(stringResource(R.string.diary_compose_record))
-            }
+            ComposeActionBarItems(
+                canSave = canSave,
+                hasContent = hasContent,
+                canAddImage = canAddImage,
+                isGenerating = isGenerating,
+                aiAssistAvailable = aiAssistAvailable,
+                visibility = visibility,
+                onAddImage = onAddImage,
+                onToggleVisibility = onToggleVisibility,
+                onAiAssist = onAiAssist,
+                onSaveDraft = onSaveDraft,
+                onStartVoice = onStartVoice,
+                onVoiceDrag = onVoiceDrag,
+                onFinishVoice = onFinishVoice,
+                record = {
+                    // R1 🟡-2：记下横向内边距 20→16（-8·contentPadding 覆写默认 Primary 20dp），字号不动。
+                    AppButton(
+                        onClick = onRecord,
+                        style = AppButtonStyle.Primary,
+                        enabled = canSave,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(stringResource(R.string.diary_compose_record))
+                    }
+                },
+            )
         }
     }
+}
+
+/** 撰写动作条的内件（琉璃 2.0 卷六·一：两张脸共用·外壳各画各的）：左组四钮 · 弹簧 · 先存着 · [record]。 */
+@Composable
+internal fun RowScope.ComposeActionBarItems(
+    canSave: Boolean,
+    hasContent: Boolean,
+    canAddImage: Boolean,
+    isGenerating: Boolean,
+    aiAssistAvailable: Boolean,
+    visibility: DiaryVisibility,
+    onAddImage: () -> Unit,
+    onToggleVisibility: () -> Unit,
+    onAiAssist: () -> Unit,
+    onSaveDraft: () -> Unit,
+    onStartVoice: () -> Unit,
+    onVoiceDrag: (Float) -> Unit,
+    onFinishVoice: () -> Unit,
+    record: @Composable () -> Unit,
+) {
+    val colors = AppTheme.colors
+    // 左组（spacedBy 0·宽度预算锁死）：加图 / 麦克风（新）/ AI 重写（hasContent 态保留·D-J1）/ 可见性（去文字标签·D-J2）。
+    Row(horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
+        DiaryNavIcon(Icons.Filled.Add, stringResource(R.string.diary_compose_add_image), enabled = canAddImage, onClick = onAddImage)
+        DiaryMicButton(onStart = onStartVoice, onDrag = onVoiceDrag, onFinish = onFinishVoice)
+        if (hasContent && aiAssistAvailable) {
+            DiaryNavIcon(Icons.Filled.Edit, stringResource(R.string.diary_compose_ai_assist), enabled = !isGenerating, onClick = onAiAssist)
+        }
+        val isOpen = visibility == DiaryVisibility.OPEN_TO_AI
+        DiaryNavIcon(
+            if (isOpen) Icons.Filled.Person else Icons.Filled.Lock,
+            stringResource(if (isOpen) R.string.diary_visibility_open else R.string.diary_visibility_private),
+            onClick = onToggleVisibility,
+        )
+    }
+    Spacer(Modifier.weight(1f))
+    if (canSave) {
+        Text(
+            stringResource(R.string.diary_compose_save_draft_short),
+            style = AppTheme.typography.secondary,
+            color = colors.text.secondary,
+            modifier = Modifier
+                .clip(AppTheme.shapes.full)
+                .clickable(onClickLabel = stringResource(R.string.diary_compose_save_draft_short)) { onSaveDraft() }
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        )
+    }
+    record()
 }
 
 /** J6 动作栏左组图标钮：40dp 视觉 + [minimumInteractiveComponentSize]（触达 48·a11y 红线）；contentDescription 兼作 onClickLabel。 */

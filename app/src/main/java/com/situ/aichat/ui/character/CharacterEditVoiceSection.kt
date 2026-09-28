@@ -51,23 +51,23 @@ internal fun VoiceSettingsSection(
     FormField(
         value = remoteVoiceId,
         onValueChange = { v -> onUpdate { it.copy(remoteVoiceID = v) } },
-        label = "音色 ID（远程 TTS）",
-        placeholder = "留空 = 跟随全局默认音色",
-        footer = "在「我的 → 语音 / TTS」里拉取并复制音色 ID（远程引擎用）。",
+        label = CharacterVoiceText.REMOTE_ID_LABEL,
+        placeholder = CharacterVoiceText.REMOTE_ID_PLACEHOLDER,
+        footer = CharacterVoiceText.REMOTE_ID_FOOTER,
         singleLine = true,
     )
 
     // 系统音色（全局引擎=系统 TTS 时用）：从设备 TextToSpeech 列举，留空=默认 zh-CN。
     var sysVoiceOpen by remember { mutableStateOf(false) }
     AppDropdownField(
-        value = voiceIdentifier.ifEmpty { "默认（zh-CN）" },
+        value = voiceIdentifier.ifEmpty { CharacterVoiceText.SYSTEM_VOICE_DEFAULT },
         expanded = sysVoiceOpen,
         onExpandedChange = { open -> sysVoiceOpen = open; if (open) onLoadSystemVoices() },
-        label = "系统音色",
+        label = CharacterVoiceText.SYSTEM_VOICE_LABEL,
         modifier = Modifier.fillMaxWidth(),
     ) {
         AppDropdownMenuItem(
-            text = "默认（zh-CN）",
+            text = CharacterVoiceText.SYSTEM_VOICE_DEFAULT,
             selected = voiceIdentifier.isEmpty(),
             onClick = { onUpdate { it.copy(voiceIdentifier = "") }; sysVoiceOpen = false },
         )
@@ -85,7 +85,7 @@ internal fun VoiceSettingsSection(
         value = emotionLabel(emotionRaw),
         expanded = emotionOpen,
         onExpandedChange = { emotionOpen = it },
-        label = "情绪（MiniMax 专属）",
+        label = CharacterVoiceText.EMOTION_LABEL,
         modifier = Modifier.fillMaxWidth(),
     ) {
         EMOTION_OPTIONS.forEach { (raw, label) ->
@@ -99,19 +99,19 @@ internal fun VoiceSettingsSection(
 
     Text(
         // contacts-character-4：对齐 iOS step 0.05 / "%.2fx"（MiniMax 语速参数粒度，非钱/概率）
-        "语速 ${"%.2f".format(speed)}x",
+        "${CharacterVoiceText.SPEED_TITLE} ${CharacterVoiceText.speedValue(speed)}",
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     AppSlider(
         value = speed.toFloat().coerceIn(0.5f, 2.0f),
-        onValueChange = { v -> onUpdate { it.copy(ttsSpeed = (v * 20).roundToInt() / 20.0) } },
+        onValueChange = { v -> onUpdate { it.copy(ttsSpeed = snapTtsSpeed(v)) } },
         valueRange = 0.5f..2.0f,
         steps = 29, // 0.5..2.0 step 0.05 = 31 档（内部 29 点），对齐 iOS
     )
 
     Text(
-        "音调 $pitch",
+        "${CharacterVoiceText.PITCH_TITLE} $pitch",
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -132,7 +132,7 @@ internal fun VoiceSettingsSection(
             AppLoadingRing(size = AppLoadingRingSize.Small)
             Spacer(Modifier.width(8.dp))
         }
-        Text("试听")
+        Text(CharacterVoiceText.PREVIEW)
     }
     if (previewError != null) {
         Text(
@@ -142,10 +142,29 @@ internal fun VoiceSettingsSection(
         )
     }
 
-    SectionFooter("情绪 / 语速 / 音调为 MiniMax 远程 TTS 专属，其它引擎会忽略；情绪「自动」会跟随每条消息的心情映射。试听用「我的 → 语音 / TTS」选定的引擎合成本角色的声音。")
+    SectionFooter(CharacterVoiceText.FOOTER)
 }
 
-private val EMOTION_OPTIONS: List<Pair<String, String>> = listOf(
+/** 语音段写死的中文（卷五：收成常量供两张脸共用·字面逐字不改）。 */
+internal object CharacterVoiceText {
+    const val REMOTE_ID_LABEL = "音色 ID（远程 TTS）"
+    const val REMOTE_ID_PLACEHOLDER = "留空 = 跟随全局默认音色"
+    const val REMOTE_ID_FOOTER = "在「我的 → 语音 / TTS」里拉取并复制音色 ID（远程引擎用）。"
+    const val SYSTEM_VOICE_LABEL = "系统音色"
+    const val SYSTEM_VOICE_DEFAULT = "默认（zh-CN）"
+    const val EMOTION_LABEL = "情绪（MiniMax 专属）"
+    const val SPEED_TITLE = "语速"
+    const val PITCH_TITLE = "音调"
+    const val PREVIEW = "试听"
+    const val FOOTER = "情绪 / 语速 / 音调为 MiniMax 远程 TTS 专属，其它引擎会忽略；情绪「自动」会跟随每条消息的心情映射。试听用「我的 → 语音 / TTS」选定的引擎合成本角色的声音。"
+    /** contacts-character-4：对齐 iOS step 0.05 / "%.2fx"。 */
+    fun speedValue(speed: Double): String = "${"%.2f".format(speed)}x"
+}
+
+/** 语速吸附到 0.05 一格（对齐 iOS）。 */
+internal fun snapTtsSpeed(raw: Float): Double = (raw * 20).roundToInt() / 20.0
+
+internal val EMOTION_OPTIONS: List<Pair<String, String>> = listOf(
     "auto" to "自动（跟随心情）",
     "happy" to "开心",
     "sad" to "伤心",
@@ -158,5 +177,5 @@ private val EMOTION_OPTIONS: List<Pair<String, String>> = listOf(
     "whisper" to "耳语（仅 2.6）",
 )
 
-private fun emotionLabel(raw: String): String =
+internal fun emotionLabel(raw: String): String =
     EMOTION_OPTIONS.firstOrNull { it.first == raw }?.second ?: raw

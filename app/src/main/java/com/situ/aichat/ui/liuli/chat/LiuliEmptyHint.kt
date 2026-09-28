@@ -132,7 +132,7 @@ private fun LiuliStarterPill(text: String, onClick: () -> Unit) {
     ) {
         Box(
             modifier = Modifier
-                .liuliPressable(interactionSource = interaction, enabled = true, brighten = false)
+                .liuliPressable(interactionSource = interaction, enabled = true)
                 .liuliCardContactShadow(LiuliShapes.pill)
                 .liuliCardSurface(LiuliShapes.pill)
                 .testTag(LIULI_STARTER_PILL_TAG),

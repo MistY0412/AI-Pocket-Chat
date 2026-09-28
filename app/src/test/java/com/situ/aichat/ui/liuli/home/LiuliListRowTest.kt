@@ -27,8 +27,9 @@ import org.robolectric.annotation.Config
 /**
  * T2-5：列表行骨架与它的两个附件（图纸 2026-09-06 卷三 §7 T2-5 · §3.2「列表行」· A-15）。
  *
- * 钉：文字左缘 = 86（屏 gutter 20 + 头像 54 + 缝 12·**与发丝起点同一个数**）、发丝起点 86、行高 78
- * （头像 54 + 上下 12）、未读丸高 20 且 >99 显 "99+"。
+ * 钉：文字左缘 = 行内 82（琉璃 2.0 卷三：卡内行距 16 + 头像 54 + 缝 12·**与卡内发丝起点同一个数**）、行高 78
+ * （头像 54 + 上下 12）、未读丸高 20 且 >99 显 "99+"。卡内发丝（列表项画·卷三 §4.8）另在
+ * `LiuliChatListContentTest` 里量（它住在列表项上，不在行内）。
  *
  * `Density(2f)`：Robolectric 的假字高恒 32**像素**、不随 sp 变——1x 密度下两行字 32 + 6 + 32 = 70dp 会盖过
  * 头像 54 成为行高，错版与对版一样绿；2x 下同样的 32px 只有 16dp，行高才真的由头像决定（PITFALLS §1d）。
@@ -52,7 +53,6 @@ class LiuliListRowTest {
                             secondary = { Text("你: 晚安") },
                             trailing = { LiuliUnreadPill(count = unread, modifier = Modifier.testTag("pill")) },
                         )
-                        LiuliRowDivider(modifier = Modifier.testTag("divider"))
                     }
                 }
             }
@@ -60,20 +60,12 @@ class LiuliListRowTest {
         compose.waitForIdle()
     }
 
-    @Test fun 文字左缘等于八十六() {
+    @Test fun 文字左缘等于行内八十二() {
         showRow()
         val left = compose.onNodeWithText("小满").getUnclippedBoundsInRoot().left
-        assertEquals(86f, left.value, 0.5f)
-    }
-
-    @Test fun 分隔发丝起点与文字左缘同一个数且只有零点五高() {
-        showRow()
-        // 「发丝起于文字左缘」= 两个数必须相等；发丝的内缩走 `padding`（同暖陶 `AppListDivider`），
-        // 故节点本身仍是全宽，只有着色从 startInset 起——能钉的是这两个数相等 + 0.5dp 的厚度。
-        val textLeft = compose.onNodeWithText("小满").getUnclippedBoundsInRoot().left
-        assertEquals(LiuliHomeGeometry.dividerInset.value, textLeft.value, 0.5f)
-        val bounds = compose.onNodeWithTag("divider").getUnclippedBoundsInRoot()
-        assertEquals(0.5f, (bounds.bottom - bounds.top).value, 0.01f)
+        assertEquals(82f, left.value, 0.5f)
+        // 「卡内发丝起于文字左缘」= 两个数必须相等（发丝由列表项画·起点同一个 dividerInset）。
+        assertEquals(LiuliHomeGeometry.dividerInset.value, left.value, 0.5f)
     }
 
     @Test fun 行高等于头像加上下内距() {

@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkOut
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -19,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.situ.aichat.R
 import com.situ.aichat.ui.liuli.designsystem.LiuliCircleButton
@@ -33,19 +35,22 @@ import com.situ.aichat.ui.liuli.page.liuliFootprint
  * = [LiuliChatGeometry.listBottomPadding] + navBar，与列表 `contentPadding.bottom` 同一个数
  * （C4 装机量测抓到：写死 12dp 会让钮沉到输入区背后·图纸 §4.7 零重叠 ④；复核 R1 🔴-1 再改成跟随实测高，
  * 引用条 / 多行输入长高时钮同升）。触达框 48dp 不占版（[liuliFootprint]）→ 视觉底缘与输入区顶恰 12dp。
+ * 卷四：住 overlay 底组（真玻璃）；面板 / 键盘打开时由 [liftPx]（= 输入区同一个 `inputRegionPx`）整体抬升。
  */
 @Composable
 internal fun BoxScope.LiuliScrollToBottom(
     visible: Boolean,
     reduceMotion: Boolean,
     bottomPadding: Dp,
+    liftPx: () -> Int,
     onClick: () -> Unit,
 ) {
     AnimatedVisibility(
         visible = visible,
         modifier = Modifier
             .align(Alignment.BottomEnd)
-            .padding(end = LiuliChatGeometry.scrollFabEnd, bottom = bottomPadding),
+            .padding(end = LiuliChatGeometry.scrollFabEnd, bottom = bottomPadding)
+            .offset { IntOffset(0, -liftPx()) },
         enter = if (reduceMotion) EnterTransition.None else fadeIn() + expandIn(),
         exit = if (reduceMotion) ExitTransition.None else shrinkOut() + fadeOut(),
     ) {

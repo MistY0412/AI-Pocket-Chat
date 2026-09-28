@@ -143,13 +143,13 @@ private fun ReviewChip(
 
 /** 那年今天回顾卡（R5·纯本地）：accent 标 + 年份 + 摘录两行，点击进详情。 */
 @Composable
-internal fun OnThisDayCard(hit: DiaryEntryWithComments, onOpenEntry: (String) -> Unit) {
+internal fun OnThisDayCard(hit: DiaryEntryWithComments, onOpenEntry: (String) -> Unit, surface: Modifier = Modifier.appCardSurface()) {
     val colors = AppTheme.colors
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .appCardSurface()
+            .then(surface)
             .clickable(onClickLabel = stringResource(R.string.a11y_diary_open)) { onOpenEntry(hit.entry.uuid) }
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),

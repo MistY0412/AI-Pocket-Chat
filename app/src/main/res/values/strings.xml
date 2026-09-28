@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">AI Pocket Chat</string>
 
     <!-- Bottom navigation -->
@@ -463,11 +463,9 @@
     <string name="contextlog_alert_line">%1$s: %2$d/%3$d failed (%4$d%%)</string>
     <string name="contextlog_alert_action">View failures</string>
     <string name="contextlog_copy_all">Copy all</string>
-    <string name="contextlog_export_txt">Export .txt</string>
     <string name="contextlog_copied">Copied</string>
     <string name="contextlog_copy_too_large">Too large to copy — exported as a file instead</string>
     <string name="contextlog_export_failed">Export failed</string>
-    <string name="contextlog_viewer_copy">Copy</string>
     <string name="contextlog_viewer_chars">%1$s chars · complete</string>
     <string name="contextlog_viewer_chars_truncated">%1$s chars · truncated</string>
     <string name="profile_footer_birthday">Set your birthday and characters will surprise you with a gift on the day. Optional.</string>
@@ -553,6 +551,24 @@
     <string name="scene_voice_call">Voice call</string>
     <string name="scene_busy_reply">Busy reply</string>
     <string name="pm_now_card_hint">Sits last by default (closest to generation, best time awareness); feel free to move it up</string>
+    <!-- Cost saver card (time awareness phase 4 · blueprint 2 §4.4) -->
+    <string name="pm_saver_title">Cost saver</string>
+    <string name="pm_saver_subtitle">Raises cache hits so repeated content is billed at the cached rate</string>
+    <string name="pm_saver_no_cache_hint">Your current provider won’t save money this way</string>
+    <string name="pm_saver_recent_label">Last %1$d chats · cache hits</string>
+    <string name="pm_saver_recent_percent">%1$d%%</string>
+    <string name="pm_saver_recent_unknown">—</string>
+    <string name="pm_saver_recent_none">No chat records yet</string>
+    <string name="pm_saver_open_log">View log ›</string>
+    <string name="pm_saver_open_log_a11y">Open context log</string>
+    <string name="pm_saver_note_1a">"When on, "</string>
+    <string name="pm_saver_note_1b">memory content that changes every turn</string>
+    <string name="pm_saver_note_1c">" (related old chats, mentioned dates, world book entries) moves right before your latest message, so the unchanged part in front can be cached by the provider."</string>
+    <string name="pm_saver_note_2b">Trade-off</string>
+    <string name="pm_saver_note_2c">: in testing reply quality didn’t change, but in a few scenes the character updates its mood slightly more or less often.</string>
+    <string name="pm_saver_note_3b">Only works with providers that cache automatically</string>
+    <string name="pm_saver_note_3c">, such as DeepSeek, GLM and Grok; not Claude and the like.</string>
+    <string name="pm_saver_module_hint">Cost saver: its “related old chats” now sit right before the latest message, rewritten as narration like “On June 14, you said: …”</string>
 
     <!-- Backup / restore (P2.6) -->
     <string name="backup_title">Backup &amp; Restore</string>
@@ -1520,6 +1536,7 @@
 	<string name="moment_comment_output_only">Output only the comment itself, with no extra explanation.</string>
 	<string name="moment_comment_user_message">Please write a comment.</string>
 	<string name="moment_comment_friend_fallback">Friend</string>
+	<string name="moment_comment_mentioned_you">“%1$s” specifically tagged you when posting this, hoping you would see it.</string>
 	<string name="moment_comment_sched_current">You are currently: %1$s</string>
 	<string name="moment_comment_sched_at"> (at %1$s)</string>
 	<string name="moment_comment_sched_feeling">, feeling: %1$s</string>
@@ -1739,6 +1756,8 @@
 	<string name="story_reader_go_chat">Go chat, notify me when ready</string>
 	<!-- P1-20 a11y (wording = iOS accessibilityLabel: Helpers.swift:168 / Choices.swift:74+:107) -->
 	<string name="story_reader_go_chat_a11y">Go to chat, get notified when it\'s ready</string>
+	<string name="story_reader_generating_keep_reading">You can keep reading this chapter</string>
+	<string name="story_reader_chapter_ready">Chapter %1$d is ready · Open ›</string>
 	<string name="story_choice_free_input_a11y">Enter a custom choice</string>
 	<string name="story_reader_locked_hint">Available once the unlock time arrives</string>
 	<!-- Reader UI (11.1i): alert / dialog -->
@@ -2086,13 +2105,43 @@
 	<string name="moment_hub_pet_desc">Raise a pet together</string>
 	<!-- Moments UI (7.2.7): compose / publish -->
 	<string name="moment_compose_title">New moment</string>
-	<string name="moment_compose_hint">Share something…</string>
+	<string name="moment_compose_hint">What\'s on your mind right now…</string>
 	<string name="moment_compose_publish">Post</string>
 	<string name="moment_compose_add_image">Add image</string>
 	<string name="moment_compose_remove_image">Remove image</string>
-	<string name="moment_compose_discard_title">Discard this post?</string>
-	<string name="moment_compose_discard_confirm">Discard</string>
-	<string name="moment_compose_discard_keep">Keep editing</string>
+	<string name="moment_mention_line_prefix">Tagged</string>
+	<string name="moment_mention_separator">", "</string>
+	<string name="moment_compose_daypart_early">Early morning</string>
+	<string name="moment_compose_daypart_morning">Morning</string>
+	<string name="moment_compose_daypart_noon">Noon</string>
+	<string name="moment_compose_daypart_afternoon">Afternoon</string>
+	<string name="moment_compose_daypart_dusk">Dusk</string>
+	<string name="moment_compose_daypart_evening">Evening</string>
+	<string name="moment_compose_daypart_late">Late night</string>
+	<string name="moment_compose_date_line">%2$s, %1$s · %3$s</string>
+	<string name="moment_compose_slim_line">%1$s · %2$s %3$s</string>
+	<string name="moment_compose_mention_chip">Tagging %1$s</string>
+	<string name="moment_compose_mention_chip_clear">Remove tags</string>
+	<string name="moment_compose_mention_chip_edit">Edit tags</string>
+	<string name="moment_compose_mention_title">Tag someone</string>
+	<string name="moment_compose_mention_subtitle">Whoever you tag will definitely stop by and leave a comment.</string>
+	<string name="moment_compose_mention_done">Done</string>
+	<string name="moment_compose_mention_done_count">Done (%1$d)</string>
+	<string name="moment_compose_mention_sleeping">Asleep · will look after waking up</string>
+	<string name="moment_compose_mention_meeting">With you now · will look afterwards</string>
+	<string name="moment_compose_keep_title">Keep this draft?</string>
+	<string name="moment_compose_keep_body">If you keep it, it\'ll still be here next time.</string>
+	<string name="moment_compose_keep">Keep</string>
+	<string name="moment_compose_not_keep">Don\'t keep</string>
+	<string name="moment_compose_restored">Picked up where you left off</string>
+	<string name="moment_compose_restored_clear">Clear</string>
+	<string name="moment_compose_drag_hint">Release to drop · the first photo leads in your feed</string>
+	<string name="moment_compose_photo_item">Photo %1$d</string>
+	<string name="moment_compose_photo_open">View</string>
+	<string name="moment_compose_photo_earlier">Move earlier</string>
+	<string name="moment_compose_photo_later">Move later</string>
+	<string name="moment_compose_chars_left">%1$d characters left</string>
+	<string name="moment_compose_chars_over">%1$d characters over</string>
 	<!-- Moments UI (7.2.8): detail + comments -->
 	<string name="moment_detail_comments_count">Comments (%1$d)</string>
 	<string name="moment_detail_comment_hint">Write a comment…</string>
@@ -2175,10 +2224,12 @@
 	<string name="appearance_palette_section">Theme color</string>
 	<string name="appearance_palette_clay">Clay</string>
 	<string name="appearance_palette_liuli">Liuli glass</string>
-	<string name="appearance_glass_section">Glass transparency</string>
-	<string name="appearance_glass_clear">Clear</string>
-	<string name="appearance_glass_tinted">Tinted</string>
-	<string name="appearance_glass_footer">Clear shows more through; Tinted is easier to read.</string>
+	<string name="appearance_glass_section">Glass style</string>
+	<string name="appearance_glass_frosted">Frosted</string>
+	<string name="appearance_glass_standard">Standard</string>
+	<string name="appearance_glass_sheer">Clear</string>
+	<string name="appearance_glass_footer">Clear looks most like real glass; Frosted is the softest. Glass over a chat wallpaper thickens automatically so text stays readable.</string>
+	<string name="appearance_glass_needs_android13">Standard and Clear need Android 13 or later, so Frosted is used for now.</string>
 	<string name="appearance_mode_section">Theme mode</string>
 	<string name="appearance_mode_system">Follow system</string>
 	<string name="appearance_mode_light">Light</string>
@@ -3490,4 +3541,264 @@
 	<string name="our_days_a11y_cell">%1$s, %2$s</string>
 	<string name="our_days_a11y_strip">Our days, %1$s</string>
 	<string name="our_days_a11y_mini_month">%1$s, open month view</string>
+	<!-- 四期·图纸四 上下文日志页 -->
+	<!-- tools:ignore="PluralsCandidate"：文案按图纸 §4.9 逐字锁定，且全 App 英文计数串一律不用 plurals（存量同类 115 条在 lint 基线里）；是否改 plurals 属全库 i18n 决策，登记图纸 §11。 -->
+	<string name="clog_tab_conversation">By chat</string>
+	<string name="clog_tab_flow">All calls</string>
+	<string name="clog_tab_trend">Trends</string>
+	<string name="clog_home_empty">No calls logged yet</string>
+	<string name="clog_section_today">Today</string>
+	<string name="clog_stat_calls">Calls</string>
+	<string name="clog_stat_failures">Failed</string>
+	<string name="clog_stat_cache">Cache hits</string>
+	<string name="clog_stat_tokens">Tokens</string>
+	<string name="clog_rate_none">—</string>
+	<string name="clog_alert_kind">\u0020·\u0020%1$s</string>
+	<string name="clog_section_characters">Characters</string>
+	<string name="clog_section_system">Not tied to a character</string>
+	<string name="clog_system_tasks">System tasks</string>
+	<string name="clog_cache_caption">cache</string>
+	<string tools:ignore="PluralsCandidate" name="clog_fail_pill">%1$d failed</string>
+	<string tools:ignore="PluralsCandidate" name="clog_meta_turns">%1$d turns</string>
+	<string tools:ignore="PluralsCandidate" name="clog_meta_voice">%1$d voice calls</string>
+	<string tools:ignore="PluralsCandidate" name="clog_meta_background">%1$d background</string>
+	<string tools:ignore="PluralsCandidate" name="clog_meta_calls">%1$d calls</string>
+	<string name="clog_meta_today">Today · %1$s</string>
+	<string name="clog_meta_yesterday">Yesterday %1$s · %2$s</string>
+	<string name="clog_meta_earlier">%1$s · %2$s</string>
+	<string name="clog_system_meta_one">%1$s · %2$s</string>
+	<string name="clog_system_meta_many">%1$s and more · %2$s</string>
+	<string name="clog_source_sep">,\u0020</string>
+	<string name="clog_date_pattern">EEE, MMM d</string>
+	<string name="clog_date_short_pattern">MMM d</string>
+	<string name="clog_day_header_today">Today · %1$s</string>
+	<string name="clog_day_header_yesterday">Yesterday · %1$s</string>
+	<string name="clog_day_today_inline">today</string>
+	<string name="clog_day_yesterday_inline">yesterday</string>
+	<string name="clog_more">More</string>
+	<string name="clog_menu_settings">Retention settings</string>
+	<string name="clog_menu_clear">Clear all</string>
+	<string name="clog_clear_title">Clear all logs?</string>
+	<string name="clog_clear_body">This permanently deletes every context log entry. It can’t be undone.</string>
+	<string name="clog_clear_confirm">Clear</string>
+	<string name="clog_cancel">Cancel</string>
+	<string name="clog_reason_all">All reasons</string>
+	<string name="clog_reason_chip">%1$s %2$d</string>
+	<string name="clog_flow_failure_line">%1$s · %2$s</string>
+	<string name="clog_range_7">Last 7 days</string>
+	<string name="clog_range_30">Last 30 days</string>
+	<string name="clog_trend_empty">No calls in this period</string>
+	<string name="clog_usage_title">Daily usage (tokens)</string>
+	<string name="clog_legend_hit">Cache hit</string>
+	<string name="clog_legend_full">Full price</string>
+	<string name="clog_hit_rate_title">Cache hit rate (chat)</string>
+	<string name="clog_by_model_title">By model · %1$s</string>
+	<string name="clog_col_model">Model</string>
+	<string name="clog_col_calls">Calls</string>
+	<string name="clog_col_tokens">Tokens</string>
+	<string name="clog_col_hits">Hits</string>
+	<string name="clog_no_cache">No cache</string>
+	<string name="clog_no_money">Costs aren’t shown: prices differ by provider and change often.</string>
+	<string name="clog_day_short">%1$d</string>
+	<string tools:ignore="PluralsCandidate" name="clog_usage_a11y">Daily usage over the last %1$d days, peak %2$s</string>
+	<string tools:ignore="PluralsCandidate" name="clog_hitrate_a11y">Chat cache hit rate over the last %1$d days, latest %2$s</string>
+	<string name="clog_conversation_chip">Chat: %1$s</string>
+	<string name="clog_conversation_untitled">Untitled chat</string>
+	<string name="clog_turn_quote">You: %1$s</string>
+	<string name="clog_quote_image">[Image]</string>
+	<string name="clog_quote_voice">[Voice]</string>
+	<string name="clog_quote_wrap">“%1$s”</string>
+	<string tools:ignore="PluralsCandidate" name="clog_turn_replies">%1$d replies</string>
+	<string name="clog_turn_cache">cache %1$d%%</string>
+	<string name="clog_turn_duration">%1$s s</string>
+	<string tools:ignore="PluralsCandidate" name="clog_turn_retries">%1$d retries</string>
+	<string name="clog_turn_failed">Failed · %1$s (%2$s)</string>
+	<string name="clog_kid_failed">failed</string>
+	<string name="clog_bg_caption">Background</string>
+	<string name="clog_character_empty">No recent calls for this character</string>
+	<string name="clog_turn_title">This turn</string>
+	<string name="clog_entry_title">Call details</string>
+	<string name="clog_entry_missing">This entry no longer exists</string>
+	<string name="clog_caption_chat">chat “%1$s”</string>
+	<string name="clog_status_ok">Succeeded</string>
+	<string name="clog_status_failed">Failed</string>
+	<string name="clog_kv_source">Source</string>
+	<string name="clog_kv_model">Model</string>
+	<string name="clog_kv_provider">Provider</string>
+	<string name="clog_kv_duration">Duration</string>
+	<string name="clog_kv_messages">Messages</string>
+	<string name="clog_messages_count">%1$d</string>
+	<string name="clog_old_value">Not in older entries</string>
+	<string name="clog_tokens_title">Token usage</string>
+	<string name="clog_tokens_input">Input</string>
+	<string name="clog_tokens_output">Output</string>
+	<string name="clog_tokens_cache">Cache hits</string>
+	<string name="clog_tokens_extra">Reasoning %1$s · hit %2$s · missed %3$s</string>
+	<string name="clog_tokens_extra_reasoning">Reasoning %1$s</string>
+	<string name="clog_tokens_estimated">Estimated locally (the API didn’t return usage)</string>
+	<string name="clog_open_failure">View failure details</string>
+	<string name="clog_map_title">Context map</string>
+	<string name="clog_legend_prefix">Prefix</string>
+	<string name="clog_legend_variable">Changes each turn</string>
+	<string name="clog_legend_history">Chat history</string>
+	<string name="clog_legend_tail">Tail</string>
+	<string name="clog_break_nav_module">Cache broke at “%1$s”</string>
+	<string name="clog_break_nav_system">Cache broke at the system prompt</string>
+	<string name="clog_break_nav_leading">Cache broke at the notes before the chat</string>
+	<string name="clog_break_nav_time">Cache broke at a time marker</string>
+	<string name="clog_break_nav_slid">Cache broke at the oldest messages</string>
+	<string name="clog_break_nav_changed">Cache broke mid-chat</string>
+	<string name="clog_break_nav_saved">Cache broke at the per-turn block (normal)</string>
+	<string name="clog_break_nav_tail">Everything before the tail was cached (normal)</string>
+	<string name="clog_break_nav_first">No earlier turn to compare yet</string>
+	<string name="clog_break_nav_old">Older entries can’t show where the cache broke</string>
+	<string name="clog_break_nav_sub">Open the full map</string>
+	<string name="clog_map_old">Older entries didn’t record the request shape, so there’s no map</string>
+	<string name="clog_sent_title">What was actually sent</string>
+	<string name="clog_sent_sub_asis">Sent as-is, not rewritten</string>
+	<string tools:ignore="PluralsCandidate" name="clog_sent_sub_adapted">Rewritten in %1$d places</string>
+	<string name="clog_sent_sub_none">Not recorded</string>
+	<string name="clog_reply_full">Full reply</string>
+	<string name="clog_turn_kids_title">Background calls from this turn</string>
+	<string name="clog_export_replay">Export replayable request</string>
+	<string name="clog_export_note">Exports the exact request sent to the model — without the API key — so it can be replayed against a real model.</string>
+	<string name="clog_export_needs_detail">To export the request, turn on “Record full details”.</string>
+	<string name="clog_export_none">There’s no request to export for this entry.</string>
+	<string name="clog_map_caption">%1$s · %2$s turn · %3$s tk in</string>
+	<string name="clog_zone_prefix">Prefix · system prompt</string>
+	<string name="clog_zone_history">Chat history</string>
+	<string name="clog_zone_tail">Tail · after the latest message</string>
+	<string name="clog_map_label_system">System prompt</string>
+	<string name="clog_map_label_leading">Notes before the chat</string>
+	<string name="clog_map_label_tail">Closing notes</string>
+	<string tools:ignore="PluralsCandidate" name="clog_map_more_modules">%1$d more</string>
+	<string tools:ignore="PluralsCandidate" name="clog_history_row">Chat history · %1$d messages</string>
+	<string name="clog_history_ticks_note">White lines = time markers (the model sees them; you don’t in the chat)</string>
+	<string name="clog_marker_tick">Tick (the message’s real time)</string>
+	<string name="clog_marker_scene">Scene-break note (says which day that part was said)</string>
+	<string tools:ignore="PluralsCandidate" name="clog_markers_more">…%1$d more markers</string>
+	<string name="clog_saved_block_extra">Re-picked from your latest message each turn</string>
+	<string name="clog_tail_note">Never cached (always after the latest message)</string>
+	<string name="clog_cut_title">The cache breaks here</string>
+	<string name="clog_cut_prev">Compared with the previous turn (%1$s),\u0020</string>
+	<string name="clog_cut_body_tail">everything before was cached; only the newly added tail was recomputed — this is normal.</string>
+	<string name="clog_cut_body_saved">this is the per-turn block Saver mode moved in front of your latest message; it changes every turn — this is normal.</string>
+	<string name="clog_cut_body_module">the “%1$s” section below changed.</string>
+	<string name="clog_cut_body_system">a part of the system prompt outside the module list (such as the world book) changed.</string>
+	<string name="clog_cut_body_leading">the notes before the chat (truncation note, recap or call note) changed.</string>
+	<string name="clog_cut_body_time">a time marker in the chat changed (for example “today” became “yesterday” after midnight).</string>
+	<string name="clog_cut_body_slid">the oldest messages were pushed out of the window, so the whole chat history was recomputed.</string>
+	<string name="clog_cut_body_changed">a message in the middle of the chat changed (deleted, edited or regenerated).</string>
+	<string name="clog_cut_body_no_previous">This is the first comparable entry in this chat, so there’s no earlier turn to compare.</string>
+	<string name="clog_cut_body_no_data">Older entries (from before the update) can’t show where the cache broke.</string>
+	<string name="clog_cut_cost">From here on, about %1$s tk is billed at full price.</string>
+	<string name="clog_map_purged">Segment details were cleared along with the log text, so only message-level breaks are shown.</string>
+	<string name="clog_provider_title">Provider report</string>
+	<string name="clog_provider_hit">Hit</string>
+	<string name="clog_provider_miss">Missed</string>
+	<string name="clog_provider_hit_value">%1$s tk (%2$d%%)</string>
+	<string name="clog_provider_miss_value">%1$s tk</string>
+	<string name="clog_provider_none">The provider didn’t report cache usage</string>
+	<string name="clog_saver_nav">Want more cache hits? Turn on Saver mode</string>
+	<string name="clog_sent_caption">%1$s · %2$s turn · %3$s (%4$s)</string>
+	<string name="clog_sent_caption_no_provider">%1$s · %2$s turn · %3$s</string>
+	<string name="clog_sent_none">Older entries didn’t record how the request was rewritten.</string>
+	<string name="clog_sent_asis">This provider reads the app’s message layout directly, so nothing was rewritten.</string>
+	<string tools:ignore="PluralsCandidate" name="clog_sent_adapted_intro">This provider moves or drops mid-chat system messages, so the app rewrote %1$d places before sending:</string>
+	<string tools:ignore="PluralsCandidate" name="clog_sent_item_leading">Merged %1$d opening system notes into one</string>
+	<string tools:ignore="PluralsCandidate" name="clog_sent_item_mid">Folded %1$d mid-chat notes (time markers etc.) into your nearby messages</string>
+	<string tools:ignore="PluralsCandidate" name="clog_sent_item_tail">Attached %1$d closing notes to your last message, framed with 【系统说明】</string>
+	<string name="clog_sent_detail_off">To see the text, turn on “Record full details”. While it’s off, only counts and sizes are shown.</string>
+	<string tools:ignore="PluralsCandidate" name="clog_sent_stats">%1$d messages · about %2$s tk</string>
+	<string name="clog_open_log_settings">Turn it on</string>
+	<string name="clog_role_system">System</string>
+	<string name="clog_role_user">You</string>
+	<string name="clog_role_tool">Tool</string>
+	<string name="clog_msg_chars">%1$s chars</string>
+	<string name="clog_added_time">Added by the app · time marker</string>
+	<string name="clog_added_note">Added by the app · %1$s chars</string>
+	<string name="clog_expand">Expand</string>
+	<string name="clog_collapse">Collapse</string>
+	<string tools:ignore="PluralsCandidate" name="clog_middle_collapsed">…… %1$d more in between ……</string>
+	<string name="clog_failure_title">Failure details</string>
+	<string name="clog_failure_steps_title">What you can do</string>
+	<string name="clog_go_api_settings">Open API settings</string>
+	<string name="clog_kv_time">Time</string>
+	<string name="clog_kv_character">Character</string>
+	<string name="clog_kv_same_kind">Same kind</string>
+	<string name="clog_same_kind_value">%2$d %1$s (%3$s)</string>
+	<string name="clog_time_value">%1$s %2$s</string>
+	<string name="clog_raw_error">Raw error</string>
+	<string name="clog_fail_timeout_name">Timed out</string>
+	<string name="clog_fail_timeout_short">Waited too long for a reply — the provider is probably slow</string>
+	<string name="clog_fail_timeout_reason">The provider took too long to answer, so the app gave up and got no reply this time.</string>
+	<string name="clog_fail_timeout_step1">Try again in a moment</string>
+	<string name="clog_fail_timeout_step2">If it keeps timing out, pick a faster model or switch providers in API settings</string>
+	<string name="clog_fail_bad_format_name">Bad request</string>
+	<string name="clog_fail_bad_format_short">The provider couldn’t read the request — the model name or URL is probably wrong</string>
+	<string name="clog_fail_bad_format_reason">The provider couldn’t handle the request (or the app couldn’t read its reply). Usually the model name or endpoint URL is wrong.</string>
+	<string name="clog_fail_bad_format_step1">Check the model name and endpoint URL in API settings</string>
+	<string name="clog_fail_bad_format_step2">If you just switched providers, tap “Test connection” first</string>
+	<string name="clog_fail_rate_limited_name">Too many requests</string>
+	<string name="clog_fail_rate_limited_short">Too many requests in a short time — wait a moment and send again</string>
+	<string name="clog_fail_rate_limited_reason">Too many requests in a short time, so the provider asked the app to slow down.</string>
+	<string name="clog_fail_rate_limited_step1">Wait a minute or two before chatting again</string>
+	<string name="clog_fail_rate_limited_step2">If it happens often, move background features such as memory summaries and growth analysis to a separate API config</string>
+	<string name="clog_fail_content_blocked_name">Blocked by moderation</string>
+	<string name="clog_fail_content_blocked_short">The provider’s content filter blocked this turn</string>
+	<string name="clog_fail_content_blocked_reason">The provider’s safety filter flagged this content and blocked it, so there was no reply this turn.</string>
+	<string name="clog_fail_content_blocked_step1">Rephrase and try again</string>
+	<string name="clog_fail_content_blocked_step2">If it keeps happening, switch to a provider with a less strict filter</string>
+	<string name="clog_fail_invalid_key_name">Invalid key</string>
+	<string name="clog_fail_invalid_key_short">The provider rejected this API key — check it in API settings</string>
+	<string name="clog_fail_invalid_key_reason">The provider doesn’t accept this API key — it may be mistyped, expired or disabled.</string>
+	<string name="clog_fail_invalid_key_step1">Paste the key again in API settings</string>
+	<string name="clog_fail_invalid_key_step2">Check in the provider’s console that the key is still valid</string>
+	<string name="clog_fail_insufficient_balance_name">Out of credit</string>
+	<string name="clog_fail_insufficient_balance_short">The provider says the balance ran out — top up or change the key</string>
+	<string name="clog_fail_insufficient_balance_reason">The provider says this account is out of credit, so there was no reply this turn.</string>
+	<string name="clog_fail_insufficient_balance_step1">Top up in the provider’s console</string>
+	<string name="clog_fail_insufficient_balance_step2">Or change the key or provider in API settings</string>
+	<string name="clog_fail_network_name">Network error</string>
+	<string name="clog_fail_network_short">The phone couldn’t reach the provider — check the network</string>
+	<string name="clog_fail_network_reason">The phone couldn’t reach the provider — no connection, a weak signal, or an unreachable address.</string>
+	<string name="clog_fail_network_step1">Check the network and try again</string>
+	<string name="clog_fail_network_step2">If you use a proxy, make sure it’s on</string>
+	<string name="clog_fail_other_name">Other</string>
+	<string name="clog_fail_other_short">Something else went wrong on the provider’s side — try again later</string>
+	<string name="clog_fail_other_reason">Something else went wrong on the provider’s side (for example the server was busy or down), so there was no reply this time.</string>
+	<string name="clog_fail_other_step1">Try again later</string>
+	<string name="clog_fail_other_step2">If it keeps happening, check the raw error below</string>
+	<!-- 四期·图纸五 上下文阅读器（两条页脚计数串的 tools:ignore="PluralsCandidate" 理由同图纸四块首注释：文案 §4.9 逐字锁定、全 App 英文计数串不用 plurals·登记图纸五 §11） -->
+	<string name="clog_reader_fallback">The actual request for this call wasn’t saved (an older record, or it was too long to keep). Below is what the app put together before sending.</string>
+	<string name="clog_reader_count_unit">messages</string>
+	<string name="clog_reader_size">~%1$s tk · %2$s chars</string>
+	<string name="clog_reader_legend_system">System prompt</string>
+	<string name="clog_reader_legend_added">Added by app</string>
+	<string name="clog_reader_role_assistant">Character</string>
+	<string name="clog_reader_open_map">View map</string>
+	<string name="clog_reader_filter_all">All</string>
+	<string name="clog_reader_unsegmented">Unsegmented (world book, etc.)</string>
+	<string name="clog_reader_changed">Changed</string>
+	<string name="clog_reader_expand_all">Show full text</string>
+	<string name="clog_reader_empty_body">(No text)</string>
+	<string tools:ignore="PluralsCandidate" name="clog_reader_footer">%1$d messages · %2$s chars</string>
+	<string tools:ignore="PluralsCandidate" name="clog_reader_footer_truncated">%1$d messages · %2$s chars · truncated</string>
+	<string name="clog_reader_copy_message">Copy this message</string>
+	<string name="clog_reader_copy_all">Copy all</string>
+	<string name="clog_reader_search">Search</string>
+	<string name="clog_reader_search_hint">Search what was sent</string>
+	<string name="clog_reader_search_clear">Clear</string>
+	<string name="clog_reader_prev_hit">Previous match</string>
+	<string name="clog_reader_next_hit">Next match</string>
+	<string name="clog_reader_hits">%1$d / %2$d</string>
+	<string name="clog_reader_hits_capped">%1$d / %2$d+</string>
+	<string name="clog_reader_no_hits">No matches</string>
+	<string name="clog_reader_only_hits">Only messages with matches</string>
+	<string name="clog_reader_only_hits_note">Folded parts open automatically</string>
+	<string name="clog_reader_search_empty">No matches for “%1$s”</string>
+	<string name="clog_reader_jump_top">Back to top</string>
+	<string name="clog_reader_jump_bottom">Jump to end</string>
+	<string name="clog_reply_reasoning">The model spent %1$s tk thinking this turn (only the amount was logged, not the thinking itself).</string>
+	<string name="clog_reply_empty">(Empty)</string>
 </resources>

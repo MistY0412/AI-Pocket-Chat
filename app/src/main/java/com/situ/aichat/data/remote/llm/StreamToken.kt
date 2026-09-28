@@ -3,7 +3,13 @@ package com.situ.aichat.data.remote.llm
 /** A single streamed delta: visible content, thinking-process text, or a tool-call fragment. */
 sealed interface StreamToken {
     data class Content(val text: String) : StreamToken
-    data class Reasoning(val text: String) : StreamToken
+
+    /**
+     * 思考片段。[fromReasoningContent] = 来自协议字段 `reasoning_content`（DeepSeek 系约定：思考模式下同一轮的工具
+     * 回喂必须把它原样带回 assistant 消息，否则 400）；OpenRouter 的 `reasoning` 字段与正文内联 `<think>` 剥出的为 false，
+     * 不回传（图纸 2026-09-26-工具回喂回传思考内容）。
+     */
+    data class Reasoning(val text: String, val fromReasoningContent: Boolean = false) : StreamToken
 
     /** 流式工具调用增量片段（1:1 iOS StreamToken.toolCallDelta）。 */
     data class ToolCallDelta(val chunk: ToolCallChunk) : StreamToken

@@ -4,6 +4,8 @@ import com.situ.aichat.R
 import com.situ.aichat.data.model.currentAge
 import com.situ.aichat.openloop.OpenLoopScanService
 import com.situ.aichat.promise.PromiseInjectionRenderer
+import com.situ.aichat.prompt.timesense.SpecialDays
+import com.situ.aichat.prompt.timesense.TimeSenseLines
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -154,6 +156,10 @@ internal fun formatBirthdayForPrompt(utcMillis: Long, pattern: String): String =
     DateTimeFormatter.ofPattern(pattern, Locale.ROOT)
         .format(Instant.ofEpochMilli(utcMillis).atZone(ZoneOffset.UTC))
 
+/** 角色记忆第三层（向量检索片段）：段头 + 引言 + 各片段（四期·图纸二 §3.2 ②·省钱模式挪位时复用同一份）。 */
+internal fun memorySnippetSection(snippets: List<String>, s: PromptStrings): List<String> =
+    listOf(s.s(R.string.pb_mem_snippets_head), s.s(R.string.pb_mem_snippets_intro)) + snippets
+
 internal fun buildCharacterMemoryContent(ctx: PromptBuilder.BuildContext): String {
     val s = ctx.strings
     val sm = ctx.structuredMemory
@@ -218,11 +224,7 @@ internal fun buildCharacterMemoryContent(ctx: PromptBuilder.BuildContext): Strin
     if (promiseBlock.isNotEmpty()) parts.add(promiseBlock)
 
     // 第三层：向量检索结果
-    if (snippets.isNotEmpty()) {
-        parts.add(s.s(R.string.pb_mem_snippets_head))
-        parts.add(s.s(R.string.pb_mem_snippets_intro))
-        for (snippet in snippets) parts.add(snippet)
-    }
+    if (snippets.isNotEmpty()) parts.addAll(memorySnippetSection(snippets, s))
 
     // 第四层：世界联动上下文（W5·提炼 + 世界记忆·自带块头·§9 联动闭环·additive）。
     if (!worldContext.isNullOrBlank()) parts.add(worldContext)
@@ -283,6 +285,14 @@ internal fun buildTimeAwarenessContent(ctx: PromptBuilder.BuildContext): String 
         directionalGapLine = !ctx.delayedGeneration,
         acquaintance = acquaintance,
         userLabel = userLabel,
+        sense = ctx.timeSense?.let { // 四期·图纸一 §3.5：在线文字聊天才非 null
+            val zone = java.time.ZoneId.systemDefault()
+            TimeSenseLines.build(it, SpecialDays.Inputs(
+                today = ctx.now.atZone(zone).toLocalDate(), zone = zone, userLabel = userLabel,
+                userBirthdayUtcMillis = ctx.userProfile?.birthday, characterBirthdayUtcMillis = ctx.character.birthday,
+                firstMessageDateMillis = ctx.character.firstMessageDate,
+            ), ctx.now, zone)
+        },
     )
 }
 

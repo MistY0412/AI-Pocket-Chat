@@ -15,11 +15,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -70,36 +66,11 @@ internal fun StoryDirectorSheet(
     val colors = AppTheme.colors
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val initialBeats = remember(beats) { beats.orEmpty() }
-    var flowText by remember { mutableStateOf(savedDirection.orEmpty()) }
-    var beatsText by remember { mutableStateOf(initialBeats) }
-    // 防重入（卷二 StoryFieldEditorViewModel 同款）：写口是 fire-and-forget，连点会发两遍。
-    var saving by remember { mutableStateOf(false) }
-    var confirmDiscard by remember { mutableStateOf(false) }
-    var confirmWithdraw by remember { mutableStateOf(false) }
-
-    // ⚠️ 三个 dirty 判据一律写成**函数**、点到才算，绝不缓存成捕获值（装机实测踩坑·图纸 §11 D-7）：
-    // 局部 fun 的函数引用（`::save`）在重组之间被 Compose 判为「参数没变」→ 整个按钮被跳过更新 →
-    // 里面捕获的 `val beatsDirty` 永远停在首帧的 false，用户改了字照样一个字节都不写库（静默失效）。
-    // 写成函数后读的是 MutableState 的当下值，与是谁持有这个闭包无关。
-    // 编辑模式下「非空」还不够：与已存走向逐字相同 = 没改，纯关面板不写库（清空则交撤回按钮，见 hint）。
-    fun flowDirty() = flowText.isNotBlank() && (savedDirection == null || flowText.trim() != savedDirection.trim())
-    fun beatsDirty() = beatsText.trim() != initialBeats.trim()
-    fun dirty() = flowDirty() || beatsDirty()
-
-    /** 保存分派（§4.4）：哪栏变了发哪条；栏 A 的**路由**看 [directionCommitted]——已答覆盖直写，没答走创建路。 */
-    fun save() {
-        if (saving) return
-        saving = true
-        if (flowDirty()) {
-            if (directionCommitted) onOverwriteDirection(flowText.trim()) else onSubmitFlow(flowText.trim())
-        }
-        if (beatsDirty()) onSaveBeats(beatsText)
-        onDismiss()
-    }
+    val initialBeats = rememberStoryDirectorInitialBeats(beats)
+    val state = rememberStoryDirectorEditorState(savedDirection, initialBeats)
 
     AppSheet(
-        onDismissRequest = { if (dirty()) confirmDiscard = true else onDismiss() },
+        onDismissRequest = { state.requestDismiss(savedDirection, initialBeats, onDismiss) },
         sheetState = sheetState,
     ) {
         Column(
@@ -136,8 +107,8 @@ internal fun StoryDirectorSheet(
                     }
                 }
                 AppTextArea(
-                    value = flowText,
-                    onValueChange = { flowText = it },
+                    value = state.flowText,
+                    onValueChange = { state.flowText = it },
                     placeholder = stringResource(R.string.story_director_flow_hint),
                     minHeight = 96.dp,
                     maxLines = 6,
@@ -168,8 +139,8 @@ internal fun StoryDirectorSheet(
                     )
                 }
                 AppTextArea(
-                    value = beatsText,
-                    onValueChange = { beatsText = it },
+                    value = state.beatsText,
+                    onValueChange = { state.beatsText = it },
                     placeholder = stringResource(R.string.story_director_beats_hint),
                     minHeight = 120.dp,
                     maxLines = 8,
@@ -187,21 +158,21 @@ internal fun StoryDirectorSheet(
                 // 破坏性动作走 quiet 档不占主 CTA（房规 PITFALLS 1d）。
                 if (savedDirection != null) {
                     AppButton(
-                        onClick = { if (!saving) confirmWithdraw = true },
+                        onClick = { state.requestWithdraw() },
                         style = AppButtonStyle.Text,
-                        enabled = !saving,
+                        enabled = !state.saving,
                     ) { Text(stringResource(R.string.story_director_withdraw)) }
                 }
                 // 只在「已由你修改」时出现：没改过的书按它等于原地踏步，摆出来只会让人以为自己改坏了什么。
                 if (beatsUserEdited) {
                     AppButton(
-                        onClick = { if (!saving) { saving = true; onRestoreAiBeats(); onDismiss() } },
+                        onClick = { state.restoreAiBeats(onRestoreAiBeats, onDismiss) },
                         style = AppButtonStyle.Tonal,
-                        enabled = !saving,
+                        enabled = !state.saving,
                     ) { Text(stringResource(R.string.story_director_restore_ai)) }
                 }
                 Spacer(Modifier.weight(1f))
-                AppButton(onClick = { save() }, style = AppButtonStyle.Primary, enabled = !saving) {
+                AppButton(onClick = { state.save(savedDirection, initialBeats, directionCommitted, onSubmitFlow, onOverwriteDirection, onSaveBeats, onDismiss) }, style = AppButtonStyle.Primary, enabled = !state.saving) {
                     Text(stringResource(R.string.action_save))
                 }
             }
@@ -210,13 +181,13 @@ internal fun StoryDirectorSheet(
 
     // dirty 返回确认（§4.4·复用卷二统一编辑页的三条词条，不新增）：放弃则一个字节都不写库。
     // 「继续编辑」要把已被拖走的 sheet 重新升起来——ModalBottomSheet 在 onDismissRequest 时已自行隐去。
-    if (confirmDiscard) {
-        val keepEditing = { confirmDiscard = false; scope.launch { sheetState.show() }; Unit }
+    if (state.confirmDiscard) {
+        val keepEditing = { state.confirmDiscard = false; scope.launch { sheetState.show() }; Unit }
         AppDialog(
             onDismissRequest = keepEditing,
             title = stringResource(R.string.story_field_discard_title),
             confirmText = stringResource(R.string.story_field_discard_yes),
-            onConfirm = { confirmDiscard = false; onDismiss() },
+            onConfirm = { state.discardAndClose(onDismiss) },
             confirmTone = AppDialogTone.Danger,
             dismissText = stringResource(R.string.story_field_discard_no),
             onDismiss = keepEditing,
@@ -225,14 +196,14 @@ internal fun StoryDirectorSheet(
 
     // 撤回确认（§4.4）：一点即永久删掉手写文本、无从找回 → 照 dirty 弃改确认同族加一道 Danger 闸。
     // 「继续编辑」同样要把已被拖走的 sheet 重新升起来（逐字照上面的 keepEditing 姿势）。
-    if (confirmWithdraw) {
-        val keepEditing = { confirmWithdraw = false; scope.launch { sheetState.show() }; Unit }
+    if (state.confirmWithdraw) {
+        val keepEditing = { state.confirmWithdraw = false; scope.launch { sheetState.show() }; Unit }
         AppDialog(
             onDismissRequest = keepEditing,
             title = stringResource(R.string.story_director_withdraw_title),
             body = stringResource(R.string.story_director_withdraw_body),
             confirmText = stringResource(R.string.story_director_withdraw_confirm),
-            onConfirm = { confirmWithdraw = false; saving = true; onWithdrawDirection(); onDismiss() },
+            onConfirm = { state.confirmWithdrawAndClose(onWithdrawDirection, onDismiss) },
             confirmTone = AppDialogTone.Danger,
             dismissText = stringResource(R.string.story_field_discard_no),
             onDismiss = keepEditing,

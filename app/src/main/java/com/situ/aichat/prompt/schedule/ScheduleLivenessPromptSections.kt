@@ -149,6 +149,16 @@ internal object ScheduleLivenessPromptSections {
         }
     }
 
+    /** 【TA自己说过的打算】（四期·图纸一 §3.7 逐字锁定）：TA 在聊天里亲口说过、落在今天的打算；空则缺席。 */
+    fun ownPlansSection(plans: List<String>): List<String> {
+        if (plans.isEmpty()) return emptyList()
+        return buildList {
+            add("【TA自己说过的打算】（TA之前在聊天里亲口说过、要在今天做的事）")
+            for (p in plans) add("- $p")
+            add("这些是TA自己的安排，请排进今天的日程；原话里说了时间就按那个时间排。和【今天的约定】冲突时，以约定为准。")
+        }
+    }
+
     /** 【近期已定的约定】背景组：只准期待、不准提前排。空则缺席。 */
     fun upcomingPromisesSection(liveness: ScheduleLivenessContext): List<String> {
         if (liveness.upcomingPromises.isEmpty()) return emptyList()

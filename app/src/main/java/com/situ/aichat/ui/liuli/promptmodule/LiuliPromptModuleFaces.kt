@@ -10,10 +10,10 @@ import com.situ.aichat.ui.promptmodule.PromptModuleSettingsScreen
  * （`promptModules` 与 `promptModules/{characterUuid}`·A-1 明说两条都换）。琉璃版排在 C3。
  */
 @Composable
-fun SkinnedPromptModuleSettingsScreen(onBack: () -> Unit, onOpenImmersiveSettings: () -> Unit) {
+fun SkinnedPromptModuleSettingsScreen(onBack: () -> Unit, onOpenImmersiveSettings: () -> Unit, onOpenContextLog: () -> Unit) {
     if (LocalAppSkin.current == AppSkin.LIULI) {
-        LiuliPromptModuleScreen(onBack = onBack, onOpenImmersiveSettings = onOpenImmersiveSettings)
+        LiuliPromptModuleScreen(onBack = onBack, onOpenImmersiveSettings = onOpenImmersiveSettings, onOpenContextLog = onOpenContextLog)
         return
     }
-    PromptModuleSettingsScreen(onBack = onBack, onOpenImmersiveSettings = onOpenImmersiveSettings)
+    PromptModuleSettingsScreen(onBack = onBack, onOpenImmersiveSettings = onOpenImmersiveSettings, onOpenContextLog = onOpenContextLog)
 }

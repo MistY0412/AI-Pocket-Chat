@@ -2,6 +2,8 @@ package com.situ.aichat.ui.liuli.settings
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -25,8 +27,8 @@ import org.robolectric.annotation.Config
 /**
  * T2：外观页内容层（图纸 2026-09-06 卷四 §8 C3b · A-6）。
  *
- * 钉：三个条件节（透明度只在琉璃 + 有实时模糊时显 E4 / 动态取色只在 SDK ≥ 31 显 E5 /
- * **底栏不透明度节琉璃不做**）；四个 setter 各恰一次且带正确的新值；选中态语义正确。
+ * 钉：三个条件节（玻璃质感琉璃脸下恒显、安卓 13 以下整行置灰·琉璃 2.0 卷一图纸 §7 T2-5·E3 / E15 /
+ * 动态取色只在 SDK ≥ 31 显 E5 / **底栏不透明度节琉璃不做**）；四个 setter 各恰一次且带正确的新值；选中态语义正确。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "zh-rCN-w411dp-h891dp")
@@ -36,12 +38,12 @@ class LiuliAppearanceContentTest {
     val compose = createComposeRule()
 
     private val skin = mutableStateOf(AppSkin.LIULI)
-    private val tier = mutableStateOf(GlassTier.CLEAR)
+    private val tier = mutableStateOf(GlassTier.SHEER)
     private val mode = mutableStateOf(AppearanceMode.SYSTEM)
     private val dynamic = mutableStateOf(false)
     private val calls = mutableMapOf<String, Any>()
 
-    private fun show(blurSupported: Boolean = true, dynamicColorSupported: Boolean = true) {
+    private fun show(hazeSupported: Boolean = true, dynamicColorSupported: Boolean = true) {
         compose.setContent {
             AIPocketChatTheme(darkTheme = false, skin = AppSkin.LIULI) {
                 CompositionLocalProvider(LocalAppHaptics provides mockk<AppHaptics>(relaxed = true)) {
@@ -55,7 +57,7 @@ class LiuliAppearanceContentTest {
                         onSetMode = { calls["mode"] = it },
                         onSetDynamicColor = { calls["dynamic"] = it },
                         onBack = {},
-                        blurSupported = blurSupported,
+                        hazeSupported = hazeSupported,
                         dynamicColorSupported = dynamicColorSupported,
                     )
                 }
@@ -77,24 +79,29 @@ class LiuliAppearanceContentTest {
         assertEquals(AppSkin.CLAY, calls["skin"])
     }
 
-    @Test fun 透明度节只在琉璃且有实时模糊时才在() {
-        show(blurSupported = true)
-        compose.onNodeWithText("清透").performScrollTo().assertIsSelected()
-        compose.onNodeWithText("着色").performScrollTo().performClick()
+    @Test fun 玻璃质感默认通透选中且点标准恰回调一次() {
+        show(hazeSupported = true)
+        compose.onNodeWithText("通透").performScrollTo().assertIsSelected()
+        compose.onNodeWithText("标准").performScrollTo().performClick()
         compose.waitForIdle()
-        assertEquals(GlassTier.TINTED, calls["tier"])
+        assertEquals(GlassTier.STANDARD, calls["tier"])
     }
 
-    @Test fun 无实时模糊能力时透明度节不组合() {
-        show(blurSupported = false)
-        compose.onNodeWithText("清透").assertDoesNotExist()
-        compose.onNodeWithText("着色").assertDoesNotExist()
+    @Test fun 安卓13以下整行置灰显示毛玻璃且点不动() {
+        show(hazeSupported = false)
+        compose.onNodeWithText("毛玻璃").performScrollTo().assertIsSelected()
+        listOf("毛玻璃", "标准", "通透").forEach { compose.onNodeWithText(it).assertIsNotEnabled() }
+        compose.onNodeWithText("标准和通透需要安卓 13 及以上，当前使用毛玻璃。").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("通透").performClick()
+        compose.waitForIdle()
+        assertEquals("置灰时点哪段都不回调", null, calls["tier"])
     }
 
-    @Test fun 暖陶脸下透明度节不组合() {
+    @Test fun 暖陶脸下玻璃质感节不组合() {
         skin.value = AppSkin.CLAY
-        show(blurSupported = true)
-        compose.onNodeWithText("清透").assertDoesNotExist()
+        show(hazeSupported = true)
+        compose.onNodeWithText("玻璃质感").assertDoesNotExist()
+        compose.onNodeWithText("通透").assertDoesNotExist()
     }
 
     @Test fun 深浅模式三段与切换回调() {

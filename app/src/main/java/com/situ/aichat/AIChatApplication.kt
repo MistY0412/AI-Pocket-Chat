@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.situ.aichat.diagnostics.ContextLogService
+import com.situ.aichat.diagnostics.StrictModeGuard
 import com.situ.aichat.notification.NotificationChannels
 import com.situ.aichat.ui.gift.GiftImageStore
 import com.situ.aichat.ui.pet.PetSpriteLoader
@@ -28,6 +29,9 @@ class AIChatApplication : Application(), Configuration.Provider {
     }
 
     override fun onCreate() {
+        // 稳定性防线 B：debug 包专用 StrictMode 哨兵（只记日志不打断）；放在 super.onCreate() 之前，连 Hilt 注入期的
+        // 主线程 IO 也一并记下。release 包里 BuildConfig.DEBUG 恒 false，整段连同 StrictModeGuard 被 R8 删掉。
+        if (BuildConfig.DEBUG) StrictModeGuard.install()
         super.onCreate()
         // 通知渠道(P6.1a)：发任何通知前必须先建好渠道(Android 8+)。幂等，可重复调用。
         NotificationChannels.ensureCreated(this)

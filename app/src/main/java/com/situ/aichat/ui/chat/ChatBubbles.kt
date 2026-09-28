@@ -47,8 +47,10 @@ import kotlin.math.PI
 import kotlin.math.sin
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -62,6 +64,7 @@ import com.situ.aichat.ui.components.rememberReduceMotion
 import com.situ.aichat.ui.designsystem.AppShapes
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
+import com.situ.aichat.ui.designsystem.userFill
 import com.situ.aichat.util.DateFormatters
 import com.situ.aichat.R
 import kotlinx.coroutines.delay
@@ -74,10 +77,18 @@ import kotlinx.coroutines.delay
  * chat-ui-5：气泡下方一行「HH:mm + 回执」（1:1 iOS BubbleInlineTimestamp）。仅用户消息显回执：
  * [read]=true → ✓✓（主题强调色，对应 iOS iMessage 蓝映射 accent）；false → ✓（灰，发出 1s 后才显，前 1s 仅时间）；
  * null（AI 消息）→ 只显时间无勾。
+ * 卷四：有壁纸时由列表提供 [LocalBubbleStampTone]，字与勾换成壁纸上的玻璃主字色 + 描边；没有壁纸 = 原样。
  */
 @Composable
 internal fun BubbleInlineTimestamp(timestampMs: Long, isUser: Boolean, read: Boolean?, a11yHidden: Boolean = false) {
     val colors = AppTheme.colors
+    val tone = LocalBubbleStampTone.current
+    val density = LocalDensity.current
+    val stampStyle = if (tone == null) {
+        AppTypography.captionNumeric
+    } else {
+        AppTypography.captionNumeric.copy(shadow = Shadow(tone.halo, Offset.Zero, with(density) { STAMP_HALO_BLUR.toPx() }))
+    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -86,8 +97,8 @@ internal fun BubbleInlineTimestamp(timestampMs: Long, isUser: Boolean, read: Boo
         // WCAG 决议：功能性小字（时间戳）用 text.secondary（tertiary 降为纯装饰）；tnum 防分秒跳动错位。
         Text(
             DateFormatters.hourMinute(timestampMs),
-            style = AppTypography.captionNumeric,
-            color = colors.text.secondary,
+            style = stampStyle,
+            color = tone?.color ?: colors.text.secondary,
         )
         if (isUser && read != null) {
             Crossfade(targetState = read, label = "receipt") { isRead ->
@@ -95,7 +106,7 @@ internal fun BubbleInlineTimestamp(timestampMs: Long, isUser: Boolean, read: Boo
                     Icon(
                         Icons.Filled.DoneAll,
                         contentDescription = stringResource(R.string.a11y_message_read),
-                        tint = colors.accent.text,
+                        tint = tone?.color ?: colors.accent.text,
                         modifier = Modifier.size(14.dp),
                     )
                 } else {
@@ -109,7 +120,7 @@ internal fun BubbleInlineTimestamp(timestampMs: Long, isUser: Boolean, read: Boo
                         Icon(
                             Icons.Filled.Check,
                             contentDescription = stringResource(R.string.a11y_message_delivered),
-                            tint = colors.text.secondary,
+                            tint = tone?.color ?: colors.text.secondary,
                             modifier = Modifier.size(14.dp),
                         )
                     }
@@ -146,7 +157,7 @@ internal fun Bubble(
             .then(
                 if (isUser) {
                     // 审计 P5：渐变按主题色 remember，重组不再逐次新建 Brush。
-                    Modifier.background(remember(colors) { Brush.linearGradient(listOf(colors.bubble.userStart, colors.bubble.userEnd)) })
+                    Modifier.background(remember(colors) { colors.bubble.userFill() })
                 } else {
                     Modifier.background(colors.bubble.ai)
                 },
@@ -185,6 +196,8 @@ internal fun Bubble(
  * 下**尺寸不动画**——隔离行为测试实证内容已切换而容器高度纹丝不动（52dp 恒定），设备上呈现为「三点一帧
  * 瞬变正文」的跳动（列表重排捎带把终态尺寸修正，动画全程缺失）。手搓双层 = 变身进度单值驱动交叉淡入/缩放
  * + [animateContentSize] 承担长高（最扎实的尺寸动画原语），行为由 AssistantBubbleMorphTest 三采样点钉住。
+ *
+ * [onDoubleClick] / [body] 两个参数只给琉璃用（卷三），暖陶不传 = 改前原样。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -197,6 +210,10 @@ internal fun AssistantTextBubble(
     maxWidth: Dp,
     onLongClick: () -> Unit,
     a11yDescription: String? = null,
+    /** 琉璃 2.0 卷三（加法零回归·null = 原样）：双击回调（琉璃的 ❤️ 回应）。 */
+    onDoubleClick: (() -> Unit)? = null,
+    /** 琉璃 2.0 卷三（加法零回归·null = 原样 `Text`）：正文槽（琉璃长文折叠）；引用块仍由本件画在它之上。 */
+    body: (@Composable () -> Unit)? = null,
 ) {
     val colors = AppTheme.colors
     val reduceMotion = rememberReduceMotion()
@@ -213,7 +230,7 @@ internal fun AssistantTextBubble(
             .clip(shape)
             .background(colors.bubble.ai)
             .then(if (colors.isDark) Modifier.border(1.dp, colors.bubble.aiStroke, shape) else Modifier)
-            .combinedClickable(onClick = {}, onLongClick = { if (revealed) onLongClick() }, onLongClickLabel = stringResource(R.string.a11y_message_menu))
+            .combinedClickable(onClick = {}, onLongClick = { if (revealed) onLongClick() }, onLongClickLabel = stringResource(R.string.a11y_message_menu), onDoubleClick = onDoubleClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -241,7 +258,7 @@ internal fun AssistantTextBubble(
                         )
                         Spacer(Modifier.size(4.dp))
                     }
-                    Text(text = text, style = AppTypography.body, color = colors.text.primary)
+                    if (body != null) body() else Text(text = text, style = AppTypography.body, color = colors.text.primary)
                 }
             }
             if (morph < 0.999f) {

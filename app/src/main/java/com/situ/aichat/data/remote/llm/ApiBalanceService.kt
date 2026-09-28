@@ -2,6 +2,7 @@ package com.situ.aichat.data.remote.llm
 
 import android.util.Log
 import com.situ.aichat.data.model.ApiProviderType
+import com.situ.aichat.data.remote.LazyOkHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -31,9 +32,12 @@ sealed interface ApiBalanceResult {
  * - OpenRouter: tries `/api/v1/credits` (Management Key), falls back to `/api/v1/key` on 403.
  */
 class ApiBalanceService(
-    private val client: OkHttpClient,
+    private val http: LazyOkHttpClient,
     private val json: Json,
 ) {
+    /** 测试 / 已有现成客户端用；App 内由 NetworkModule 注入懒持有（启动主线程读盘清零 ①）。 */
+    constructor(client: OkHttpClient, json: Json) : this(LazyOkHttpClient(client), json)
+
     suspend fun fetchBalance(
         providerType: ApiProviderType,
         baseUrl: String,
@@ -132,7 +136,7 @@ class ApiBalanceService(
 
     private suspend fun get(url: String, headers: Map<String, String>): Pair<Int, String?> =
         withContext(Dispatchers.IO) {
-            val timed = client.newBuilder().callTimeout(15, TimeUnit.SECONDS).build()
+            val timed = http.get().newBuilder().callTimeout(15, TimeUnit.SECONDS).build()
             // 请求构造也在 runCatching 内：key 混入非 ASCII 字符（如粘贴带进中文/全角）时 addHeader 抛
             // IllegalArgumentException，此前在 catch 外 = 未捕获闪退（调用链 refreshBalances 无兜底）。
             runCatching {

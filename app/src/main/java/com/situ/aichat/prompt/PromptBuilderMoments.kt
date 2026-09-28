@@ -19,7 +19,7 @@ internal fun buildMomentsContextContent(ctx: PromptBuilder.BuildContext): String
     val parts = mutableListOf<String>()
     parts.add("[最近的朋友圈互动]")
     parts.add(
-        "当前时刻：$nowStr。以下是你和${ctx.resolvedUserName}最近 7 天在朋友圈的互动记录，" +
+        (if (ctx.appSettings.cacheSaverEnabled) "当前日期：${nowStr.substringBefore(' ')}" else "当前时刻：$nowStr") + "。以下是你和${ctx.resolvedUserName}最近 7 天在朋友圈的互动记录，" +
             "每条都标注了发布时间（如「4月19日 09:00 · 3天前」）：",
     )
     parts.add("- 请根据每条的时间标签判断新旧，不要把几天前的当成刚刚发生的")

@@ -99,7 +99,7 @@ class StorySettingsViewModelTest {
     fun 自定义提示词_trim后空字段归null_编码非空写库() {
         coEvery { repo.getStory("s1") } returns StoryEntity(id = "s1", customPromptsJson = null)
         var captured: String? = SENTINEL
-        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg(); Unit }
+        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg() }
 
         vm().saveCustomPrompts(
             genreTechniques = "  修仙核心技法  ", writerIdentity = "", writingRules = "   ", bannedExpressions = "  少写雨  ",
@@ -117,7 +117,7 @@ class StorySettingsViewModelTest {
     fun 自定义提示词_四字段全空_清JSON为null() {
         coEvery { repo.getStory("s1") } returns StoryEntity(id = "s1", customPromptsJson = null)
         var captured: String? = SENTINEL
-        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg(); Unit }
+        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg() }
 
         vm().saveCustomPrompts("", "  ", "", "")
         await("写库") { captured != SENTINEL }
@@ -136,7 +136,7 @@ class StorySettingsViewModelTest {
         )
         coEvery { repo.getStory("s1") } returns StoryEntity(id = "s1", customPromptsJson = existing)
         var captured: String? = SENTINEL
-        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg(); Unit }
+        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg() }
 
         vm().saveCustomPrompts("新技法", "新身份", "", "")
         await("写库") { captured != SENTINEL }
@@ -153,7 +153,7 @@ class StorySettingsViewModelTest {
         coEvery { repo.getStory("s1") } returns
             StoryEntity(id = "s1", customPromptsJson = CustomStoryPrompts.encode(CustomStoryPrompts(pacingPreference = "快节奏")))
         var captured: String? = SENTINEL
-        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg(); Unit }
+        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg() }
 
         vm().saveCustomPrompts("", "", "", "")
         await("写库") { captured != SENTINEL }
@@ -179,7 +179,7 @@ class StorySettingsViewModelTest {
         )
         coEvery { repo.getStory("s1") } returns StoryEntity(id = "s1", customPromptsJson = existing)
         var captured: String? = SENTINEL
-        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg(); Unit }
+        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg() }
 
         vm().savePacing("  慢热，多写日常  ")
         await("写库") { captured != SENTINEL }
@@ -195,7 +195,7 @@ class StorySettingsViewModelTest {
     fun 节奏偏好_超300字截断_预设题材空JSON也能落() {
         coEvery { repo.getStory("s1") } returns StoryEntity(id = "s1", customPromptsJson = null)
         var captured: String? = SENTINEL
-        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg(); Unit }
+        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg() }
 
         // 故事二期 D-8：上限 100 → 300（380 字截成 300）
         vm().savePacing("节".repeat(380))
@@ -211,7 +211,7 @@ class StorySettingsViewModelTest {
         coEvery { repo.getStory("s1") } returns
             StoryEntity(id = "s1", customPromptsJson = CustomStoryPrompts.encode(CustomStoryPrompts(pacingPreference = "旧值")))
         var captured: String? = SENTINEL
-        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg(); Unit }
+        coEvery { repo.updateCustomPrompts(any(), any()) } answers { captured = secondArg() }
 
         vm().savePacing("   ")
         await("写库") { captured != SENTINEL }

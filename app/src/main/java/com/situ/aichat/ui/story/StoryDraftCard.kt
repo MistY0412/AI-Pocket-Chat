@@ -61,10 +61,7 @@ internal fun StoryDraftCard(
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    stringResource(
-                        if (draftUserEdited) R.string.story_continue_draft_tag_user
-                        else R.string.story_continue_draft_tag_ai,
-                    ),
+                    stringResource(storyDraftTagRes(draftUserEdited)),
                     color = StoryReaderLayout.menuAccentColor(isDark),
                     fontSize = 10.sp,
                 )
@@ -91,4 +88,4 @@ internal fun StoryDraftCard(
 }
 
 /** 草稿正文的预览行数（图纸 U-2 锁定值）。 */
-private const val DRAFT_MAX_LINES = 4
+internal const val DRAFT_MAX_LINES = 4

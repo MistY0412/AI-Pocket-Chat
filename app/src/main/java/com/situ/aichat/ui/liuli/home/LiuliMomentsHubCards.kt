@@ -23,7 +23,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -34,17 +33,20 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.situ.aichat.R
-import com.situ.aichat.data.local.entity.CharacterEntity
-import com.situ.aichat.data.local.entity.MomentPostEntity
-import com.situ.aichat.data.model.MomentAuthorType
 import com.situ.aichat.ui.components.CharacterAvatar
 import com.situ.aichat.ui.designsystem.AppFeatureIcons
+import com.situ.aichat.ui.designsystem.AppNavIcons
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
+import com.situ.aichat.ui.designsystem.Palette
+import com.situ.aichat.ui.liuli.designsystem.LiuliMaterials
 import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
+import com.situ.aichat.ui.liuli.designsystem.LiuliTileTone
 import com.situ.aichat.ui.moments.MomentsHubState
-import com.situ.aichat.ui.moments.StoryHubStatus
-import com.situ.aichat.ui.moments.storyHubStatus
+import com.situ.aichat.ui.moments.momentsHubDiaryPreviewText
+import com.situ.aichat.ui.moments.momentsHubPostPreview
+import com.situ.aichat.ui.moments.momentsHubPreviewAuthor
+import com.situ.aichat.ui.moments.momentsHubStoryPreviewText
 
 /** 卡内落值（§3.2「卡片」/ §4.5）：提示条 14 圆角 10/14 · 头像排 26 叠 −6 描边 2 · 预览正文取 30 字。 */
 private val BANNER_SHAPE = RoundedCornerShape(14.dp)
@@ -52,7 +54,6 @@ private val WARN_ICON = 16.dp
 private val STRIP_AVATAR = 26.dp
 private val STRIP_AVATAR_OVERLAP = (-6).dp
 private val STRIP_AVATAR_RING = 2.dp
-private const val PREVIEW_CHARS = 30
 
 /** API 未配置提示条（§3.2「提示条」）：14 圆角 · 10/14 内距 · warningContainer 底 + onWarning 字 13 + Warning 16。 */
 @Composable
@@ -81,7 +82,11 @@ fun LiuliCircleStrip(state: MomentsHubState, onClick: () -> Unit, modifier: Modi
     val colors = AppTheme.colors
     val title = stringResource(R.string.moment_nav_title)
     LiuliHubCard(onClick = onClick, onClickLabel = title, modifier = modifier) {
-        LiuliStripHeader(title = title, subText = stringResource(R.string.moment_hub_circle_subtitle)) {
+        LiuliStripHeader(
+            title = title,
+            subText = stringResource(R.string.moment_hub_circle_subtitle),
+            leading = { LiuliIconTile(AppNavIcons.Moments, LiuliTileTone.Sky) },
+        ) {
             LiuliUnreadPill(state.unreadCount)
             if (state.unreadCount > 0) Spacer(Modifier.width(6.dp))
         }
@@ -117,11 +122,11 @@ private fun LiuliCirclePreview(state: MomentsHubState) {
     val meLabel = stringResource(R.string.moment_author_me)
     val aiLabel = stringResource(R.string.moment_author_ai)
     posts.forEachIndexed { index, post ->
-        val author = previewAuthor(post, state.charactersByUuid, meLabel, aiLabel)
+        val author = momentsHubPreviewAuthor(post, state.charactersByUuid, meLabel, aiLabel)
         Text(
             buildAnnotatedString {
                 withStyle(SpanStyle(color = colors.accent.text, fontWeight = FontWeight.SemiBold)) { append("$author：") }
-                withStyle(SpanStyle(color = colors.text.secondary)) { append(post.content.take(PREVIEW_CHARS).replace("\n", " ")) }
+                withStyle(SpanStyle(color = colors.text.secondary)) { append(momentsHubPostPreview(post.content)) }
             },
             style = AppTypography.secondary,
             maxLines = 1,
@@ -135,8 +140,7 @@ private fun LiuliCirclePreview(state: MomentsHubState) {
 @Composable
 fun LiuliGridCard(
     icon: ImageVector,
-    tileTint: Color,
-    tileInk: Color,
+    tone: LiuliTileTone,
     title: String,
     body: String,
     badgeText: String?,
@@ -150,13 +154,13 @@ fun LiuliGridCard(
         modifier = modifier.heightIn(min = LiuliHomeGeometry.gridCardMinHeight),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            LiuliIconTile(icon, tileTint, tileInk)
+            LiuliIconTile(icon, tone)
             if (badgeText != null) {
                 Spacer(Modifier.weight(1f))
                 Text(
-                    badgeText, color = colors.accent.onPrimary,
+                    badgeText, color = Palette.White,
                     style = AppTypography.caption.copy(fontSize = 10.sp, fontWeight = FontWeight.W600),
-                    modifier = Modifier.clip(LiuliShapes.pill).background(colors.accent.primary).padding(horizontal = 6.dp, vertical = 3.dp),
+                    modifier = Modifier.clip(LiuliShapes.pill).background(LiuliMaterials.accentBrush).padding(horizontal = 6.dp, vertical = 3.dp),
                 )
             }
         }
@@ -167,63 +171,30 @@ fun LiuliGridCard(
     }
 }
 
-/** 日记方卡：`status.successContainer` 图标块（A-12）+ 最新一篇预览 + 未读评论徽标。 */
+/** 日记方卡：薄荷图标块（卷三 §4.10）+ 最新一篇预览 + 未读评论徽标。 */
 @Composable
 fun LiuliDiaryCard(state: MomentsHubState, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = AppTheme.colors
     LiuliGridCard(
         icon = AppFeatureIcons.Diary,
-        tileTint = colors.status.successContainer,
-        tileInk = colors.status.onSuccess,
+        tone = LiuliTileTone.Mint,
         title = stringResource(R.string.moment_hub_diary),
-        body = liuliDiaryPreviewText(state),
+        body = momentsHubDiaryPreviewText(state),
         badgeText = if (state.diaryUnreadCount > 0) stringResource(R.string.diary_unread_badge, state.diaryUnreadCount) else null,
         onClick = onClick,
         modifier = modifier,
     )
 }
 
-/** 故事方卡：`accent.container` 图标块（A-12）+ 连载进度三态。 */
+/** 故事方卡：丁香图标块（卷三 §4.10）+ 连载进度三态。 */
 @Composable
 fun LiuliStoryCard(state: MomentsHubState, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = AppTheme.colors
     LiuliGridCard(
         icon = AppFeatureIcons.Story,
-        tileTint = colors.accent.container,
-        tileInk = colors.accent.onContainer,
+        tone = LiuliTileTone.Lilac,
         title = stringResource(R.string.moment_hub_story),
-        body = liuliStoryPreviewText(state),
+        body = momentsHubStoryPreviewText(state),
         badgeText = null,
         onClick = onClick,
         modifier = modifier,
     )
-}
-
-/** 故事卡 body：连载进度三态（判据借 `storyHubStatus` 纯函数·只搬文案装配）。 */
-@Composable
-internal fun liuliStoryPreviewText(state: MomentsHubState): String = when (val s = storyHubStatus(state.latestStory)) {
-    is StoryHubStatus.Chapter -> stringResource(R.string.story_hub_chapter, s.number, s.title)
-    StoryHubStatus.NoChapter -> stringResource(R.string.story_hub_no_chapter)
-    StoryHubStatus.None -> stringResource(R.string.moment_hub_story_desc)
-}
-
-/** 日记卡 body：最新一篇非草稿日记的「心情 emoji + 正文前 30」；无则默认描述（照暖陶 F6 逐字）。 */
-@Composable
-internal fun liuliDiaryPreviewText(state: MomentsHubState): String {
-    val entry = state.latestDiary ?: return stringResource(R.string.moment_hub_diary_desc)
-    val body = entry.content.take(PREVIEW_CHARS).replace("\n", " ")
-    if (body.isBlank()) return stringResource(R.string.moment_hub_diary_desc)
-    val emoji = entry.moodEmoji
-    return if (!emoji.isNullOrEmpty()) "$emoji $body" else body
-}
-
-/** 预览作者名（本地化「我」/ 角色名 / 「AI」回落·照暖陶 F6 逐字）。 */
-private fun previewAuthor(
-    post: MomentPostEntity,
-    charactersByUuid: Map<String, CharacterEntity>,
-    meLabel: String,
-    aiLabel: String,
-): String = when (MomentAuthorType.fromRaw(post.authorTypeRaw)) {
-    MomentAuthorType.USER -> meLabel
-    MomentAuthorType.CHARACTER -> post.characterUuid?.let { charactersByUuid[it]?.name } ?: aiLabel
 }

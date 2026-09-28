@@ -190,6 +190,10 @@ class MomentRepository @Inject constructor(
     suspend fun recentUserPostsInWindow(after: Long, before: Long, limit: Int): List<MomentPostEntity> =
         dao.recentUserPostsInWindow(after, before, limit)
 
+    /** Scenario D: non-deleted user posts with mentions in `(after, before)` (newest first). */
+    suspend fun recentUserPostsWithMentionsInWindow(after: Long, before: Long, limit: Int): List<MomentPostEntity> =
+        dao.recentUserPostsWithMentionsInWindow(after, before, limit)
+
     /** Scenario C: non-deleted AI posts in `(after, before)` (newest first). */
     suspend fun recentCharacterPostsInWindow(after: Long, before: Long, limit: Int): List<MomentPostEntity> =
         dao.recentCharacterPostsInWindow(after, before, limit)

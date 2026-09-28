@@ -55,6 +55,8 @@ import com.situ.aichat.ui.designsystem.AppDialog
 import com.situ.aichat.ui.designsystem.AppMenu
 import com.situ.aichat.ui.designsystem.AppMenuItem
 import com.situ.aichat.ui.designsystem.AppSpacing
+import com.situ.aichat.ui.designsystem.AppTheme
+import com.situ.aichat.ui.designsystem.AppTypography
 import com.situ.aichat.ui.designsystem.AppTextField
 import com.situ.aichat.ui.designsystem.AppTopBar
 import com.situ.aichat.prompt.PromptModule
@@ -81,6 +83,7 @@ internal fun sceneName(scene: PromptScene): String = stringResource(
 fun PromptModuleSettingsScreen(
     onBack: () -> Unit,
     onOpenImmersiveSettings: () -> Unit, // §4-U5 叙事卡→沉浸设置页
+    onOpenContextLog: () -> Unit, // 四期·图纸二 省钱卡「看日志」
     viewModel: PromptModuleSettingsViewModel = hiltViewModel(),
 ) {
     val modules by viewModel.modules.collectAsStateWithLifecycle()
@@ -88,6 +91,7 @@ fun PromptModuleSettingsScreen(
     // settings-misc-2：表情包模块行受「角色发送表情包」总开关 gating。
     val canSendStickers by viewModel.characterCanSendStickersEnabled.collectAsStateWithLifecycle()
     val narrativeDetailRaw by viewModel.offlineNarrativeDetailRaw.collectAsStateWithLifecycle() // §4-U5 叙事卡回显
+    val saver by viewModel.cacheSaver.collectAsStateWithLifecycle() // 四期·图纸二 省钱卡
 
     // All remember() calls stay above the early return so the edit↔list switch never skips a slot.
     var editing by remember { mutableStateOf<PromptModule?>(null) }
@@ -157,6 +161,7 @@ fun PromptModuleSettingsScreen(
                     Text(stringResource(R.string.pm_tip_3), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            if (saver.visible) item { CacheSaverCard(saver, viewModel::setCacheSaverEnabled, onOpenContextLog, Modifier.padding(horizontal = AppSpacing.screenGutter).padding(bottom = AppSpacing.l)) }
             item {
                 Row(
                     Modifier
@@ -196,9 +201,9 @@ fun PromptModuleSettingsScreen(
             }
 
             sectionHeader(R.string.pm_section_prefix)
-            moduleSection(visible(PromptModulePosition.PREFIX), R.string.pm_empty_prefix, canSendStickers, sceneFilter, viewModel::toggle, openEdit, viewModel::move)
+            moduleSection(visible(PromptModulePosition.PREFIX), R.string.pm_empty_prefix, canSendStickers, sceneFilter, saver.enabled, viewModel::toggle, openEdit, viewModel::move)
             sectionHeader(R.string.pm_section_suffix)
-            moduleSection(visible(PromptModulePosition.SUFFIX), R.string.pm_empty_suffix, canSendStickers, sceneFilter, viewModel::toggle, openEdit, viewModel::move)
+            moduleSection(visible(PromptModulePosition.SUFFIX), R.string.pm_empty_suffix, canSendStickers, sceneFilter, saver.enabled, viewModel::toggle, openEdit, viewModel::move)
             if (sceneFilter == PromptScene.OFFLINE_MEETING) { // 线下 tab 底部叙事预设跳转卡（§4-U5·只读·不排序）
                 item { NarrativePresetCard(levelRaw = narrativeDetailRaw, onClick = onOpenImmersiveSettings) }
             }
@@ -244,6 +249,7 @@ private fun LazyListScope.moduleSection(
     emptyRes: Int,
     canSendStickers: Boolean,
     sceneFilter: PromptScene?,
+    cacheSaverOn: Boolean,
     onToggle: (String) -> Unit,
     onEdit: (PromptModule) -> Unit,
     onMove: (String, Boolean) -> Unit,
@@ -268,6 +274,8 @@ private fun LazyListScope.moduleSection(
             sceneFilter = sceneFilter,
             // settings-misc-2：表情包系统模块在总开关关闭时灰置不可交互（保留勾选偏好）。
             isDisabledByParentToggle = module.systemModuleType == SystemModuleType.STICKER_LIBRARY && !canSendStickers,
+            saverHint = cacheSaverOn && module.isEnabled && module.systemModuleType == SystemModuleType.CHARACTER_MEMORY &&
+                module.position == PromptModulePosition.PREFIX, // 关掉的模块不提示（复核 R1 🔵）
             onToggle = { onToggle(module.id) },
             onEdit = { onEdit(module) },
             onMoveUp = { onMove(module.id, true) },
@@ -283,6 +291,7 @@ private fun ModuleRow(
     isLast: Boolean,
     sceneFilter: PromptScene?,
     isDisabledByParentToggle: Boolean,
+    saverHint: Boolean,
     onToggle: () -> Unit,
     onEdit: () -> Unit,
     onMoveUp: () -> Unit,
@@ -334,6 +343,8 @@ private fun ModuleRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            // 四期·图纸二 §4.3：省钱模式开着时，前置区的角色记忆行说明「相关的旧聊天」已挪位并改写成叙述句。
+            if (saverHint) Text(stringResource(R.string.pm_saver_module_hint), style = AppTypography.caption, color = AppTheme.colors.status.onSuccess, modifier = Modifier.padding(top = 3.dp))
         }
         IconButton(onClick = onMoveUp, enabled = !isFirst) {
             Icon(Icons.Filled.ArrowUpward, contentDescription = stringResource(R.string.pm_move_up))

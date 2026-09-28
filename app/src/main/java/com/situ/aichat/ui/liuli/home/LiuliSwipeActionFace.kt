@@ -1,6 +1,5 @@
 package com.situ.aichat.ui.liuli.home
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -23,8 +22,9 @@ import androidx.compose.ui.unit.dp
 import com.situ.aichat.ui.chat.SwipeAction
 import com.situ.aichat.ui.designsystem.AppTheme
 import com.situ.aichat.ui.designsystem.AppTypography
+import com.situ.aichat.ui.liuli.designsystem.liuliPressBrighten
 import com.situ.aichat.ui.liuli.designsystem.liuliPressable
-import com.situ.aichat.ui.liuli.glass.LiuliGlassStyle
+import com.situ.aichat.ui.liuli.glass.LiuliGlassRole
 import com.situ.aichat.ui.liuli.glass.liuliGlass
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
 
@@ -36,7 +36,8 @@ private val LABEL_TOP = 4.dp
 /**
  * 琉璃的左滑动作面（图纸 2026-09-06 卷四 A-12·卷三B ②）。
  *
- * 76 宽的面**底是纸面**（`surface.base`·与行同色，滑开时像是「行让开露出下面的纸」），中央一枚 44 玻璃圆钮
+ * 76 宽的面**不铺底**（卷三：行住在半透明分段卡里，面由 `SwipeActionsRow(translucentContent = true)` 只画在滑开
+ * 露出的那一截·关着时一像素不画），中央一枚 44 玻璃圆钮
  * （Button 档）+ 图标 + 一行 11 号小字。暖陶那边是整块实色面——两张脸的动作面长相不同，但手势 / 吸附 /
  * 触觉 / a11y `customActions` 全在 `SwipeActionsRow` 里共用一份机制（只经 add-only 的 `actionFace` 形参换脸）。
  *
@@ -53,7 +54,6 @@ fun LiuliSwipeActionFace(action: SwipeAction, modifier: Modifier, onClick: () ->
     val interaction = remember { MutableInteractionSource() }
     Column(
         modifier = modifier
-            .background(colors.surface.base)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -67,9 +67,10 @@ fun LiuliSwipeActionFace(action: SwipeAction, modifier: Modifier, onClick: () ->
     ) {
         Box(
             modifier = Modifier
-                .liuliPressable(interactionSource = interaction, enabled = true, brighten = true)
+                .liuliPressable(interactionSource = interaction, enabled = true)
                 .size(BUTTON)
-                .liuliGlass(CircleShape, dark = dark, style = LiuliGlassStyle.Button),
+                .liuliGlass(CircleShape, dark = dark, role = LiuliGlassRole.Button)
+                .liuliPressBrighten(interaction, enabled = true),
             contentAlignment = Alignment.Center,
         ) {
             Icon(action.icon, contentDescription = null, tint = action.contentColor, modifier = Modifier.size(ICON))

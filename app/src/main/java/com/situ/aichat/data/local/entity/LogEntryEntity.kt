@@ -45,4 +45,25 @@ data class LogEntryEntity(
     val cacheHitTokens: Int = 0,
     val cacheMissTokens: Int = 0,
     val isTokenEstimated: Boolean = true,
+    // —— 时间感知四期·图纸三（v51）：对话 / 轮次关联 + 实际发送 + 请求形状 + 失败分类 ——
+    /** 所属会话 uuid（聊天 / 语音回合、回合带出的后台调用、补回复、余温、图片理解）；其余后台任务 = null。 */
+    val conversationUuid: String? = null,
+    /** 角色 uuid（有 [com.situ.aichat.diagnostics.LogTrace] 时记）；其余 null，照旧按 [characterName] 归组。 */
+    val characterUuid: String? = null,
+    /** 轮次 id：同一轮的主调用与它带出的后台调用共用；非回合调用 = null。 */
+    val turnId: String? = null,
+    /** 锚点消息 uuid：聊天回合 = 本轮第一条用户消息；图片理解 = 那条图片消息；其余 null。 */
+    val anchorMessageUuid: String? = null,
+    /** 服务商类型（[com.situ.aichat.data.model.ApiProviderType.raw]）；没捕获到请求 = null。 */
+    val providerType: String? = null,
+    /** 发送前改写计数（[com.situ.aichat.diagnostics.LogSendAdaptation] 的 JSON）；'' = 没捕获到请求。 */
+    @ColumnInfo(defaultValue = "''") val sendAdaptationJson: String = "",
+    /** 实际发出的请求体（媒体换替身·不含 key）；仅「记录完整详细内容」开着时存，否则 ''。 */
+    @ColumnInfo(defaultValue = "''") val requestJson: String = "",
+    /** 请求形状（[com.situ.aichat.diagnostics.LogRequestShape] 的 JSON：逐条指纹 / 角色 / 估算 token / 时间标记）；恒存，不含正文。 */
+    @ColumnInfo(defaultValue = "''") val shapeJson: String = "",
+    /** 失败分类（[com.situ.aichat.diagnostics.LlmFailureKind.raw]）；成功 = null；v50 老失败行 = null（读时按 [errorMessage] 现算）。 */
+    val failureKind: String? = null,
+    /** HTTP 状态码（能取到时）。 */
+    val httpStatus: Int? = null,
 )

@@ -393,7 +393,7 @@ class DiaryExchangeTest {
         // 丰富化依赖默认空（不关心丰富化的用例走这条·enrichment 各段自动省略）。
         coEvery { milestoneDao.getForCharacter(any()) } returns emptyList()
         coEvery { promiseRepository.injectableForCharacter(any(), any()) } returns emptyList()
-        coEvery { openLoopRepository.openLoopsForCharacter(any()) } returns emptyList()
+        coEvery { openLoopRepository.openLoopsForChat(any()) } returns emptyList()
         coEvery { apiConfigRepo.resolveConfigValues(any()) } returns mockk<ApiConfigValues>()
         coEvery {
             contextLog.completion(any(), any(), any(), any(), any(), any(), any(), any(), any())
@@ -465,7 +465,7 @@ class DiaryExchangeTest {
         // C 惦记块（复核 R1 补钉）：open 无到期 → selectLoopsForInjection(lastAssistantTime=null)=今天首轮 → 取最新 open。
         every { context.getString(R.string.pb_loop_head) } returns "## 你心里还惦记的事"
         every { context.getString(R.string.pb_loop_line, *anyVararg()) } returns "- 你还惦记着：想去的那家咖啡店"
-        coEvery { openLoopRepository.openLoopsForCharacter("c1") } returns listOf(
+        coEvery { openLoopRepository.openLoopsForChat("c1") } returns listOf(
             OpenLoopEntity(
                 uuid = "l1", conversationUuid = "cv1", characterUuid = "c1",
                 content = "想去的那家咖啡店", typeRaw = OpenLoopType.USER_EVENT, createdAt = 0L,

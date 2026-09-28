@@ -43,8 +43,8 @@ import com.situ.aichat.ui.chat.rememberChatSheetsState
 import com.situ.aichat.ui.chat.rememberMessageDeleteSound
 import com.situ.aichat.ui.chat.rememberMicPermissionState
 import com.situ.aichat.ui.components.LocalAppHaptics
-import com.situ.aichat.ui.liuli.glass.BackdropState
-import com.situ.aichat.ui.liuli.glass.rememberBackdropState
+import com.situ.aichat.ui.liuli.glass.LiuliGlassHostState
+import com.situ.aichat.ui.liuli.glass.rememberLiuliGlassHostState
 import com.situ.aichat.ui.voicecall.VoiceCallPreflightViewModel
 import com.situ.aichat.ui.voicecall.VoiceSetupNeed
 import kotlinx.coroutines.launch
@@ -81,7 +81,7 @@ internal class LiuliChatSession(
     val emotionPlayed: MutableList<String>,
     val emotionHiddenIntervals: MutableList<LongRange>,
     val snackbarHost: SnackbarHostState,
-    val backdrop: BackdropState,
+    val glassHost: LiuliGlassHostState,
     /** 视觉底部第一条可见项不是最新一条 → 出回底钮（反转口径·照抄暖陶 `ChatScreen.kt:451-453`）。 */
     val showScrollDownState: State<Boolean>,
     /** 贴近底部（决定上翻加载触发与回底缩窗·照抄 `ChatScreen.kt:455-457`）。 */
@@ -137,7 +137,7 @@ internal fun rememberLiuliChatSession(
     val haptics = LocalAppHaptics.current
     val playDeleteSound = rememberMessageDeleteSound()
     val snackbarHost = remember { SnackbarHostState() }
-    val backdrop = rememberBackdropState()
+    val glassHost = rememberLiuliGlassHostState()
 
     val sheets = rememberChatSheetsState()
     val softwareKeyboard = LocalSoftwareKeyboardController.current
@@ -244,7 +244,7 @@ internal fun rememberLiuliChatSession(
 
     return remember(
         sheets, inputPanel, micPermission, listState, scrollCoordinator, dismissKeyboardOnDrag,
-        sendFlight, immersiveMenu, reaction, fold, imageState, actions, snackbarHost, backdrop,
+        sendFlight, immersiveMenu, reaction, fold, imageState, actions, snackbarHost, glassHost,
     ) {
         LiuliChatSession(
             sheets = sheets,
@@ -267,7 +267,7 @@ internal fun rememberLiuliChatSession(
             emotionPlayed = emotionPlayed,
             emotionHiddenIntervals = emotionHiddenIntervals,
             snackbarHost = snackbarHost,
-            backdrop = backdrop,
+            glassHost = glassHost,
             showScrollDownState = showScrollDownState,
             isNearBottomState = isNearBottomState,
             inputState = inputState,

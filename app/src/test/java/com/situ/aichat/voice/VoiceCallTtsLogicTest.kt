@@ -29,6 +29,31 @@ class VoiceCallTtsLogicTest {
         assertEquals("嗯", r.remainder)
     }
 
+    // ---- cutSentencesHoldingSystemNote（时间感知四期·图纸一 复核 R1：【系统说明】整块回声不念） ----
+
+    @Test
+    fun systemNote_closedBlock_strippedBeforeCutting() {
+        val r = VoiceCallTtsLogic.cutSentencesHoldingSystemNote("好呀。【系统说明】\n现在：9月26日 周六 21:40\n【/系统说明】\n那说定了。")
+        assertEquals(listOf("好呀。", "那说定了。"), r.sentences)
+        assertEquals("", r.remainder)
+    }
+
+    @Test
+    fun systemNote_unclosedBlock_heldInBuffer_thenDroppedWhenClosed() {
+        val first = VoiceCallTtsLogic.cutSentencesHoldingSystemNote("嗯。【系统说明】\n现在：9月26日\n")
+        assertEquals(listOf("嗯。"), first.sentences)
+        assertEquals("【系统说明】\n现在：9月26日\n", first.remainder)
+        val second = VoiceCallTtsLogic.cutSentencesHoldingSystemNote(first.remainder + "周六 21:40\n【/系统说明】\n晚安。")
+        assertEquals(listOf("晚安。"), second.sentences)
+        assertEquals("", second.remainder)
+    }
+
+    @Test
+    fun systemNote_absent_sameAsCutSentences() {
+        val text = "你好。在吗？嗯"
+        assertEquals(VoiceCallTtsLogic.cutSentences(text), VoiceCallTtsLogic.cutSentencesHoldingSystemNote(text))
+    }
+
     @Test
     fun cut_noEnding_bufferKept() {
         val r = VoiceCallTtsLogic.cutSentences("没有标点的句子")

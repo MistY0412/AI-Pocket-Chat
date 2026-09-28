@@ -41,6 +41,7 @@ import com.situ.aichat.ui.designsystem.AppTypography
 import com.situ.aichat.ui.liuli.designsystem.LiuliCircleButton
 import com.situ.aichat.ui.liuli.designsystem.LiuliShapes
 import com.situ.aichat.ui.liuli.designsystem.LiuliTheme
+import com.situ.aichat.ui.liuli.designsystem.liuliPressLight
 import com.situ.aichat.ui.liuli.glass.liuliGlass
 import com.situ.aichat.ui.liuli.page.liuliFootprint
 import com.situ.aichat.ui.theme.LocalIsDarkTheme
@@ -99,6 +100,7 @@ internal fun LiuliChatTopBar(
                 .weight(1f)
                 .height(LiuliChatGeometry.topBarHeight)
                 .liuliGlass(LiuliShapes.pill, dark = dark)
+                .liuliPressLight(dark, enabled = characterUuid != null)
                 .then(
                     characterUuid?.let { uuid ->
                         Modifier.clickable(onClickLabel = openProfileLabel, role = Role.Button) { onOpenProfile(uuid) }
@@ -132,6 +134,7 @@ internal fun LiuliChatTopBar(
                 modifier = Modifier
                     .height(40.dp)
                     .liuliGlass(LiuliShapes.pill, dark = dark)
+                    .liuliPressLight(dark)
                     .clickable(role = Role.Button, onClick = onEndMeeting)
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
